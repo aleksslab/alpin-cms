@@ -30,7 +30,7 @@
                 const template = document.getElementById('tmpl-slider-slide');
                 if (!template) return;
                 
-                const index = container.querySelectorAll('.slide-item-card').length;
+                const index = container.querySelectorAll('.slide-item-card').length + 1;
                 let html = template.innerHTML;
                 html = html.replace(/__INDEX__/g, index);
                 const temp = document.createElement('div');
