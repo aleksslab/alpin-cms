@@ -1,0 +1,36 @@
+/**
+ * Счетчики (Статистика) — стили для сайта
+ */
+
+.stat-item {
+    transition: transform 0.3s ease;
+}
+
+.stat-item:hover {
+    transform: translateY(-4px);
+}
+
+.stat-value {
+    line-height: 1.2;
+    transition: color 0.3s ease;
+}
+
+.stat-item:hover .stat-value {
+    color: var(--primary-color, #10B981);
+}
+
+/* Адаптив для маленьких экранов */
+@media (max-width: 640px) {
+    .stat-value {
+        font-size: 2rem !important;
+    }
+    
+    .grid.gap-8 {
+        gap: 1.5rem;
+    }
+}
+
+/* Для модуля в контексте страницы */
+.stats-module .stat-item:last-child {
+    margin-bottom: 0;
+}

@@ -1,0 +1,195 @@
+{
+    "carousel": {
+        "name": "Слайдер",
+        "icon": "icon-image",
+        "description": "Слайдер с изображениями и текстом",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "cards": {
+        "name": "Плитка с карточками",
+        "icon": "icon-award",
+        "description": "Сетка карточек с изображением, названием и ссылкой",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "icons-list": {
+        "name": "Список с иконками",
+        "icon": "icon-list",
+        "description": "Элементы с иконкой, заголовком и описанием",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "text-media": {
+        "name": "Текст + Медиа",
+        "icon": "icon-file-text",
+        "description": "Блок с текстом и изображением, особенностями и статистикой",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "hero": {
+        "name": "Обложка (Hero)",
+        "icon": "icon-layout-dashboard",
+        "description": "Полноэкранный баннер с заголовком и кнопкой",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "text": {
+        "name": "Произвольный HTML\/текст",
+        "icon": "icon-file-text",
+        "description": "Блок с произвольным HTML\/текстом",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "calculator": {
+        "name": "Калькулятор корма",
+        "icon": "icon-calculator",
+        "description": "Интерактивный калькулятор подбора порции для собак и кошек",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "contacts": {
+        "name": "Контакты",
+        "icon": "icon-phone",
+        "description": "Контактная информация, форма обратной связи и карта",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "faq": {
+        "name": "FAQ (Вопрос-Ответ)",
+        "icon": "icon-help-circle",
+        "description": "Аккордеон с вопросами и ответами",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "lead-form": {
+        "name": "Форма захвата лидов",
+        "icon": "icon-mail",
+        "description": "Готовая форма обратной связи с настройками полей",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "stats": {
+        "name": "Счетчики (Статистика)",
+        "icon": "icon-trending-up",
+        "description": "Блок со счетчиками и анимацией при скролле",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "countdown": {
+        "name": "Таймер обратного отсчета",
+        "icon": "icon-clock",
+        "description": "Таймер до указанной даты с визуальным оформлением",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "brands-marquee": {
+        "name": "Бегущая лента",
+        "icon": "icon-images",
+        "description": "Бесконечная лента с логотипами партнеров и клиентов",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "timeline": {
+        "name": "Временная шкала",
+        "icon": "icon-timeline",
+        "description": "Отображение этапов работы, истории или плана действий",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "testimonials": {
+        "name": "Отзывы клиентов",
+        "icon": "icon-message-square",
+        "description": "Отзывы клиентов с фото, видео и рейтингом",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "before-after": {
+        "name": "До и После",
+        "icon": "icon-split",
+        "description": "Слайдер для сравнения двух изображений",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "slider-advanced": {
+        "name": "Слайдер продвинутый",
+        "icon": "icon-images",
+        "description": "Полноэкранный слайдер с эффектами перехода",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "pricing": {
+        "name": "Тарифная сетка",
+        "icon": "icon-credit-card",
+        "description": "Тарифы с переключателем месячной\/годовой оплаты",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "map-advanced": {
+        "name": "Яндекс.Карты",
+        "icon": "icon-map-pin",
+        "description": "Интерактивная карта с кастомными метками",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "portfolio": {
+        "name": "Портфолио",
+        "icon": "icon-grid",
+        "description": "Сетка портфолио с фильтрацией по категориям",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "quiz": {
+        "name": "Квиз",
+        "icon": "icon-message-square",
+        "description": "Интерактивный квиз для сбора данных и квалификации лидов",
+        "has_settings": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "social-icons": {
+        "name": "Социальные иконки",
+        "icon": "icon-share-2",
+        "description": "Иконки социальных сетей из настроек сайта",
+        "has_settings": true,
+        "auto_unpack": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "site-menu": {
+        "name": "Меню сайта",
+        "icon": "icon-menu",
+        "description": "Выводит любое созданное в системе меню в виде списка ссылок",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    }
+}

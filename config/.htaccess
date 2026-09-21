@@ -1,0 +1,13 @@
+# Локальные настройки безопасности панели конфигурации
+
+# 1. Отключаем движок перенаправлений для этой папки (защита от ЧПУ главного сайта)
+<IfModule mod_rewrite.c>
+    RewriteEngine Off
+</IfModule>
+
+# 2. Запрещаем просмотр содержимого подпапок из браузера (ошибка 403 Forbidden)
+Options -Indexes
+<IfModule mod_autoindex.c>
+    IndexIgnore *
+</IfModule>
+

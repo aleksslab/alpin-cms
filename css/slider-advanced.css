@@ -1,0 +1,100 @@
+/**
+ * Слайдер продвинутый — стили для сайта
+ */
+
+.carousel-prev,
+.carousel-next {
+    transition: all 0.3s ease;
+}
+
+.carousel-prev:hover,
+.carousel-next:hover {
+    background: rgba(255,255,255,0.4);
+}
+
+.carousel-dot {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.carousel-dot:hover {
+    background: rgba(255,255,255,0.6);
+}
+
+/* Адаптив */
+@media (max-width: 768px) {
+    .carousel-module .relative {
+        height: 400px !important;
+    }
+    
+    .carousel-prev,
+    .carousel-next {
+        width: 40px;
+        height: 40px;
+        opacity: 1 !important;
+    }
+    
+    .carousel-prev {
+        left: 12px;
+    }
+    
+    .carousel-next {
+        right: 12px;
+    }
+    
+    .carousel-module .bg-white\/10 {
+        padding: 1.25rem;
+        max-width: 90%;
+    }
+    
+    .carousel-module h3 {
+        font-size: 1.5rem;
+    }
+    
+    .carousel-module p {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .carousel-module .relative {
+        height: 300px !important;
+    }
+    
+    .carousel-prev,
+    .carousel-next {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .carousel-module .bg-white\/10 {
+        padding: 1rem;
+    }
+    
+    .carousel-module h3 {
+        font-size: 1.25rem;
+    }
+    
+    .carousel-module p {
+        font-size: 0.875rem;
+    }
+    
+    .carousel-module .absolute.bottom-8 {
+        bottom: 12px;
+        padding: 4px 12px;
+        gap: 6px;
+    }
+    
+    .carousel-dot {
+        width: 6px;
+        height: 6px;
+    }
+    
+    .carousel-dot.h-2 {
+        height: 6px !important;
+    }
+    
+    .carousel-dot.w-8 {
+        width: 20px !important;
+    }
+}

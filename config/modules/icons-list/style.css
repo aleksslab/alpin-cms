@@ -1,0 +1,22 @@
+/**
+ * Список с иконками — стили для админки
+ */
+
+/* Превью иконки */
+.icon-preview-wrapper {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-preview-wrapper .js-icon-preview-icon {
+    font-size: 1.5rem;
+    color: var(--primary-color, #10B981);
+}

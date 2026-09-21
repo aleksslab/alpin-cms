@@ -1,0 +1,42 @@
+/* Стили для админки текстового модуля */
+.text-module-settings .editor-field {
+    margin-bottom: 1rem;
+}
+
+.text-module-settings .editor-field:last-child {
+    margin-bottom: 0;
+}
+
+.text-module-settings label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+
+.text-module-settings input,
+.text-module-settings select {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    color: #1e293b;
+    outline: none;
+}
+
+.text-module-settings input:focus,
+.text-module-settings select:focus {
+    border-color: var(--primary-color);
+}
+
+.text-module-settings #text-editor-container {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    height: 300px;
+}

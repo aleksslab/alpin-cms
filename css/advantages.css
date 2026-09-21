@@ -1,0 +1,9 @@
+/* Стили для модуля advantages (уже есть в style.css, но вынесем отдельно) */
+#advantages .icon-leaf::before,
+#advantages .icon-shield-check::before,
+#advantages .icon-heart::before,
+#advantages .icon-bone::before,
+#advantages .icon-activity::before,
+#advantages .icon-sparkles::before {
+    font-size: 1.75rem;
+}

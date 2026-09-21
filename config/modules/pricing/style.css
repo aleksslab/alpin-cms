@@ -1,0 +1,21 @@
+/**
+ * Тарифная сетка — стили для админки
+ */
+
+.icon-preview-wrapper {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-preview-wrapper .js-icon-preview-icon {
+    font-size: 1.25rem;
+    color: var(--primary-color, #10B981);
+}

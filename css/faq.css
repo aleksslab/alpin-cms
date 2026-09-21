@@ -1,0 +1,36 @@
+/**
+ * FAQ — стили для сайта
+ */
+
+.faq-item {
+    transition: border-color 0.2s;
+}
+
+.faq-item:hover {
+    border-color: var(--primary-color, #10B981);
+}
+
+.faq-item .faq-answer {
+    transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+.faq-item .faq-icon {
+    transition: transform 0.3s ease;
+}
+
+.faq-item .faq-icon.rotate-45 {
+    transform: rotate(45deg);
+}
+
+.faq-item.is-open {
+    border-color: var(--primary-color, #10B981);
+}
+
+/* Картинки внутри ответов */
+.faq-answer img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.75rem;
+    margin: 0.75rem 0;
+    display: block;
+}

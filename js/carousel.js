@@ -1,0 +1,109 @@
+/**
+ * Карусель — скрипты для сайта (модуль)
+ */
+(function() {
+    let currentSlide = 0;
+    let slides = [];
+    let dots = [];
+    let carouselInterval;
+
+    function initCarousel() {
+        slides = document.querySelectorAll('.carousel-module .carousel-slide');
+        dots = document.querySelectorAll('.carousel-module .carousel-dot');
+
+        if (!slides.length) return;
+
+        const container = document.querySelector('.carousel-module .relative');
+        const autoplay = container?.dataset?.autoplay === 'true';
+        const interval = parseInt(container?.dataset?.interval) || 6000;
+
+        function showSlide(index) {
+            if (index === currentSlide) return;
+
+            slides[currentSlide].classList.replace('opacity-100', 'opacity-0');
+            slides[currentSlide].classList.replace('z-10', 'z-0');
+            if (dots.length) {
+                dots[currentSlide].classList.replace('w-8', 'w-2');
+                dots[currentSlide].classList.replace('bg-white/80', 'bg-white/50');
+                dots[currentSlide].classList.add('hover:bg-white/80');
+            }
+
+            currentSlide = (index + slides.length) % slides.length;
+
+            slides[currentSlide].classList.replace('opacity-0', 'opacity-100');
+            slides[currentSlide].classList.replace('z-0', 'z-10');
+            if (dots.length) {
+                dots[currentSlide].classList.replace('w-2', 'w-8');
+                dots[currentSlide].classList.replace('bg-white/50', 'bg-white/80');
+                dots[currentSlide].classList.remove('hover:bg-white/80');
+            }
+
+            startCarouselTimer();
+        }
+
+        function nextSlide() {
+            showSlide(currentSlide + 1);
+        }
+
+        function prevSlide() {
+            showSlide(currentSlide - 1);
+        }
+
+        function setSlide(idx) {
+            showSlide(idx);
+        }
+
+        function startCarouselTimer() {
+            clearInterval(carouselInterval);
+            if (autoplay && slides.length > 1) {
+                carouselInterval = setInterval(nextSlide, interval);
+            }
+        }
+
+        // Кнопки
+        document.querySelectorAll('.carousel-module .carousel-prev').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                clearInterval(carouselInterval);
+                prevSlide();
+                startCarouselTimer();
+            });
+        });
+
+        document.querySelectorAll('.carousel-module .carousel-next').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                clearInterval(carouselInterval);
+                nextSlide();
+                startCarouselTimer();
+            });
+        });
+
+        dots.forEach(function(dot, index) {
+            dot.addEventListener('click', function() {
+                clearInterval(carouselInterval);
+                setSlide(index);
+                startCarouselTimer();
+            });
+        });
+
+        const containerEl = document.querySelector('.carousel-module .relative');
+        if (containerEl) {
+            containerEl.addEventListener('mouseenter', function() {
+                clearInterval(carouselInterval);
+            });
+            containerEl.addEventListener('mouseleave', function() {
+                startCarouselTimer();
+            });
+        }
+
+        showSlide(0);
+        startCarouselTimer();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCarousel);
+    } else {
+        initCarousel();
+    }
+})();

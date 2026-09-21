@@ -1,0 +1,1604 @@
+select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 2.5rem !important; /* pr-10 */
+}
+
+/* Кастомные чекбоксы на чистом CSS */
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0 !important;
+    aspect-ratio: 1 / 1 !important;
+    border: 2px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    outline: none !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease-in-out !important;
+    display: grid !important;
+    place-content: center !important;
+}
+input[type="checkbox"]:checked {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+}
+input[type="checkbox"]::before {
+    content: "";
+    width: 10px;
+    height: 6px;
+    border-left: 2px solid white;
+    border-bottom: 2px solid white;
+    transform: rotate(-45deg) translate(1px, -1px);
+    opacity: 0;
+    transition: opacity 0.1s ease-in-out;
+}
+input[type="checkbox"]:checked::before { opacity: 1; }
+input[type="checkbox"]:disabled {
+    background-color: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+    cursor: not-allowed !important;
+}
+
+/* ==========================================================================
+   2. THEME CONFIGURATION (VARIABLES)
+   ========================================================================== */
+:root {
+    --primary-color: #10B981;
+    --primary-dark: #059669;
+    --bg-main: #FFFFFF;
+    --bg-card: #FFFFFF;
+    --bg-section: #F8FAFC;
+    --text-main: #334155;
+    --text-muted: #64748B;
+    --border-color: #F1F5F9;
+}
+/* Тёмная тема */
+/* --- Базовые переменные --- */
+[data-theme="dark"] {
+    --bg-main: #0F172A;
+    --bg-card: #1E293B;
+    --bg-section: #1E293B;
+    --bg-hover: #334155;
+    --bg-input: #0F172A;
+    --text-main: #F1F5F9;
+    --text-muted: #94A3B8;
+    --border-color: #334155;
+    --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+}
+
+/* --- Основной фон --- */
+[data-theme="dark"] body {
+    background-color: var(--bg-main) !important;
+    color: var(--text-main) !important;
+}
+
+/* --- Карточки и блоки --- */
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-white\/90 {
+    background-color: var(--bg-card) !important;
+}
+
+[data-theme="dark"] .bg-slate-50,
+[data-theme="dark"] .bg-slate-50\/50,
+[data-theme="dark"] .bg-slate-100 {
+    background-color: var(--bg-section) !important;
+}
+
+[data-theme="dark"] .bg-slate-200 {
+    background-color: var(--bg-hover) !important;
+}
+
+/* --- Текст --- */
+[data-theme="dark"] .text-slate-800,
+[data-theme="dark"] .text-slate-700,
+[data-theme="dark"] .text-slate-600,
+[data-theme="dark"] .text-slate-900 {
+    color: var(--text-main) !important;
+}
+
+[data-theme="dark"] .text-slate-500,
+[data-theme="dark"] .text-slate-400 {
+    color: var(--text-muted) !important;
+}
+
+/* --- Границы --- */
+[data-theme="dark"] .border-slate-100,
+[data-theme="dark"] .border-slate-200,
+[data-theme="dark"] .border-slate-300 {
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .border-b {
+    border-bottom-color: var(--border-color) !important;
+}
+[data-theme="dark"] .border-t {
+    border-top-color: var(--border-color) !important;
+}
+[data-theme="dark"] .border-r {
+    border-right-color: var(--border-color) !important;
+}
+[data-theme="dark"] .border-l {
+    border-left-color: var(--border-color) !important;
+}
+
+/* --- Тени --- */
+[data-theme="dark"] .shadow-sm {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3) !important;
+}
+[data-theme="dark"] .shadow-lg {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4) !important;
+}
+[data-theme="dark"] .shadow-xl {
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.4) !important;
+}
+[data-theme="dark"] .shadow-2xl {
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5) !important;
+}
+
+/* --- Ховеры --- */
+[data-theme="dark"] .hover\:bg-slate-50:hover,
+[data-theme="dark"] .hover\:bg-slate-100:hover {
+    background-color: var(--bg-hover) !important;
+}
+[data-theme="dark"] .hover\:text-slate-800:hover {
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] .hover\:text-slate-600:hover {
+    color: var(--text-main) !important;
+}
+
+/* --- Сайдбар --- */
+[data-theme="dark"] .admin-sidebar-panel {
+    background-color: var(--bg-card) !important;
+    border-right-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .sidebar-menu-link {
+    color: var(--text-muted) !important;
+}
+[data-theme="dark"] .sidebar-menu-link:hover {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] .sidebar-menu-link.active {
+    background-color: #064E3B !important;
+    color: #34D399 !important;
+    border-color: #065F46 !important;
+}
+
+[data-theme="dark"] .sidebar-group-title {
+    color: var(--text-muted) !important;
+}
+[data-theme="dark"] .sidebar-group-title:hover {
+    color: var(--text-main) !important;
+}
+
+/* --- Инпуты, селекты, textarea --- */
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="email"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+    background-color: var(--bg-input) !important;
+    color: var(--text-main) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15) !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+    color: var(--text-muted) !important;
+}
+
+/* --- Модалки --- */
+[data-theme="dark"] .modal-content-card {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .modal-backdrop-fixed {
+    background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-theme="dark"] .modal-backdrop-fixed .bg-white {
+    background-color: var(--bg-card) !important;
+}
+
+/* --- Социальные сети (строки) --- */
+[data-theme="dark"] .js-social-row {
+    background-color: var(--bg-section) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .js-social-row input {
+    background-color: transparent !important;
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] .js-social-row .text-slate-500 {
+    color: var(--text-muted) !important;
+}
+
+/* --- Конструктор страниц --- */
+[data-theme="dark"] .constructor-zone {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .constructor-zone .bg-slate-50\/50 {
+    background-color: var(--bg-section) !important;
+}
+[data-theme="dark"] .constructor-zone .border-slate-100 {
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .constructor-row {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .constructor-row .bg-slate-50\/50 {
+    background-color: var(--bg-section) !important;
+}
+
+[data-theme="dark"] .constructor-column {
+    background-color: var(--bg-section) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .constructor-column .bg-white {
+    background-color: var(--bg-card) !important;
+}
+
+[data-theme="dark"] .constructor-module {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .constructor-module .text-slate-700 {
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] .constructor-module .text-slate-400 {
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .constructor-empty {
+    border-color: var(--border-color) !important;
+    color: var(--text-muted) !important;
+}
+
+/* --- Аккордеон (секции) --- */
+[data-theme="dark"] .section-header {
+    background-color: var(--bg-section) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .section-header .text-slate-700 {
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] .section-header .text-slate-400 {
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .section-content {
+    background-color: var(--bg-card) !important;
+}
+[data-theme="dark"] .section-content .bg-white {
+    background-color: var(--bg-card) !important;
+}
+
+[data-theme="dark"] .section-header:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+/* --- Картинка-превью --- */
+[data-theme="dark"] .carousel-inline-preview {
+    background-color: var(--bg-section) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* --- Проводник (файловый менеджер) --- */
+[data-theme="dark"] .js-fm-tile-item {
+    background-color: var(--bg-section) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .js-fm-tile-item .fm-tile-name {
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] .js-fm-tile-item:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+[data-theme="dark"] .fm-context-menu {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .fm-context-menu li {
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] .fm-context-menu li:hover {
+    background-color: var(--bg-hover) !important;
+}
+[data-theme="dark"] .fm-context-menu li [class^="icon-"] {
+    color: var(--text-muted) !important;
+}
+
+/* --- Медиа-модалка (галерея) --- */
+[data-theme="dark"] .media-scroll-zone {
+    background-color: var(--bg-card) !important;
+}
+[data-theme="dark"] .media-preview-item {
+    background-color: var(--bg-section) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .media-preview-item:hover {
+    border-color: var(--primary-color) !important;
+}
+
+/* --- Чекбоксы --- */
+[data-theme="dark"] input[type="checkbox"] {
+    background-color: var(--bg-section) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* --- Кнопки (не-primary) --- */
+[data-theme="dark"] .border-slate-200 {
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .bg-slate-200\/60 {
+    background-color: var(--bg-hover) !important;
+}
+
+/* --- Дропдаун соцсетей --- */
+[data-theme="dark"] #js-social-dropdown-menu {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .js-social-dropdown-item:hover {
+    background-color: var(--bg-hover) !important;
+}
+[data-theme="dark"] .js-social-dropdown-item .text-slate-700 {
+    color: var(--text-main) !important;
+}
+
+/* --- Селект --- */
+[data-theme="dark"] select {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") !important;
+}
+
+/* --- Ссылки --- */
+[data-theme="dark"] a:not(.sidebar-menu-link):not(.btn-primary):not(.btn-rose) {
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] a:not(.sidebar-menu-link):not(.btn-primary):not(.btn-rose):hover {
+    color: var(--text-muted) !important;
+}
+
+/* --- Хедер админки --- */
+[data-theme="dark"] .bg-white.border-b.border-slate-100 {
+    background-color: var(--bg-card) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+[data-theme="dark"] .bg-slate-50 {
+    background-color: var(--bg-section) !important;
+}
+
+/* --- Логин страница --- */
+[data-theme="dark"] .login-page-wrapper .bg-white {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .login-page-wrapper .text-slate-800 {
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] .login-page-wrapper .text-slate-500 {
+    color: var(--text-muted) !important;
+}
+[data-theme="dark"] .login-page-wrapper .border-slate-200 {
+    border-color: var(--border-color) !important;
+}
+
+/* --- Страницы (list) --- */
+[data-theme="dark"] .table thead tr {
+    background-color: var(--bg-section) !important;
+}
+[data-theme="dark"] .table tbody tr {
+    border-bottom-color: var(--border-color) !important;
+}
+[data-theme="dark"] .table tbody tr:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+/* --- Мобильное меню (бургер) --- */
+[data-theme="dark"] #js-burger-trigger {
+    background-color: var(--bg-section) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] #js-burger-trigger:hover {
+    background-color: var(--bg-hover) !important;
+}
+/* ===== Скролбары ===== */
+[data-theme="dark"] ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: var(--bg-section);
+    border-radius: 4px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Firefox */
+[data-theme="dark"] * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) var(--bg-section);
+}
+/* ==========================================================================
+   4. СТРОКИ РЕДАКТОРА (ОБНОВЛЕННАЯ ГЕОМЕТРИЯ С УЧЕТОМ БОКОВОГО САЙДБАРA)
+   ========================================================================== */
+.editor-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+}
+.editor-field, .editor-action {
+    width: 100% !important;
+}
+
+/* Плавный деструктивный hover на кнопку удаления */
+.editor-action button {
+    transition: all 0.2s ease-in-out !important;
+    border-color: #e11d48 !important;
+}
+.editor-action button:hover {
+    background-color: #e11d48 !important;
+    color: #ffffff !important;
+}
+
+/* ЭТАП А: Средние экраны (Планшеты и ноутбуки от 768px до 1023px при открытом сайдбаре) */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .editor-row {
+        flex-direction: column !important; /* Поля идут длинными этажами друг под друга */
+        align-items: stretch !important;
+    }
+    .editor-field {
+        width: 100% !important; /* Инпуты занимают всю ширину рабочей зоны */
+    }
+}
+
+/* ЭТАП Б: Большие экраны (Мониторы от 1024px и выше, места становится очень много) */
+@media (min-width: 1024px) {
+    .editor-row {
+        flex-direction: row !important; /* Сетка плавно разворачивается в горизонтальный ряд */
+        align-items: flex-end !important;
+    }
+    .editor-field {
+        flex: 1 !important; /* Ячейки делят строку на равные аккуратные части */
+    }
+    .editor-action {
+        width: 52px !important;
+        flex-shrink: 0 !important;
+    }
+    .md\:w-1\/4 {
+        width: 25% !important;
+        flex-shrink: 0 !important;
+    }
+    .md\:w-3\/4 {
+        width: 75% !important;
+        flex: 1 1 auto !important;
+    }
+}
+
+/* ==========================================================================
+   5. МАТРИЦА НАВИГАЦИИ (CONSTRUCTOR MATRIX)
+   ========================================================================== */
+#sections-rows-container .items-center { align-items: center !important; } 
+#sections-rows-container .editor-row button { width: 2.25rem !important; height: 2.25rem !important; font-size: 0.875rem !important; border-radius: 0.5rem !important; } 
+#sections-rows-container .editor-row button:disabled { opacity: 0.4 !important; background-color: #f1f5f9 !important; border-color: #e2e8f0 !important; color: #94a3b8 !important; pointer-events: none !important; cursor: not-allowed !important; }
+@media (max-width: 767px) { 
+    #sections-rows-container .editor-row > div.justify-end { position: absolute !important; top: 0px; right: 0px; }
+    #sections-rows-container .editor-row > div:first-of-type { margin-top: .75rem; }}
+
+.matrix-container {
+    column-count: 1 !important;
+    column-gap: 8px !important;
+    flex: 1 !important;
+}
+
+@media (min-width: 576px) {
+    .matrix-container {
+        column-count: 2 !important;
+        column-gap: 16px !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    .matrix-container {
+        column-count: 3 !important;
+        column-gap: 16px !important;
+    }
+}
+
+@media (min-width: 1440px) {
+    .matrix-container {
+        column-count: 4 !important;
+        column-gap: 20px !important;
+    }
+}
+
+.matrix-label {    
+    break-inside: avoid !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 6px 0 !important;
+    color: #475569 !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    transition: color 0.2s ease-in-out !important;
+    white-space: nowrap !important;
+}
+.matrix-label:hover { color: var(--primary-color) !important; }
+
+/* ==========================================================================
+   6. АВТОРИЗАЦИЯ, БЕЗОПАСНОСТЬ И ЖУРНАЛЫ БЛОКИРОВОК
+   ========================================================================== */
+.login-page-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 24px;
+}
+.login-page-wrapper #login-box,
+.login-page-wrapper #generator-box {
+    width: 100%;
+    max-width: 600px;
+}
+
+/* Сетка Anti-Brute Force */
+@media (min-width: 768px) {
+    .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Таблицы логов IP */
+.desktop-only { display: none !important; }
+.mobile-only { display: block !important; }
+@media (min-width: 768px) {
+    .desktop-only { display: table !important; }
+    .mobile-only { display: none !important; }
+}
+
+/* Статусы и кнопки безопасности */
+.btn-rose {
+    background-color: #e11d48 !important;
+    color: #ffffff !important;
+    transition: background-color 0.2s ease-in-out !important;
+}
+.btn-rose:hover { background-color: #be123c !important; }
+
+.badge-temporary, .badge-permanent {
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 2px 10px !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    width: 100px;
+}
+
+.badge-temporary {
+    background-color: #fef3c7 !important;
+    color: #d97706 !important;
+    border: 1px solid #fde68a !important;
+}
+.badge-permanent {
+    background-color: #ffe4e6 !important;
+    color: #e11d48 !important;
+    border: 1px solid #fecdd3 !important;
+}
+
+.btn-unban {
+    color: #059669 !important;
+    font-weight: 700 !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    transition: color 0.2s ease-in-out !important;
+}
+.btn-unban:hover { color: #047857 !important; text-decoration: underline !important; }
+
+.btn-unban-mobile {
+    width: 100% !important;
+    text-align: center !important;
+    padding: 8px 16px !important;
+    background-color: #ffffff !important;
+    border: 1px solid #a7f3d0 !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #059669 !important;
+    transition: all 0.2s ease-in-out !important;
+}
+.btn-unban-mobile:hover {
+    background-color: #f0fdf4 !important;
+    border-color: #34d399 !important;
+    color: #047857 !important;
+}
+
+/* Форма добавления новой секции */
+.new-section-row { display: flex !important; flex-direction: column !important; gap: 16px !important; }
+@media (min-width: 768px) {
+    .new-section-row { flex-direction: row !important; align-items: flex-end !important; }
+    .new-section-field { flex: 2 !important; }
+    .new-section-action { flex: 1 !important; min-width: 160px; }
+    .new-section-action button { width: 100% !important; }
+}
+
+
+/* ==========================================================================
+   7. СКРОЛЛИРУЕМЫЕ ТАБЫ (SCROLLABLE TABS)
+   ========================================================================== */
+.scrollable-tabs-container {
+    display: flex !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding-bottom: 1px !important;
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+.scrollable-tabs-container::-webkit-scrollbar { display: none !important; }
+.scrollable-tabs-container a { flex-shrink: 0 !important; }
+
+.tabs-wrapper-relative { position: relative !important; width: 100% !important; }
+.tabs-wrapper-relative::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 1px !important;
+    width: 40px !important;
+    background: linear-gradient(to right, rgba(248, 250, 252, 0) 0%, rgb(248, 250, 252) 100%) !important;
+    pointer-events: none !important;
+    z-index: 20 !important;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+/* ==========================================================================
+   8. КОМПОНЕНТЫ МЕДИА-МЕНЕДЖЕРА (МОДАЛЬНОЕ ОКНО И ПАНЕЛЬ ЗАГРУЗКИ)
+   ========================================================================== */
+.modal-backdrop-fixed {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 9999 !important;
+    background-color: rgba(15, 23, 42, 0.6) !important;
+    backdrop-filter: blur(4px) !important;
+    display: none;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 1rem !important;
+}
+
+.modal-backdrop-fixed.active {
+    display: flex !important;
+}
+
+.modal-content-card {
+    background-color: #ffffff !important;
+    width: 100% !important;
+    max-width: 650px !important;
+    border-radius: 2rem !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    border: 1px solid #f1f5f9 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    /* ИСПРАВЛЕНО: на смартфонах модалка займет почти весь экран, не ломая верстку */
+    max-height: 85vh !important; 
+    overflow: hidden !important;
+}
+
+/* ИСПРАВЛЕНО: Компактный горизонтальный бар загрузки с жестким выравниванием */
+.modal-upload-inline-bar {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+    width: 100% !important;
+}
+
+/* Нативная иконка плюса в стиле остальных кнопок админки */
+.modal-upload-icon-box {
+    width: 2.25rem !important; /* Соответствует h-9 / 36px */
+    height: 2.25rem !important;
+    background-color: #ecfdf5 !important; /* bg-emerald-50 */
+    color: #065f46 !important; /* text-emerald-800 */
+    border: 1px solid #d1fae5 !important; /* border-emerald-100 */
+    border-radius: 0.5rem !important; /* rounded-lg */
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+
+/* Текстовый блок описания внутри плашки */
+.modal-upload-text-block {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+}
+
+/* Кнопка "Обзор..." приведенная к высоте стандартных кнопок */
+.modal-upload-btn-action {
+    padding: 0.625rem 1.25rem !important; /* Высота подстроена под стандарты */
+    background-color: var(--primary-color) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    font-size: 0.75rem !important;
+    border-radius: 0.75rem !important;
+    transition: background-color 0.15s ease-in-out !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+.modal-upload-btn-action:hover {
+    background-color: var(--primary-dark) !important;
+}
+/* ЭФФЕКТ ДЛЯ DRAG & DROP: Подсветка плашки загрузки при наведении файла */
+.modal-upload-inline-bar.drag-over {
+    border-color: var(--primary-color) !important;
+    background-color: #f0fdf4 !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1) !important;
+}
+
+/* ИСПРАВЛЕНО: Гибкая зона прокрутки. На десктопе max 350px, на мобильных сжимается автоматически */
+.media-scroll-zone {
+    padding: 1.5rem !important; /* p-6 */
+    overflow-y: auto !important;
+    flex: 1 1 0% !important;
+    background-color: #ffffff !important;
+    max-height: 350px !important;
+}
+
+@media (max-width: 576px) {
+    .media-scroll-zone {
+        max-height: 220px !important; /* На мобильных зажимаем сильнее, чтобы сетка не вылетала */
+    }
+}
+
+.media-preview-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+}
+@media (min-width: 576px) {
+    .media-preview-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
+}
+
+.media-preview-item {
+    position: relative !important;
+    aspect-ratio: 16 / 9 !important;
+    background-color: #f8fafc !important;
+    border-radius: 0.75rem !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(226, 232, 240, 0.6) !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease-in-out !important;
+}
+.media-preview-item:hover {
+    border-color: var(--primary-color) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+/* КУБИК ПРЕВЬЮ СЛАЙДА РАЗМЕРОМ С ИНПУТ */
+.carousel-inline-preview {
+    width: 54px !important;
+    height: 54px !important;
+    min-width: 54px !important;
+    border-radius: 0.75rem !important; /* rounded-xl */
+    overflow: hidden !important;
+    border: 1px solid #e2e8f0 !important; /* border-slate-200 */
+    background-color: #f1f5f9 !important; /* bg-slate-100 */
+    flex-shrink: 0 !important;
+    cursor: zoom-in !important; /* Курсор лупы */
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: transform 0.2s ease, border-color 0.2s ease !important;
+}
+.carousel-inline-preview:hover {
+    border-color: var(--primary-color) !important;
+    transform: scale(1.04) !important;
+}
+.carousel-inline-preview img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+
+/* МОДАЛКА ПРОСМОТРА ПОЛНОЙ КАРТИНКИ (ZOOM) */
+.zoom-modal-backdrop {
+    position: fixed !important;
+    top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    z-index: 10000 !important;
+    background-color: rgba(15, 23, 42, 0.75) !important;
+    backdrop-filter: blur(5px) !important;
+    display: none;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 2rem !important;
+}
+.zoom-modal-backdrop.active { display: flex !important; }
+.zoom-modal-img {
+    max-width: 90vw !important;
+    max-height: 85vh !important;
+    border-radius: 1.5rem !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+    border: 2px solid #ffffff !important;
+}
+/* ==========================================================================
+   9. ТРЁХЭТАПНАЯ МОБИЛЬНАЯ АДАПТИВНОСТЬ (СТАРТ РЯДА ОТ 480PX)
+   ========================================================================== */
+
+/* Этап 1: Ультра-маленькие экраны (по умолчанию до 479px включительно) */
+.js-media-input-group {
+    display: flex !important;
+    flex-direction: column !important; /* Строго вертикально */
+    align-items: stretch !important;
+    gap: 12px !important;
+    width: 100% !important;
+}
+
+/* Картинка-превью по центру на самых маленьких экранах */
+.js-media-input-group .carousel-inline-preview {
+    margin: 0 auto !important;
+    align-self: center !important;
+}
+
+.js-media-input-group .js-image-url-input {
+    width: 100% !important;
+    display: block !important;
+}
+
+/* Кнопка "Фото" на 100% ширины для удобного тапа */
+.js-media-input-group button.carousel-btn-photo,
+.js-media-input-group .carousel-btn-photo {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+    height: 48px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Этап 2: Средние экраны и горизонтальные смартфоны (от 480px до 767px) */
+@media (min-width: 480px) and (max-width: 767px) {
+    .js-media-input-group {
+        display: flex !important;
+        flex-direction: row !important; /* Кубик и инпут стоят в линию */
+        flex-wrap: wrap !important;     /* Разрешаем кнопке упасть на новую строку */
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    /* Картинка стоит первой, на одной линии с инпутом */
+    .js-media-input-group .carousel-inline-preview {
+        margin: 0 !important;
+        align-self: center !important;
+    }
+
+    /* Инпут занимает всё доступное место в первом ряду справа от кубика */
+    .js-media-input-group .js-image-url-input {
+        width: auto !important;
+        flex: 1 1 0% !important;
+    }
+
+    /* ИСПРАВЛЕНО НАДЁЖНО: Жестко блокируем сжатие кнопки и растягиваем её на 100% */
+    .js-media-input-group button.carousel-btn-photo,
+    .js-media-input-group .carousel-btn-photo {
+        width: 100% !important;
+        min-width: 100% !important;    /* НАМЕРТВО ЗАПРЕЩАЕТ КНОПКЕ СЖИМАТЬСЯ ВЛЕВО */
+        flex: 1 1 100% !important;      /* Занимает всю вторую строчку */
+        margin-top: 6px !important;     /* Аккуратный отступ сверху от инпута */
+        height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+}
+
+/* Этап 3: Планшеты и ПК (от 768px и выше) */
+@media (min-width: 768px) {
+    .js-media-input-group {
+        flex-direction: row !important; /* Горизонтальная линия */
+        flex-wrap: nowrap !important;   /* Запрещаем любые переносы */
+        align-items: center !important;
+        gap: 8px !important;
+    }
+    
+    .js-media-input-group .carousel-inline-preview {
+        margin: 0 !important;
+        align-self: center !important;
+    }
+    
+    .js-media-input-group .js-image-url-input {
+        width: auto !important;
+        flex: 1 1 0% !important;
+    }
+    
+    /* Кнопка встает в общий ряд в самый конец строки */
+    .js-media-input-group button.carousel-btn-photo,
+    .js-media-input-group .carousel-btn-photo {
+        width: auto !important;
+        max-width: auto !important;
+        flex: 0 0 auto !important;
+        height: auto !important;
+    }
+}
+/* ==========================================================================
+   10. ГЕОМЕТРИЯ БОКОВОГО САЙДБАР-МЕНЮ И МОБИЛЬНОГО БУРГЕРА
+   ========================================================================== */
+.admin-sidebar-panel {
+    width: 260px !important;
+    min-width: 260px !important;
+    background-color: #ffffff !important;
+    border-right: 1px solid #f1f5f9 !important;
+    padding: 1.5rem 1rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    transition: transform 0.3s ease-in-out !important;
+    z-index: 40 !important;
+}
+
+/* Мелкие аккуратные заголовки групп меню */
+.sidebar-group-title {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #94a3b8 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: 0.5rem 0.75rem !important;
+    margin-top: 0.25rem !important;
+}
+
+/* Ссылки навигации */
+.sidebar-menu-link {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 0.75rem 1rem !important;
+    color: #475569 !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    border-radius: 0.75rem !important;
+    transition: all 0.15s ease-in-out !important;
+}
+.sidebar-menu-link:hover {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+}
+
+/* Активное состояние ссылки */
+.sidebar-menu-link.active {
+    background-color: #ecfdf5 !important;
+    color: var(--primary-dark) !important;
+    border: 1px solid #d1fae5 !important;
+}
+
+/* Затемняющий бэкдроп для мобилок */
+.sidebar-backdrop-overlay {
+    position: fixed !important;
+    top: 80px !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    background-color: rgba(15, 23, 42, 0.4) !important;
+    backdrop-filter: blur(2px) !important;
+    z-index: 35 !important;
+    display: none;
+}
+.sidebar-backdrop-overlay.active { display: block !important; }
+
+/* --- СТИЛИ ДЛЯ СВОРАЧИВАЕМЫХ ГРУПП МЕНЮ --- */
+.sidebar-group-title {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    cursor: pointer !important;
+    user-select: none !important;
+}
+.sidebar-group-title:hover {
+    color: #475569 !important; /* Легкая подсветка заголовка при наведении */
+}
+
+/* Иконка стрелочки-шеврон */
+.sidebar-group-chevron {
+    font-size: 12px !important;
+    transition: transform 0.2s ease-in-out !important;
+    transform: rotate(-90deg); /* По умолчанию группа закрыта (стрелка влево) */
+}
+
+/* Скрытый контент по умолчанию */
+.sidebar-group-content {
+    display: none;
+    margin-top: 0.25rem !important;
+}
+
+/* СОСТОЯНИЕ "ОТКРЫТО" (через класс .open) */
+.sidebar-menu-group.open .sidebar-group-content {
+    display: block !important;
+}
+.sidebar-menu-group.open .sidebar-group-chevron {
+    transform: rotate(0deg); /* Стрелка смотрит вниз */
+}
+
+/* Подсветка иконки скрытого модуля при наведении на строку */
+.sidebar-menu-link:hover .icon-eye-off {
+    color: #94a3b8 !important;
+}
+
+/* АДАПТИВНОСТЬ ДЛЯ ТЕЛЕФОНОВ */
+@media (max-width: 767px) {
+    .admin-sidebar-panel {
+        position: fixed !important;
+        top: 80px !important;
+        
+        /* ИСПРАВЛЕНО ЖЕЛЕЗОБЕТОННО: Задаем жесткие границы и включаем вертикальный скролл */
+        bottom: 0 !important;
+        max-height: calc(100vh - 80px) !important; /* Высота строго от низа хедера до конца экрана */
+        overflow-y: auto !important;                /* Включает плавную прокрутку пальцем, если пунктов много */
+        -webkit-overflow-scrolling: touch !important; /* Делает скролл на iPhone/iOS идеально мягким */
+        
+        transform: translateX(-100%) !important; 
+        box-shadow: 15px 0 30px -5px rgba(0, 0, 0, 0.05) !important;
+    }
+    .admin-sidebar-panel.active {
+        transform: translateX(0) !important; /* Выезжает на экран */
+    }
+}
+
+@media (min-width: 768px) {
+    #js-burger-trigger {
+        display: none !important;
+    }
+}
+/* ==========================================================================
+   11. ГЕОМЕТРИЯ И СТИЛИ ИНТЕРАКТИВНОЙ ГАЛЕРЕИ ВЫБОРА ИКОНОК
+   ========================================================================== */
+
+/* Превращаем контейнер иконок в компактный, адаптивный флекс-ряд */
+#js-icons-picker-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    width: 100% !important;
+}
+
+/* Каждая карточка иконки на смартфонах */
+.js-icon-picker-item {
+    width: calc(25% - 8px) !important; /* Ровно 4 штуки в ряд на мобилках */
+    aspect-ratio: 1 / 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    border-radius: 0.75rem !important; /* rounded-xl */
+    transition: all 0.15s ease-in-out !important;
+}
+
+/* На планшетах увеличиваем плотность ряда */
+@media (min-width: 576px) {
+    .js-icon-picker-item {
+        width: calc(16.666% - 9px) !important; /* Ровно 6 штук в ряд */
+    }
+}
+
+/* На больших экранах ПК делаем сетку ультра-компактной */
+@media (min-width: 768px) {
+    .js-icon-picker-item {
+        width: calc(10% - 9px) !important; /* Ровно 10 аккуратных кубиков в ряд! */
+    }
+}
+
+/* Стилизация внутренних элементов карточки значка */
+.js-icon-picker-item span[class^="icon-"] {
+    font-size: 20px !important; /* Фиксируем аккуратный размер самого значка */
+    color: #475569 !important;  /* text-slate-600 */
+    transition: transform 0.15s ease-in-out, color 0.15s ease-in-out !important;
+}
+
+.js-icon-picker-item span.text-\[8px\] {
+    font-size: 8px !important;
+    font-weight: 700 !important;
+    color: #94a3b8 !important; /* text-slate-400 */
+    line-height: 1.2 !important;
+    text-align: center !important;
+    width: 100% !important;
+    display: block !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important; /* Мягко обрезает слишком длинные имена точек */
+}
+
+/* Интерактивный ховер */
+.js-icon-picker-item:hover {
+    background-color: #ecfdf5 !important; /* bg-emerald-50 */
+    border-color: #a7f3d0 !important;     /* border-emerald-200 */
+}
+.js-icon-picker-item:hover span[class^="icon-"] {
+    color: var(--primary-dark) !important;
+    transform: scale(1.1) !important; /* Легкое интерактивное увеличение */
+}
+.js-icon-picker-item:hover span.text-\[8px\] {
+    color: var(--primary-dark) !important;
+}
+/* Оформление самого текстового инпута поиска */
+#js-icon-search-input {
+    width: 100% !important;
+    padding: 0.875rem 1.25rem 0.875rem 2.75rem !important; /* Отступ слева увеличен до 2.75rem под лупу */
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important; /* border-slate-200 */
+    border-radius: 0.75rem !important;    /* rounded-xl */
+    font-size: 1rem !important;           /* text-base */
+    color: #1e293b !important;            /* text-slate-800 */
+    outline: none !important;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+}
+
+/* Красивый фокус строки поиска с мягкой подсветкой */
+#js-icon-search-input:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15) !important;
+}
+
+/* Намертво центрируем иконку лупы внутри инпута строго слева */
+/*#icon-picker-modal .icon-search {
+    position: absolute !important;
+    left: 1rem !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;  Идеальный центр по вертикали 
+    color: #94a3b8 !important;               text-slate-400 
+    font-size: 1.125rem !important;          text-lg 
+    pointer-events: none !important;          Чтобы клик проходил сквозь лупу в инпут 
+}*/
+
+/* Фикс для кнопки-крестика [X] закрытия в шапке (чтобы она не зажималась) */
+#icon-picker-modal .modal-content-card button {
+    transition: all 0.15s ease-in-out !important;
+}
+#icon-picker-modal .modal-content-card button:hover {
+    background-color: #f1f5f9 !important; /* bg-slate-100 */
+    color: #1e293b !important;
+}
+
+/* ==========================================================================
+   12. ГЕОМЕТРИЯ НАТИВНОГО ПЛИТОЧНОГО ПРОВОДНИКА ФАЙЛОВ
+   ========================================================================== */
+
+/* Превращаем сетку в гибкий адаптивный флекс-ряд */
+#js-fm-tiles-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    width: 100% !important;
+}
+
+#js-fm-tiles-grid .col-span-full { 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+}
+
+/* Базовая плитка элемента (Папка или Файл) на смартфонах */
+.js-fm-tile-item {
+    width: calc(50% - 6px) !important; /* Строго 2 плитки в ряд на мобилках */
+    aspect-ratio: 1.1 / 1 !important;  /* Чуть шире, чем классический квадрат */
+    background-color: #f8fafc !important; /* bg-slate-50 */
+    border: 1px solid #f1f5f9 !important; /* border-slate-100 */
+    border-radius: 1rem !important;        /* rounded-2xl */
+    padding: 1.25rem 0.75rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+/* На планшетах и средних экранах ноутбуков (до 1023px) */
+@media (min-width: 576px) {
+    .js-fm-tile-item {
+        width: calc(25% - 9px) !important; /* 4 плитки в ряд */
+    }
+}
+
+/* На больших мониторах компьютеров (от 1024px и выше) */
+@media (min-width: 1024px) {
+    .js-fm-tile-item {
+        width: calc(14.285% - 11px) !important; /* 7 плиток в ряд */
+    }
+}
+
+/* Иконки внутри плиток (Папки, Код, Картинки) */
+.js-fm-tile-item .fm-tile-icon {
+    font-size: 32px !important; /* Крупный, читаемый размер значка */
+    transition: transform 0.15s ease-in-out, color 0.15s ease-in-out !important; /* Добавлена плавная смена цвета */
+}
+
+/* 
+   ИСПРАВЛЕНО НАМЕРТВО: Интерактивный ховер.
+   При наведении на карточку мы заставляем ЛЮБУЮ текстовую иконку (даже разноцветные php/css) 
+   плавно перекрашиваться в var(--primary-dark) вместе с текстом подписи!
+*/
+.js-fm-tile-item:hover {
+    background-color: #ecfdf5 !important; /* bg-emerald-50 */
+    border-color: #a7f3d0 !important;     /* border-emerald-200 */
+    transform: translateY(-2px) !important; /* Легкое приподнятие */
+    box-shadow: 0 10px 20px -10px rgba(16, 185, 129, 0.15) !important;
+}
+
+.js-fm-tile-item:hover .fm-tile-icon {
+    transform: scale(1.08) !important; /* Легкий зум значка при ховере */
+    color: var(--primary-dark) !important;
+}
+
+.js-fm-tile-item .fm-tile-name {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #334155 !important; /* text-slate-700 */
+    text-align: center !important;
+    line-height: 1.3 !important;
+    width: 100% !important;
+    display: block !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important; /* Мягкое обрезание длинных имен файлов */
+    transition: color 0.15s ease-in-out !important;
+}
+
+.js-fm-tile-item:hover .fm-tile-name {
+    color: var(--primary-dark) !important; 
+}
+
+/* Превью-миниатюра для плиток, внутри которых лежат живые картинки */
+.js-fm-tile-thumb {
+    width: 46px !important;
+    height: 46px !important;
+    object-fit: cover !important;
+    border-radius: 0.5rem !important; /* rounded-lg */
+    border: 1px solid #e2e8f0 !important;
+    background-color: #ffffff !important;
+}
+
+#js-fm-preview-image {
+    min-width: 280px !important;
+}
+
+.animate-pulse{ animation:pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+@keyframes pulse{ 0%,100%{ opacity: 1; }50%{ opacity: .5; } }
+
+.animate-spin{ animation: spin 1s linear infinite; }
+@keyframes spin{from{ transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+
+
+/* ==========================================================================
+   14. СТИЛИЗАЦИЯ УНИВЕРСАЛЬНОГО МЕНЮ ДЕЙСТВИЙ И ПЛАШЕК ПРОВОДНИКА
+   ========================================================================== */
+
+/* БАЗОВЫЙ ДЕСКТОПНЫЙ РЕЖИМ: Компактное всплывающее меню у курсора */
+.fm-context-menu {
+    position: fixed !important;
+    z-index: 9999 !important;
+    width: 220px !important;
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important; /* border-slate-200 */
+    border-radius: 0.75rem !important;    /* rounded-xl */
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12) !important;
+    overflow: hidden !important;
+    animation: fmMenuFadeIn 0.12s ease-out !important;
+}
+
+@keyframes fmMenuFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* Элементы списка команд меню */
+.fm-context-menu li {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 0.625rem 1rem !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #475569 !important; /* text-slate-600 */
+    cursor: pointer !important;
+    transition: all 0.1s ease-in-out !important;
+}
+
+/* Элегантный ховер в стиле темы */
+.fm-context-menu li:hover {
+    background-color: #f0fdf4 !important; /* bg-emerald-50/50 */
+    color: var(--primary-dark) !important;
+}
+
+/* Иконки внутри пунктов меню */
+.fm-context-menu li [class^="icon-"] {
+    font-size: 14px !important;
+    color: #94a3b8 !important; /* text-slate-400 */
+    transition: color 0.1s ease-in-out !important;
+}
+.fm-context-menu li:hover [class^="icon-"] {
+    color: var(--primary-color) !important;
+}
+
+/* Пункт "Удалить" выделяем деструктивным красным цветом */
+.fm-context-menu li.fm-menu-delete:hover {
+    background-color: #fff1f2 !important; /* bg-rose-50 */
+    color: #e11d48 !important;             /* text-rose-600 */
+}
+.fm-context-menu li.fm-menu-delete:hover [class^="icon-"] {
+    color: #e11d48 !important;
+}
+
+/* АДАПТИВНОСТЬ ДЛЯ ТЕЛЕФОНОВ: Меню превращается в стильную нижнюю плашку */
+@media (max-width: 767px) {
+    .fm-context-menu {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        top: auto !important; /* Сбрасываем позиционирование по Y */
+        width: 100% !important;
+        border-radius: 1.5rem 1.5rem 0 0 !important; /* Скругление только сверху */
+        border: none !important;
+        border-top: 1px solid #e2e8f0 !important;
+        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08) !important;
+        animation: fmMenuSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    
+    @keyframes fmMenuSlideUp {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
+    
+    .fm-context-menu li {
+        padding: 0.875rem 1.25rem !important; /* Увеличиваем под тапы пальцем */
+        font-size: 15px !important;
+    }
+    .fm-context-menu li [class^="icon-"] {
+        font-size: 16px !important;
+    }
+}
+/* ==========================================================================
+   КОНСТРУКТОР СТРАНИЦ
+   ========================================================================== */
+/* Зоны конструктора */
+.constructor-zone {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+.constructor-zone:hover {
+    border-color: #cbd5e1;
+}
+
+/* Ряды конструктора */
+.constructor-row {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+.constructor-row:hover {
+    border-color: #94a3b8;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+/* Колонки конструктора */
+.constructor-column {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    transition: border-color 0.2s, background 0.2s;
+}
+.constructor-column:hover {
+    border-color: #94a3b8;
+    background: #f1f5f9;
+}
+
+/* Модули конструктора */
+.constructor-module {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    cursor: default;
+}
+.constructor-module:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
+}
+
+/* Анимации для конструктора */
+.constructor-zone,
+.constructor-row,
+.constructor-column,
+.constructor-module {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Модалка выбора модуля */
+#module-select-modal .modal-content-card {
+    max-width: 500px !important;
+}
+#module-select-modal .modal-content-card .space-y-2 button {
+    text-align: left;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+#module-select-modal .modal-content-card .space-y-2 button:hover {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+}
+#module-select-modal .modal-content-card .space-y-2 button .icon-box,
+#module-select-modal .modal-content-card .space-y-2 button [class^="icon-"] {
+    font-size: 1.25rem;
+    color: #94a3b8;
+}
+
+/* Схема страницы */
+.constructor-schema {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    overflow: hidden;
+}
+.constructor-schema .schema-header {
+    padding: 0.5rem 1rem;
+    background: #f1f5f9;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+}
+.constructor-schema .schema-body {
+    padding: 1rem;
+}
+
+/* Цвета зон в схеме */
+.schema-zone-header { background: #d1fae5; border-color: #a7f3d0; color: #065f46; }
+.schema-zone-hero { background: #dbeafe; border-color: #bfdbfe; color: #1e40af; }
+.schema-zone-main { background: #fef3c7; border-color: #fde68a; color: #92400e; }
+.schema-zone-sidebar { background: #f3e8ff; border-color: #e9d5ff; color: #6b21a8; }
+.schema-zone-footer { background: #d1fae5; border-color: #a7f3d0; color: #065f46; }
+
+/* Кнопки в конструкторе */
+.constructor-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    color: #475569;
+    transition: all 0.15s;
+    cursor: pointer;
+}
+.constructor-btn:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+.constructor-btn-primary {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #ffffff;
+}
+.constructor-btn-primary:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+}
+
+/* Пустое состояние зоны */
+.constructor-empty {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.875rem;
+    padding: 1.5rem;
+    border: 2px dashed #e2e8f0;
+    border-radius: 0.75rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .constructor-column {
+        min-width: 80px;
+        flex-basis: 100% !important;
+        max-width: 100% !important;
+    }
+    .constructor-schema .schema-body .flex {
+        flex-direction: column;
+    }
+    .constructor-schema .schema-body .w-1\/4,
+    .constructor-schema .schema-body .w-1\/2,
+    .constructor-schema .schema-body .w-3\/4 {
+        width: 100% !important;
+    }
+}
+/* Аккордеон для разделов страницы */
+.section-header {
+    user-select: none;
+}
+
+.section-header .section-arrow {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.section-content {
+    transition: all 0.3s ease;
+}
+
+.section-content.hidden {
+    display: none;
+}

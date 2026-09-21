@@ -1,0 +1,57 @@
+# Включаем механизм перенаправлений
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Если запрашиваемый файл или папка существуют — не перенаправляем
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Все остальные запросы направляем в index.php
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Запрещаем просмотр содержимого папок
+Options -Indexes
+
+# Запрет прямого доступа к чувствительным расширениям
+<FilesMatch "\.(json|log|zip|bak|sql|env|ini|pepper)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ===== SECURITY HEADERS =====
+<IfModule mod_headers.c>
+    # Запрет MIME-sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # Запрет встраивания в iframe (кликджекинг)
+    Header always set X-Frame-Options "SAMEORIGIN"
+    
+    # Политика Referer
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Отключение ненужных браузерных API
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    
+    # Скрыть X-Powered-By (дополнительно к php.ini)
+    Header unset X-Powered-By
+    
+    # HSTS (только на HTTPS)
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+
+# Скрыть версию PHP в заголовках
+<IfModule mod_php7.c>
+    php_flag expose_php Off
+</IfModule>
+<IfModule mod_php.c>
+    php_flag expose_php Off
+</IfModule>
+
+# Скрыть ServerSignature (в .htaccess работает не всегда, нужен httpd.conf)
+ServerSignature Off

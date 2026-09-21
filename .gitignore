@@ -1,0 +1,59 @@
+# === Пользовательские данные (НЕ в репозиторий) ===
+/data/settings.json
+/data/pages/*.json
+/data/menus/*.json
+/data/logs/*.log
+/data/logs/archive/
+
+# === Системные данные ===
+/config/data/*.json
+/config/data/.pepper
+!/config/data/modules.json
+!/config/data/templates.json
+
+# === Бэкапы ===
+/config/backups/*.zip
+
+# === Кеш ===
+/cache/pages/*.html
+/cache/assets/*.css
+/cache/assets/*.js
+
+# === Загруженные картинки ===
+/images/*
+!/images/.htaccess
+
+# === IDE ===
+.vscode/
+.idea/
+.netbeans/
+.osp/
+nbproject/
+nbproject/private/
+*.sublime-*
+
+# === OS ===
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# === Логи ===
+*.log
+
+# === Папки/файлы разработки модулей ===
+/config/modules/archives/dev/
+
+# === Временные и служебные файлы ===
+/config/fonts_
+/config/css/old_config.css
+/fonts/youtube.svg
+*.tmp
+*.bak
+*.swp
+*~
+*_.php
+*_.js
+*.docx
+/favicon_iсo.zip
+/favicon-512.png
+/generate_test_pages.php
