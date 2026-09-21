@@ -138,6 +138,7 @@
         "icon": "icon-images",
         "description": "Полноэкранный слайдер с эффектами перехода",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
