@@ -108,14 +108,14 @@ if (empty($stats)) {
     </div>
 
     <!-- БЛОК 4: Особенности -->
-    <div id="features-container" class="bg-slate-50/50 p-4 rounded-xl border border-slate-200 space-y-3">
+    <div id="tm-features-container" class="bg-slate-50/50 p-4 rounded-xl border border-slate-200 space-y-3">
         <h4 class="text-sm font-bold text-slate-700 mb-2">Особенности</h4>
         
         <?php 
         $featureTemplate = '
         <div class="feature-item bg-white p-4 rounded-xl border border-slate-200 space-y-3">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Особенность #{INDEX}</span>
+                <span class="js-feature-num text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Особенность #{INDEX}</span>
                 <button type="button" class="js-remove-feature w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all cursor-pointer" title="Удалить">
                     <span class="icon-x text-sm"></span>
                 </button>
@@ -173,14 +173,14 @@ if (empty($stats)) {
     </button>
 
     <!-- БЛОК 5: Статистика -->
-    <div id="stats-container" class="bg-slate-50/50 p-4 rounded-xl border border-slate-200 space-y-3">
+    <div id="tm-stats-container" class="bg-slate-50/50 p-4 rounded-xl border border-slate-200 space-y-3">
         <h4 class="text-sm font-bold text-slate-700 mb-2">Статистика</h4>
         
         <?php 
         $statTemplate = '
         <div class="stat-item bg-white p-4 rounded-xl border border-slate-200 space-y-3">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Статистика #{INDEX}</span>
+                <span class="js-stat-num text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Статистика #{INDEX}</span>
                 <button type="button" class="js-remove-stat w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all cursor-pointer" title="Удалить">
                     <span class="icon-x text-sm"></span>
                 </button>

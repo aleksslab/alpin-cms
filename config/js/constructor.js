@@ -1128,6 +1128,120 @@ if (typeof PageConstructor === 'undefined') {
             }, 100);
         }
         
+        /**
+         * Возвращает следующий индекс для полей prefix[N][...] в контейнере.
+         *
+         * Возвращает max(N) + 1. Это гарантирует МОНОТОННОЕ возрастание индексов
+         * в порядке DOM, что критично для корректного парсинга FormData в
+         * saveModuleSettings: FormData итерирует в порядке DOM, а присваивание
+         * идёт по индексам. Если индексы убывают — порядок в массиве переворачивается.
+         *
+         * После сохранения JSON содержит плотный массив [0..N-1] (благодаря
+         * .filter() в saveModuleSettings), поэтому при повторном открытии модалки
+         * индексы снова начинаются с 0 — «утечки» номеров нет.
+         *
+         * @param {HTMLElement} container Контейнер, внутри которого ищутся input'ы
+         * @param {string}      prefix    Префикс name, например "slides", "items", "cards"
+         * @returns {number}              max(existing indices) + 1, либо 0 если ничего нет
+         */
+        getNextIndex(container, prefix) {
+            if (!container || !prefix) return 0;
+
+            const safe = String(prefix).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp('^' + safe + '\\[(\\d+)\\]');
+
+            let maxIndex = -1;
+            container.querySelectorAll('[name]').forEach(function(input) {
+                const m = input.name.match(re);
+                if (m) {
+                    const idx = parseInt(m[1], 10);
+                    if (idx > maxIndex) maxIndex = idx;
+                }
+            });
+
+            return maxIndex + 1;
+        }
+
+        /**
+         * Пересчитывает визуальные подписи карточек в порядке DOM.
+         *
+         * @param {HTMLElement} container     Контейнер со списком
+         * @param {string}      cardSelector  Селектор карточки (например '.slide-item-card')
+         * @param {string}      labelSelector Селектор подписи внутри карточки (например '.js-slide-num')
+         * @param {string}      labelText     Текст перед номером (например 'Слайд #')
+         */
+        updateCardNumbers(container, cardSelector, labelSelector, labelText) {
+            if (!container || !cardSelector || !labelSelector) return;
+
+            const cards = container.querySelectorAll(cardSelector);
+            cards.forEach(function(card, index) {
+                const label = card.querySelector(labelSelector);
+                if (label) label.textContent = (labelText || '') + (index + 1);
+            });
+        }
+
+        /**
+         * Добавляет новую карточку из <template> в контейнер.
+         *
+         * Использует getNextIndex для уникального индекса (max + 1) —
+         * это исключает коллизии name-атрибутов после удаления средних элементов.
+         *
+         * @param {HTMLElement} container
+         * @param {string}      templateId    id <template>-элемента (без '#')
+         * @param {string}      prefix        Префикс name, например "slides"
+         * @param {string}      cardSelector  Селектор карточки (опционально)
+         * @param {string}      labelSelector Селектор подписи (опционально)
+         * @param {string}      labelText     Текст подписи (опционально)
+         * @param {Function}    onAfterAdd    Callback(newCard) после вставки (опционально)
+         * @returns {HTMLElement|null}        Новая карточка или null
+         */
+        addCard(container, templateId, prefix, cardSelector, labelSelector, labelText, onAfterAdd) {
+            if (!container || !templateId || !prefix) return null;
+
+            const template = document.getElementById(templateId);
+            if (!template) return null;
+
+            const index = this.getNextIndex(container, prefix);
+            const html = template.innerHTML.replace(/__INDEX__/g, index);
+
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            const newCard = temp.firstElementChild;
+            if (!newCard) return null;
+
+            container.appendChild(newCard);
+
+            if (cardSelector && labelSelector) {
+                this.updateCardNumbers(container, cardSelector, labelSelector, labelText);
+            }
+
+            if (typeof onAfterAdd === 'function') {
+                try { onAfterAdd(newCard); } catch (e) { /* не роняем UI из-за callback */ }
+            }
+
+            return newCard;
+        }
+
+        /**
+         * Удаляет карточку с проверкой минимального количества.
+         *
+         * @param {HTMLElement} card
+         * @param {HTMLElement} container
+         * @param {string}      cardSelector
+         * @param {number}      minCount      Минимум карточек, ниже которого удалять нельзя (по умолч. 1)
+         * @returns {boolean}                 true — удалили, false — не разрешено
+         */
+        removeCard(card, container, cardSelector, minCount) {
+            if (!card || !container || !cardSelector) return false;
+            const min = (typeof minCount === 'number' && minCount > 0) ? minCount : 1;
+
+            const cards = container.querySelectorAll(cardSelector);
+            if (cards.length <= min) return false;
+
+            card.remove();
+            return true;
+        }
+
         preview() {
             if (!this.pageId) return;
 
@@ -1183,6 +1297,110 @@ if (typeof PageConstructor === 'undefined') {
     window.saveModuleSettings = () => window.constructor?.saveModuleSettings();
     window.selectModule = (type) => window.constructor?.selectModule(type);
     window.previewPage = () => window.constructor?.preview();
+    window.getNextIndex = (container, prefix) => window.constructor?.getNextIndex(container, prefix);
+
+        /**
+     * Универсальная инициализация list-модуля в модалке настроек.
+     * Модуль передаёт только конфиг — вся логика add/remove/renumber здесь.
+     *
+     * @param {Object} cfg
+     * @param {string}   cfg.container       id контейнера (без '#')
+     * @param {string}   cfg.prefix          Префикс name="prefix[N][...]"
+     * @param {string}   cfg.template        id <template>-элемента (без '#')
+     * @param {string}   cfg.cardSelector    Селектор карточки
+     * @param {string}   cfg.labelSelector   Селектор подписи (для визуальной нумерации)
+     * @param {string}   cfg.labelText       Текст подписи, например 'Слайд #'
+     * @param {string}   cfg.addBtn          id кнопки «Добавить» (без '#')
+     * @param {string}   cfg.removeBtn       Селектор кнопки удаления внутри карточки
+     * @param {number}   [cfg.minCount=1]    Минимум карточек
+     * @param {string}   [cfg.minMessage]    Сообщение при попытке удалить ниже минимума
+     * @param {Function} [cfg.onAfterAdd]    Callback(newCard) после добавления карточки
+     * @param {Function} [cfg.onAfterChange] Callback(container) после любого изменения (add + remove)
+     */
+    window.initListModule = function(cfg) {
+        if (!cfg || !cfg.container) return;
+
+        const container = document.getElementById(cfg.container);
+        if (!container) return;
+
+        const ctor = window.constructor;
+        if (!ctor) return;
+
+        // === Первичная нумерация ===
+        if (cfg.cardSelector && cfg.labelSelector) {
+            ctor.updateCardNumbers(
+                container,
+                cfg.cardSelector,
+                cfg.labelSelector,
+                cfg.labelText
+            );
+        }
+
+        // === Кнопка "Добавить" ===
+        if (cfg.addBtn) {
+            const addBtn = document.getElementById(cfg.addBtn);
+            if (addBtn) {
+                // Клонируем: устраняем возможные старые обработчики при повторной init
+                const newBtn = addBtn.cloneNode(true);
+                addBtn.parentNode.replaceChild(newBtn, addBtn);
+
+                newBtn.addEventListener('click', function() {
+                    const added = ctor.addCard(
+                        container,
+                        cfg.template,
+                        cfg.prefix,
+                        cfg.cardSelector,
+                        cfg.labelSelector,
+                        cfg.labelText,
+                        cfg.onAfterAdd
+                    );
+
+                    // Если карточка не добавилась — не уведомляем модуль
+                    if (!added) return;
+
+                    if (typeof cfg.onAfterChange === 'function') {
+                        try { cfg.onAfterChange(container); } catch (e) { /* ignore */ }
+                    }
+                });
+            }
+        }
+
+        // === Удаление — делегирование ===
+        if (cfg.removeBtn && cfg.cardSelector) {
+            container.addEventListener('click', function(e) {
+                const btn = e.target.closest(cfg.removeBtn);
+                if (!btn) return;
+
+                const card = btn.closest(cfg.cardSelector);
+                if (!card) return;
+
+                const removed = ctor.removeCard(
+                    card,
+                    container,
+                    cfg.cardSelector,
+                    cfg.minCount || 1
+                );
+
+                if (!removed) {
+                    alert(cfg.minMessage || 'Должна остаться хотя бы одна карточка');
+                    return;
+                }
+
+                if (cfg.labelSelector) {
+                    ctor.updateCardNumbers(
+                        container,
+                        cfg.cardSelector,
+                        cfg.labelSelector,
+                        cfg.labelText
+                    );
+                }
+
+                if (typeof cfg.onAfterChange === 'function') {
+                    try { cfg.onAfterChange(container); } catch (e) { /* ignore */ }
+                }
+            });
+        }
+    };
     
     // === АККОРДЕОН ДЛЯ РАЗДЕЛОВ СТРАНИЦЫ ===
     window.toggleSection = function(headerEl) {

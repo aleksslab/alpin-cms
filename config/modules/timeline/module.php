@@ -63,7 +63,7 @@ if (!is_array($items) || empty($items)) {
         $itemTemplate = '
         <div class="timeline-item-card bg-slate-50/50 p-4 rounded-xl border border-slate-200 space-y-3">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Этап #{INDEX}</span>
+                <span class="js-timeline-num text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Этап #{INDEX}</span>
                 <div class="flex items-center gap-3">
                     <label class="flex items-center gap-1.5 cursor-pointer">
                         <input type="hidden" name="items[{INDEX}][completed]" value="0">

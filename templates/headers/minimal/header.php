@@ -5,6 +5,8 @@ $mainMenuId = getMainMenuId();
 $menuItems = $mainMenuId ? getMenuItems($mainMenuId) : [];
 
 $burgerMenuHTML = renderMobileMenu($menuItems);
+
+$hasContacts = !empty($phone) || !empty($email);
 ?>
 <header class="<?php echo $headerFixed ? 'sticky top-0 z-50 ' : ''; ?>bg-white/90 backdrop-blur-xl border-b border-slate-100 shadow-sm h-20">
     <div class="container mx-auto px-6 h-20 flex items-center justify-between">
@@ -30,20 +32,26 @@ $burgerMenuHTML = renderMobileMenu($menuItems);
 
             <?php echo $burgerMenuHTML; ?>
 
+            <?php if ($hasContacts): ?>
             <div class="mt-2 pt-4 border-t border-slate-100 flex flex-col gap-2">
-                <a href="tel:<?php echo e($phone); ?>" class="flex items-center gap-3 text-slate-800 font-bold">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-[var(--primary-color)]">
-                        <span class="icon-phone text-sm"></span>
-                    </div>
-                    <?php echo formatPhone($phone); ?>
-                </a>
-                <a href="mailto:<?php echo e($email); ?>" class="flex items-center gap-3 text-slate-600 hover:text-[var(--primary-color)] transition-colors">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-[var(--primary-color)]">
-                        <span class="icon-mail text-sm"></span>
-                    </div>
-                    <?php echo e($email); ?>
-                </a>
+                <?php if (!empty($phone)): ?>
+                    <a href="tel:<?php echo e(preg_replace('/[^0-9+]/', '', $phone)); ?>" class="flex items-center gap-3 text-slate-800 font-bold">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-[var(--primary-color)]">
+                            <span class="icon-phone text-sm"></span>
+                        </div>
+                        <?php echo formatPhone($phone); ?>
+                    </a>
+                <?php endif; ?>
+                <?php if (!empty($email)): ?>
+                    <a href="mailto:<?php echo e($email); ?>" class="flex items-center gap-3 text-slate-600 hover:text-[var(--primary-color)] transition-colors">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-[var(--primary-color)]">
+                            <span class="icon-mail text-sm"></span>
+                        </div>
+                        <?php echo e($email); ?>
+                    </a>
+                <?php endif; ?>
             </div>
+            <?php endif; ?>
 
         </div>
     </div>

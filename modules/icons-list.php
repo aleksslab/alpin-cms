@@ -4,7 +4,7 @@
  */
 
 $subtitle = $moduleData['subtitle'] ?? '';
-$title = $moduleData['title'] ?? 'Наши преимущества';
+$title = $moduleData['title'] ?? '';
 $description = $moduleData['description'] ?? '';
 $items = $moduleData['items'] ?? [];
 

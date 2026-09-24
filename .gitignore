@@ -44,7 +44,6 @@ desktop.ini
 /config/modules/archives/dev/
 
 # === Временные и служебные файлы ===
-/config/fonts_
 /config/css/old_config.css
 /fonts/youtube.svg
 *.tmp

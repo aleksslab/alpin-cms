@@ -22,6 +22,7 @@
         "icon": "icon-list",
         "description": "Элементы с иконкой, заголовком и описанием",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
@@ -30,6 +31,7 @@
         "icon": "icon-file-text",
         "description": "Блок с текстом и изображением, особенностями и статистикой",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
@@ -73,6 +75,7 @@
         "icon": "icon-help-circle",
         "description": "Аккордеон с вопросами и ответами",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
@@ -89,6 +92,7 @@
         "icon": "icon-trending-up",
         "description": "Блок со счетчиками и анимацией при скролле",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
@@ -114,6 +118,7 @@
         "icon": "icon-timeline",
         "description": "Отображение этапов работы, истории или плана действий",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
@@ -122,6 +127,7 @@
         "icon": "icon-message-square",
         "description": "Отзывы клиентов с фото, видео и рейтингом",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
@@ -147,6 +153,7 @@
         "icon": "icon-credit-card",
         "description": "Тарифы с переключателем месячной\/годовой оплаты",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
@@ -164,6 +171,7 @@
         "icon": "icon-grid",
         "description": "Сетка портфолио с фильтрацией по категориям",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
@@ -172,6 +180,7 @@
         "icon": "icon-message-square",
         "description": "Интерактивный квиз для сбора данных и квалификации лидов",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
@@ -190,6 +199,15 @@
         "description": "Выводит любое созданное в системе меню в виде списка ссылок",
         "has_settings": true,
         "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "hero-landing": {
+        "name": "Обложка-лендинг",
+        "icon": "icon-layout-panel-top",
+        "description": "Hero для лендинга: две кнопки, визуал, микро-факты, split-раскладка",
+        "has_settings": true,
+        "auto_unpack": true,
         "version": "1.0.0",
         "author": "AlekSSLab"
     }

@@ -76,7 +76,7 @@ if (empty($items)) {
         $itemTemplate = '
         <div class="faq-item-card bg-slate-50/50 p-4 rounded-xl border border-slate-200 space-y-3">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Вопрос #{INDEX}</span>
+                <span class="js-faq-num text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Вопрос #{INDEX}</span>
                 <button type="button" class="js-remove-faq w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all cursor-pointer" title="Удалить вопрос">
                     <span class="icon-x text-sm"></span>
                 </button>

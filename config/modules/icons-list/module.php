@@ -4,7 +4,7 @@
  */
 
 $subtitle = $moduleData['subtitle'] ?? '';
-$title = $moduleData['title'] ?? 'Наши преимущества';
+$title = $moduleData['title'] ?? '';
 $description = $moduleData['description'] ?? '';
 $items = $moduleData['items'] ?? [];
 $settingsClass = $moduleData['settings']['class'] ?? '';
@@ -48,9 +48,9 @@ if (empty($items)) {
     <div id="icons-rows-container" class="space-y-3">
         <?php 
         $itemTemplate = '
-        <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-200 space-y-3">
+        <div class="js-icon-card bg-slate-50/50 p-4 rounded-xl border border-slate-200 space-y-3">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Иконка #{INDEX}</span>
+                <span class="js-icon-num text-xs font-bold text-[var(--primary-color)] uppercase tracking-wider">Иконка #{INDEX}</span>
                 <button type="button" class="js-remove-icon w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all cursor-pointer" title="Удалить иконку">
                     <span class="icon-x text-sm"></span>
                 </button>

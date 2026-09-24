@@ -9,7 +9,11 @@
 
 ### Контент
 - 📄 **Страницы** — неограниченное количество, ЧПУ, статусы (черновик/опубликована)
-- 🧩 **20+ модулей** — hero, text, cards, faq, pricing, quiz, calculator, contacts, map, carousel, slider-advanced, before-after, brands-marquee, countdown, portfolio, social-icons, stats, testimonials, timeline, text-media, icons-list, site-menu, lead-form, carousel
+- 🧩 **24 модуля** — hero, hero-landing, text, text-media, cards, 
+  icons-list, stats, timeline, faq, contacts, lead-form, quiz, 
+  calculator, pricing, testimonials, portfolio, carousel, 
+  slider-advanced, before-after, brands-marquee, countdown, 
+  map-advanced, social-icons, site-menu
 - 🏗 **Визуальный конструктор** — ряды, колонки (11 вариантов ширины), модули
 - 📋 **Меню** — иерархические, dropdown, назначение главного
 - 📱 **Адаптивные хедеры/футеры** — по 4 варианта, легко добавлять свои
@@ -167,6 +171,7 @@
 | Модуль | Назначение |
 |--------|------------|
 | `hero` | Обложка с фоном и кнопкой |
+| `hero-landing` | Hero для лендинга: 2 кнопки, визуал, микро-факты |
 | `text` | Произвольный HTML/текст |
 | `text-media` | Текст + картинка (слева/справа) |
 | `cards` | Сетка карточек |

@@ -154,7 +154,10 @@ $jsRowId = !empty($row['_jsId']) ? $row['_jsId'] : ('row_' . uniqid());
                                             $firstKey = array_key_first($modData);
                                             $firstVal = $modData[$firstKey] ?? '';
                                             if (is_string($firstVal) && strlen($firstVal) > 0) {
-                                                echo mb_strimwidth($firstVal, 0, 20, '...');
+                                                // Убираем HTML-теги ПЕРЕД выводом — иначе ломает структуру
+                                                $plain = strip_tags($firstVal);
+                                                $plain = trim(preg_replace('/\s+/', ' ', $plain));
+                                                echo e(mb_strimwidth($plain, 0, 20, '...'));
                                             } elseif (is_array($firstVal) && count($firstVal) > 0) {
                                                 echo count($firstVal) . ' эл.';
                                             }

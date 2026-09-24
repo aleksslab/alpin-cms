@@ -40,9 +40,14 @@ if ($backgroundType === 'image' && !empty($backgroundImage)) {
 } else if ($backgroundType === 'color' && !empty($backgroundColor)) {
     $bgStyle = 'background-color: ' . e($backgroundColor) . ';';
 }
+
+// === ВЫСОТА HERO ===
+// По умолчанию — на весь экран (100vh).
+// Если в settings.class есть 'hero-compact' — высота по контенту.
+$heroMinHeight = (strpos($moduleClass, 'hero-compact') !== false) ? 'auto' : '100vh';
 ?>
 
-<div class="hero-module relative overflow-hidden" style="<?php echo $bgStyle; ?>; min-height: 100vh; display: flex; align-items: center;">
+<div class="hero-module relative overflow-hidden" style="<?php echo $bgStyle; ?>; min-height: <?php echo $heroMinHeight; ?>; display: flex; align-items: center;">
     <?php if ($backgroundType === 'image'): ?>
     <div class="absolute inset-0 bg-black/40"></div>
     <?php endif; ?>
