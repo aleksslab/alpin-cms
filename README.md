@@ -1,4 +1,7 @@
 # AlPin CMS
+[![Latest Release](https://img.shields.io/github/v/release/AlekSSLab/alpin-cms)](https://github.com/AlekSSLab/alpin-cms/releases)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 
 **Flat-File CMS на PHP 7.4+** — система управления контентом без базы данных.  
 Все данные хранятся в JSON-файлах. Модульная архитектура, визуальный конструктор страниц, встроенное кеширование и минификация.
@@ -266,4 +269,5 @@
 
 - **Документация:** [docs/](docs/)
 - **FAQ:** [FAQ.md](docs/for-users/FAQ.md)
+- **Релизы** — [GitHub Releases](https://github.com/AlekSSLab/alpin-cms/releases)
 - **Issues:** [GitHub Issues](https://github.com/AlekSSLab/alpin-cms/issues)
