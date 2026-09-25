@@ -284,7 +284,7 @@ if (!defined('APP_ROOT') || empty($_SESSION['admin_auth'])) {
             </div>
 
             <!-- ИНТЕРАКТИВНЫЙ БЛОК ПРЕДУПРЕЖДЕНИЙ И ТРАНСЛИТЕРАЦИИ -->
-            <div id="js-create-warning-zone" class="matrix-container p-4 bg-slate-50 border border-slate-100 rounded-xl" style="display: none !important;">
+            <div id="js-create-warning-zone" class="p-4 bg-slate-50 border border-slate-100 rounded-xl" style="display: none !important;">
                 <div id="js-create-warning-text" class="text-xs font-semibold text-slate-500">
                     Внимание: Кириллица и пробелы в именах файлов могут усложнить их вызов по прямым ссылкам в браузере.
                 </div>

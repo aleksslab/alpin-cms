@@ -10,9 +10,11 @@ $templateId = $template['id'] ?? 'full-width';
 $showHeader = $page['show_header'] ?? true;
 $showFooter = $page['show_footer'] ?? true;
 
+$pageRows = (isset($page['rows']) && is_array($page['rows'])) ? $page['rows'] : [];
+
 $hasCustomHeader = false;
 $hasCustomFooter = false;
-foreach ($page['rows'] as $row) {
+foreach ($pageRows as $row) {
     if (($row['zone'] ?? '') === 'header') {
         $hasCustomHeader = true;
     }
@@ -24,7 +26,7 @@ foreach ($page['rows'] as $row) {
 // Определяем зоны с контентом
 $zonesWithContent = [];
 foreach ($allZones as $zoneName => $zoneConfig) {
-    $zoneRows = array_filter($page['rows'], function($row) use ($zoneName) {
+    $zoneRows = array_filter($pageRows, function($row) use ($zoneName) {
         return ($row['zone'] ?? 'main') === $zoneName;
     });
     if (!empty($zoneRows)) {
@@ -49,7 +51,7 @@ if ($showHeader) {
     }
 }
 
-if (!empty($page['rows'])) {
+if (!empty($pageRows)) {
     
     $flexZones = ['main', 'sidebar-left', 'sidebar-right'];
     $flexOpen = false;

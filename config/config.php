@@ -6,12 +6,8 @@ if (function_exists('header_remove')) {
 }
 
 // === ОТОБРАЖЕНИЕ ОШИБОК ===
-// На локалке
-define('DEBUG_SITE', true);
-define('DEBUG_ADMIN', true);
-// На проде
-//define('DEBUG_SITE', false);
-//define('DEBUG_ADMIN', false);
+define('DEBUG_SITE', false);
+define('DEBUG_ADMIN', false);
 
 if (!defined('DEBUG_SITE'))  define('DEBUG_SITE', false);
 if (!defined('DEBUG_ADMIN')) define('DEBUG_ADMIN', false);
