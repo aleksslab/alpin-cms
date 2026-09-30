@@ -64,7 +64,7 @@ desktop.ini
 !/config/modules/pages/
 !/config/modules/previews/
 /config/modules/previews/*
-!/config/modules/previews/.geetkeep
+!/config/modules/previews/.gitkeep
 
 # Сайт
 /modules/*.php 
