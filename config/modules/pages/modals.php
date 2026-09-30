@@ -4,8 +4,6 @@
  */
 $modules = getModulesData();
 $token = $_SESSION['csrf_token'] ?? '';
-// Подключаем медиа-модалку для zoomCarouselImage
-include APP_ROOT . '/config/core/media_modal.php';
 ?>
 
 <!-- Модалка выбора модуля -->
@@ -29,15 +27,10 @@ include APP_ROOT . '/config/core/media_modal.php';
                     <button type="button" onclick="window.selectModule('<?php echo e($key); ?>')" 
                             class="w-full p-3 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl text-left transition-all flex items-center gap-3">
 
-                        <?php if ($hasPreview): ?>
-                            <div onclick="event.stopPropagation(); zoomCarouselImage(this)" 
-                                 class="carousel-inline-preview cursor-pointer" 
-                                 title="Кликните для увеличения" 
-                                 style="width:40px !important;height:40px !important;min-width:40px !important;">
-                                <img src="<?php echo $previewImg; ?>" 
-                                     class="js-slide-preview-img w-full h-full object-cover" 
-                                     alt="Превью модуля">
-                            </div>
+                        <?php if ($hasPreview): ?>                            
+                            <img src="<?php echo $previewImg; ?>" 
+                                 class="w-[40px] h-[40px] object-cover rounded-xl" 
+                                 alt="Превью модуля">
                         <?php else: ?>
                             <span class="<?php echo e($mod['icon'] ?? 'icon-box'); ?> text-lg text-slate-400 w-[40px] text-center"></span>
                         <?php endif; ?>

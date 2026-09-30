@@ -40,9 +40,6 @@ desktop.ini
 # === Логи ===
 *.log
 
-# === Папки/файлы разработки модулей ===
-/config/modules/archives/dev/
-
 # === Временные и служебные файлы ===
 /config/css/old_config.css
 /fonts/youtube.svg
@@ -56,3 +53,22 @@ desktop.ini
 /favicon_iсo.zip
 /favicon-512.png
 /generate_test_pages.php
+
+# === Распакованные модули ===
+# Админка
+/config/modules/*/
+!/config/modules/archives/
+/config/modules/archives/*/
+!/config/modules/config\_vars/
+!/config/modules/menu/
+!/config/modules/pages/
+!/config/modules/previews/
+/config/modules/previews/*
+!/config/modules/previews/.geetkeep
+
+# Сайт
+/modules/*.php 
+/js/*.js
+!/js/script.js
+/css/*.css
+!/css/style.css
