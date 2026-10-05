@@ -370,6 +370,12 @@ function loadPage(string $slug): ?array {
     if (empty($page['status']) || $page['status'] !== 'published') {
         return null;
     }
+
+    // Страховка: если срок снятия с публикации истёк, но cron ещё не отработал —
+    // страница уже невидима.
+    if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] <= time()) {
+        return null;
+    }
     
     // Добавляем поля по умолчанию, если их нет
     if (!isset($page['show_header'])) {

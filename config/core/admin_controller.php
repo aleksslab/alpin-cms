@@ -59,6 +59,39 @@ function regenerateCronToken(): string {
 }
 
 /**
+ * Возвращает минимальный интервал между запусками виртуального крона публикации.
+ * В секундах. Защита от долбёжки при частых перезагрузках админки.
+ *
+ * @return int
+ */
+function getCronPublishMinInterval(): int {
+    return 300; // 5 минут
+}
+
+/**
+ * Возвращает время последнего запуска виртуального крона публикации (Unix timestamp).
+ * 0 — если ни разу не запускался.
+ *
+ * @return int
+ */
+function getLastCronPublishTime(): int {
+    $settings = getSettingsData();
+    return intval($settings['last_cron_publish'] ?? 0);
+}
+
+/**
+ * Сохраняет время последнего запуска виртуального крона публикации.
+ *
+ * @param int $timestamp
+ * @return void
+ */
+function setLastCronPublishTime(int $timestamp): void {
+    $settings = getSettingsData();
+    $settings['last_cron_publish'] = $timestamp;
+    saveData('settings', $settings);
+}
+
+/**
  * Проверяет архив на ZIP Slip — небезопасные имена файлов.
  * 
  * Блокирует: .., абсолютные пути (/...), Windows-пути (C:\...), NUL-байты.
@@ -514,6 +547,7 @@ function handleSaveSettings(): array {
             // Иначе — сохраняем текущий
             return getCronToken();
         })(),
+        'last_cron_publish' => getLastCronPublishTime(),
     ];
     
     $oldSettings = getSettingsData(true);
@@ -1648,6 +1682,10 @@ function handleSavePage(): array {
     $slug = trim($_POST['slug'] ?? '');
     $template = trim($_POST['template'] ?? 'full-width');
     $status = trim($_POST['status'] ?? 'draft');
+    $allowedStatuses = ['draft', 'scheduled', 'published', 'archived'];
+    if (!in_array($status, $allowedStatuses, true)) {
+        $status = 'draft';
+    }
     $metaDescription = trim($_POST['meta_description'] ?? '');
     $metaKeywords = trim($_POST['meta_keywords'] ?? '');
     $showHeader = isset($_POST['show_header']) ? true : false;
@@ -1726,6 +1764,51 @@ function handleSavePage(): array {
         }
     }
     
+    
+    // Даты
+    $publishAtRaw   = trim($_POST['publish_at'] ?? '');
+    $unpublishAtRaw = trim($_POST['unpublish_at'] ?? '');
+    $publishAt   = $publishAtRaw !== '' ? strtotime($publishAtRaw) : null;
+    $unpublishAt = $unpublishAtRaw !== '' ? strtotime($unpublishAtRaw) : null;
+    $now = time();
+    
+    // Валидация дат
+    if ($publishAtRaw !== '' && $publishAt === false) {
+        return ['success' => '', 'error' => 'Некорректный формат даты публикации.'];
+    }
+    if ($unpublishAtRaw !== '' && $unpublishAt === false) {
+        return ['success' => '', 'error' => 'Некорректный формат даты снятия с публикации.'];
+    }
+
+    // Логика по статусу
+    if ($status === 'scheduled') {
+        if ($publishAt === null) {
+            return ['success' => '', 'error' => 'Для запланированной публикации укажите дату и время.'];
+        }
+        if ($publishAt <= $now) {
+            return ['success' => '', 'error' => 'Дата публикации уже прошла. Выберите будущую дату или смените статус на «Опубликована».'];
+        }
+    }
+
+    if ($unpublishAt !== null) {
+        if ($unpublishAt <= $now) {
+            return ['success' => '', 'error' => 'Дата снятия с публикации уже прошла. Выберите будущую дату.'];
+        }
+        if ($publishAt !== null && $unpublishAt <= $publishAt) {
+            return ['success' => '', 'error' => 'Дата снятия с публикации должна быть позже даты публикации.'];
+        }
+    }
+    
+    // Очистка неактуальных дат в зависимости от статуса
+    if ($status === 'draft' || $status === 'archived') {
+        $publishAt = null;
+        $unpublishAt = null;
+    }
+    if ($status === 'published') {
+        $publishAt = null;  // не нужна для уже опубликованной
+        // unpublish_at оставляем — может пригодиться (автоснятие)
+    }
+
     // Формируем структуру страницы
     $pageData = [
         'id' => $id,
@@ -1733,6 +1816,8 @@ function handleSavePage(): array {
         'slug' => $slug,
         'template' => $template,
         'status' => $status,
+        'publish_at' => $publishAt,
+        'unpublish_at' => $unpublishAt,
         'meta' => [
             'description' => $metaDescription,
             'keywords' => $metaKeywords
@@ -1744,18 +1829,8 @@ function handleSavePage(): array {
     
     // Сохраняем файл через безопасную атомарную функцию ядра
     if (savePageData($id, $pageData) !== false) {
-        // Удаляем кеш страницы
-        $cacheFile = APP_ROOT . '/cache/pages/' . ($id === getHomePageId() ? 'home' : $id) . '.html';
-        if (file_exists($cacheFile)) {
-            @unlink($cacheFile);
-        }
-
-        // Удаляем кеш ассетов этой страницы
-        $pageId = $id === getHomePageId() ? 'home' : $id;
-        $files = glob(APP_ROOT . '/cache/assets/' . $pageId . '.{css,js}', GLOB_BRACE);
-        foreach ($files as $file) {
-            @unlink($file);
-        }
+        // Удаляем кеш страницы (HTML + объединённые ассеты)
+        clearPageCacheById($id);
         
         $msg = 'Страница "' . $title . '" успешно ' . ($action === 'create' ? 'создана' : 'обновлена');
         logAction('page_save', $msg . ' (ID: ' . $id . ')', 'INFO');
@@ -1765,6 +1840,153 @@ function handleSavePage(): array {
     }
     logAction('page_save', 'Ошибка сохранения страницы "' . $title . '" (ID: ' . $id . ')', 'ERROR');
     return ['success' => '', 'error' => 'Ошибка при сохранении файла. Проверьте права на запись.'];
+}
+
+/**
+ * ХЭНДЛЕР: Cron-публикация и архивация страниц.
+ * 
+ * Логика:
+ *   - scheduled + publish_at <= now   → published (publish_at = null)
+ *   - published + unpublish_at <= now → archived  (unpublish_at = null)
+ * 
+ * @param string $clientToken Токен из GET
+ * @return void
+ */
+function handleCronPublishAction(string $clientToken): void {
+    // Проверка токена (тот же, что у крона бэкапов)
+    if ($clientToken === '' || $clientToken !== getCronToken()) {
+        header('HTTP/1.1 403 Forbidden');
+        die('Error: Access denied');
+    }
+
+    $pagesDir = DATA_DIR . 'pages/';
+    if (!is_dir($pagesDir)) {
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Status: OK, no pages";
+        exit;
+    }
+
+    $files = glob($pagesDir . '*.json');
+    if (empty($files)) {
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Status: OK, no pages";
+        exit;
+    }
+
+    $now = time();
+    $publishedCount = 0;
+    $archivedCount  = 0;
+    $errors         = 0;
+
+    foreach ($files as $file) {
+        $page = _jsonToArray($file);
+        if (empty($page['id'])) {
+            continue;
+        }
+
+        $changed = false;
+
+        // Сценарий А: scheduled → published
+        if (($page['status'] ?? '') === 'scheduled'
+            && !empty($page['publish_at'])
+            && (int)$page['publish_at'] <= $now
+        ) {
+            $page['status']     = 'published';
+            $page['publish_at'] = null;
+
+            // Если unpublish_at уже в прошлом — сразу archived
+            if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] <= $now) {
+                $page['status']       = 'archived';
+                $page['unpublish_at'] = null;
+                $archivedCount++;
+                logAction('page_archive', 'Автоснятие: "' . ($page['title'] ?? $page['id']) . '" (ID: ' . $page['id'] . ')', 'INFO');
+            } else {
+                $publishedCount++;
+                logAction('page_publish', 'Автопубликация: "' . ($page['title'] ?? $page['id']) . '" (ID: ' . $page['id'] . ')', 'INFO');
+            }
+
+            $changed = true;
+        }
+        // Сценарий Б: published → archived
+        elseif (($page['status'] ?? '') === 'published'
+            && !empty($page['unpublish_at'])
+            && (int)$page['unpublish_at'] <= $now
+        ) {
+            $page['status']       = 'archived';
+            $page['unpublish_at'] = null;
+
+            $archivedCount++;
+            $changed = true;
+
+            logAction('page_archive', 'Автоснятие: "' . ($page['title'] ?? $page['id']) . '" (ID: ' . $page['id'] . ')', 'INFO');
+        }
+
+        if ($changed) {
+            if (savePageData($page['id'], $page)) {
+                clearPageCacheById($page['id']);
+            } else {
+                $errors++;
+                logAction('page_publish', 'Ошибка записи при автопубликации: ' . $page['id'], 'ERROR');
+            }
+        }
+    }
+
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Status: OK, published: {$publishedCount}, archived: {$archivedCount}";
+    if ($errors > 0) {
+        echo ", errors: {$errors}";
+    }
+    exit;
+}
+
+/**
+ * Возвращает метку, CSS-классы и иконку для бейджа статуса страницы.
+ * Используется в списке страниц (pages.php).
+ *
+ * @param array $page Данные страницы (нужны status, publish_at, unpublish_at)
+ * @return array ['label' => string, 'class' => string, 'icon' => string]
+ */
+function getPageStatusBadge(array $page): array {
+    $status = $page['status'] ?? 'draft';
+    $now = time();
+
+    switch ($status) {
+        case 'published':
+            if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] > $now) {
+                return [
+                    'label' => 'Снятие запланировано',
+                    'class' => 'text-orange-700 bg-orange-50',
+                    'icon' => 'icon-clock'
+                ];
+            }
+            return [
+                'label' => 'Опубликована',
+                'class' => 'text-emerald-800 bg-emerald-50',
+                'icon' => 'icon-circle-check'
+            ];
+
+        case 'scheduled':
+            return [
+                'label' => 'Запланирована',
+                'class' => 'text-blue-700 bg-blue-50',
+                'icon' => 'icon-calendar-clock'
+            ];
+
+        case 'archived':
+            return [
+                'label' => 'Снята с публикации',
+                'class' => 'text-slate-600 bg-slate-100',
+                'icon' => 'icon-archive'
+            ];
+
+        case 'draft':
+        default:
+            return [
+                'label' => 'Черновик',
+                'class' => 'text-amber-700 bg-amber-50',
+                'icon' => 'icon-file-edit'
+            ];
+    }
 }
 
 /**
@@ -3227,6 +3449,35 @@ function clearPageCache(): void {
     $assetsDir = APP_ROOT . '/cache/assets/';
     if (is_dir($assetsDir)) {
         $files = glob($assetsDir . '*.{css,js}', GLOB_BRACE);
+        foreach ($files as $file) {
+            @unlink($file);
+        }
+    }
+}
+
+/**
+ * Сбрасывает кеш страницы по её ID: HTML-кеш + объединённые ассеты.
+ * Учитывает, что главная страница кешируется как home.html.
+ *
+ * @param string $id ID страницы
+ * @return void
+ */
+function clearPageCacheById(string $id): void {
+    if ($id === '') {
+        return;
+    }
+
+    $cacheKey = ($id === getHomePageId()) ? 'home' : $id;
+
+    // HTML-кеш страницы
+    $cacheFile = APP_ROOT . '/cache/pages/' . $cacheKey . '.html';
+    if (file_exists($cacheFile)) {
+        @unlink($cacheFile);
+    }
+
+    // Объединённые ассеты страницы
+    $files = glob(APP_ROOT . '/cache/assets/' . $cacheKey . '.{css,js}', GLOB_BRACE);
+    if (is_array($files)) {
         foreach ($files as $file) {
             @unlink($file);
         }

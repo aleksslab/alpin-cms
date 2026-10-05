@@ -23,6 +23,11 @@ $token = $_SESSION['csrf_token'] ?? '';
 $pageTitle = $isEdit ? ($editPage['title'] ?? '') : ($_POST['title'] ?? '');
 $pageSlug = $isEdit ? ($editPage['slug'] ?? '') : ($_POST['slug'] ?? '');
 $pageStatus = $isEdit ? ($editPage['status'] ?? 'draft') : ($_POST['status'] ?? 'draft');
+$pagePublishAt   = $isEdit ? ($editPage['publish_at'] ?? null)   : null;
+$pageUnpublishAt = $isEdit ? ($editPage['unpublish_at'] ?? null) : null;
+// Конвертируем Unix timestamp в формат datetime-local (Y-m-d\TH:i)
+$publishAtValue   = $pagePublishAt   ? date('Y-m-d\TH:i', (int)$pagePublishAt)   : '';
+$unpublishAtValue = $pageUnpublishAt ? date('Y-m-d\TH:i', (int)$pageUnpublishAt) : '';
 $pageMetaDesc = $isEdit ? ($editPage['meta']['description'] ?? '') : ($_POST['meta_description'] ?? '');
 $pageMetaKeywords = $isEdit ? ($editPage['meta']['keywords'] ?? '') : ($_POST['meta_keywords'] ?? '');
 
@@ -98,14 +103,58 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
                         </div>
                     </div>
                     
-                    <div class="editor-row">
+                    <div class="editor-row" style="align-items: flex-start !important;">
                         <div class="editor-field">
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Статус</label>
-                            <label class="flex items-center gap-3 cursor-pointer mt-2">
-                                <input type="checkbox" name="status" value="published" <?php echo ($pageStatus === 'published') ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] rounded border-slate-300 focus:ring-[var(--primary-color)]">
-                                <span class="text-sm font-medium text-slate-700">Опубликована</span>
-                            </label>
-                            <input type="hidden" name="status_hidden" value="draft">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Статус публикации</label>
+
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'draft' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="draft" <?php echo $pageStatus === 'draft' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                    <span class="text-sm font-medium text-slate-700 whitespace-nowrap">Черновик</span>
+                                </label>
+
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'scheduled' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="scheduled" <?php echo $pageStatus === 'scheduled' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                    <span class="text-sm font-medium text-slate-700 whitespace-nowrap">По расписанию</span>
+                                </label>
+
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'published' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="published" <?php echo $pageStatus === 'published' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                    <span class="text-sm font-medium text-slate-700 whitespace-nowrap">Опубликована</span>
+                                </label>
+
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'archived' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="archived" <?php echo $pageStatus === 'archived' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                    <span class="text-sm font-medium text-slate-700 whitespace-nowrap">Снята с публикации</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Даты: отдельная строка, видимость через JS -->
+                    <div id="js-dates-row">
+                        <div class="editor-row" style="align-items: flex-start !important;">
+                            <div class="editor-field" id="js-publish-at-field">
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                    Опубликовать <span class="text-rose-500 js-required-star">*</span>
+                                </label>
+                                <input type="datetime-local"
+                                       name="publish_at"
+                                       id="publish-at-input"
+                                       value="<?php echo e($publishAtValue); ?>"
+                                       class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl text-base text-slate-800 focus:outline-none focus:border-[var(--primary-color)]">
+                                <p class="text-[10px] text-slate-400 mt-1">Дата и время автоматической публикации.</p>
+                            </div>
+
+                            <div class="editor-field" id="js-unpublish-at-field">
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Снять с публикации</label>
+                                <input type="datetime-local"
+                                       name="unpublish_at"
+                                       id="unpublish-at-input"
+                                       value="<?php echo e($unpublishAtValue); ?>"
+                                       class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl text-base text-slate-800 focus:outline-none focus:border-[var(--primary-color)]">
+                                <p class="text-[10px] text-slate-400 mt-1">Оставьте пустым, если снимать не нужно.</p>
+                            </div>
                         </div>
                     </div>
                 </div>

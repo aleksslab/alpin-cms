@@ -72,7 +72,7 @@ $currentPage = $paginated['page'];
                     <?php foreach ($pagesList as $page): ?>
                         <?php 
                         $isHome = ($page['slug'] === '');
-                        $statusClass = ($page['status'] === 'published') ? 'text-emerald-800 bg-emerald-50' : 'text-amber-600 bg-amber-50';
+                        $badge = getPageStatusBadge($page);
                         ?>
                         <tr class="hover:bg-slate-50 transition-colors group border-b border-slate-100">
                             <td class="py-3 px-4 font-mono text-xs text-slate-400"><?php echo e($page['id']); ?></td>
@@ -94,8 +94,9 @@ $currentPage = $paginated['page'];
                             </td>
                             <td class="py-3 text-slate-600"><?php echo e($page['template'] ?? 'full-width'); ?></td>
                             <td class="py-3">
-                                <span class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold <?php echo $statusClass; ?>">
-                                    <?php echo $page['status'] === 'published' ? 'Опубликована' : 'Черновик'; ?>
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold <?php echo $badge['class']; ?>">
+                                    <span class="<?php echo e($badge['icon']); ?> text-[10px]"></span>
+                                    <?php echo e($badge['label']); ?>
                                 </span>
                             </td>
                             <td class="py-3 text-right px-4">
@@ -144,7 +145,7 @@ $currentPage = $paginated['page'];
         <?php foreach ($pagesList as $page): ?>
             <?php 
             $isHome = ($page['slug'] === '');
-            $statusClass = ($page['status'] === 'published') ? 'text-emerald-800 bg-emerald-50' : 'text-amber-600 bg-amber-50';
+            $badge = getPageStatusBadge($page);
             ?>
             <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                 <div class="flex items-start justify-between border-b border-slate-100 pb-3 mb-3">
@@ -163,8 +164,9 @@ $currentPage = $paginated['page'];
                             <?php endif; ?>
                         </div>
                     </div>
-                    <span class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold <?php echo $statusClass; ?> flex-shrink-0">
-                        <?php echo $page['status'] === 'published' ? 'Опубликована' : 'Черновик'; ?>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold <?php echo $badge['class']; ?>">
+                        <span class="<?php echo e($badge['icon']); ?> text-[10px]"></span>
+                        <?php echo e($badge['label']); ?>
                     </span>
                 </div>
                 

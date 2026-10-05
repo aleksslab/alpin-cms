@@ -91,6 +91,7 @@ if ($isAuth) {
     
     require_once 'core/admin_controller.php';
     
+    // --- ВИРТУАЛЬНЫЙ КРОН БЭКАПА ---
     $cronSettings = getBackupSettingsData();
     // Проверяем, включен ли Виртуальный Крон в сохраненном JSON-конфиге
     if (!empty($cronSettings['cron_virtual'])) {
@@ -119,6 +120,33 @@ if ($isAuth) {
             ]);
             @file_get_contents($cronUrl, false, $cronContext);
         }
+    }
+    
+    // --- ВИРТУАЛЬНЫЙ КРОН ПУБЛИКАЦИИ ---
+    // Дёргаемся при заходе админа, но не чаще одного раза в 5 минут.
+    $lastPublish = getLastCronPublishTime();
+    $publishInterval = getCronPublishMinInterval();
+
+    if (time() >= ($lastPublish + $publishInterval)) {
+        // Сразу помечаем, что «мы запустились», до фактического запроса —
+        // чтобы следующий F5 не отправил второй запрос.
+        setLastCronPublishTime(time());
+
+        $cronProtocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+        $safeHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        if (!preg_match('#^[a-z0-9\-\.]+(:\d+)?$#i', $safeHost)) {
+            $safeHost = 'localhost';
+        }
+
+        $publishUrl = $cronProtocol . $safeHost . dirname($_SERVER['SCRIPT_NAME']) . '/cron/publish.php?token=' . urlencode(getCronToken());
+
+        $publishContext = stream_context_create([
+            'http' => [
+                'timeout' => 1.0,
+                'ignore_errors' => true
+            ]
+        ]);
+        @file_get_contents($publishUrl, false, $publishContext);
     }
     
     // =========================================================================

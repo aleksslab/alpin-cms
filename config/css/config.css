@@ -586,7 +586,7 @@ input[type="checkbox"]:disabled {
 /* Таблицы логов IP */
 .desktop-only { display: none !important; }
 .mobile-only { display: block !important; }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
     .desktop-only { display: table !important; }
     .mobile-only { display: none !important; }
 }
