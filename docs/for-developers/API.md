@@ -161,7 +161,8 @@ $page = loadPage('about');
 ```
 
 **Валидация** **slug** (**regex**, **без** `..`).  
-**Проверка** `status === 'published'`.
+**Проверка** `status === 'published'`.  
+**Проверка** `unpublish_at`: если задан и уже наступил — возвращает `null` (подстраховка от задержки cron).
 
 ---
 
@@ -338,8 +339,18 @@ $res = handleSaveSettings();
 
 **Сохраняет** **страницу** (**создание**/**редактирование**).
 
-**Валидация** `title`, `slug`, `template`, `status`.  
-**Сохранение** **rows**/**columns**/**modules**.
+**Валидация** `title`, `slug`, `template`, `status` (4 значения: `draft` / `scheduled` / `published` / `archived`).  
+**Валидация дат:**
+- `scheduled` требует `publish_at` в будущем.
+- `unpublish_at` (если задан) — в будущем и позже `publish_at`.
+- Даты в прошлом → ошибка.
+
+**Очистка дат по статусу:**
+- `draft` / `archived` → обе даты обнуляются.
+- `published` → `publish_at` обнуляется, `unpublish_at` сохраняется.
+
+**Сохранение** `rows`/`columns`/`modules`.  
+**Сброс кеша** страницы через `clearPageCacheById($id)`.
 
 ---
 
@@ -447,13 +458,101 @@ $res = handleSaveSettings();
 
 ### `handleCronBackupAction(string $token): void`
 
-**Крон** **бэкапа** (**токен** **из** `$_GET['token']`).
+**Крон** **бэкапа** (**токен** **из** `$_GET['token']`).  
+**Сравнение с** `getCronToken()` — общий токен для бэкапов и публикации, хранится в `data/settings.json`.
 
 ---
 
 ### `clearPageCache(): void`
 
 **Очистка** **кеша** **страниц** + **объединённых** **ассетов**.
+
+---
+
+### `clearPageCacheById(string $id): void`
+
+**Очистка кеша одной страницы** (HTML + объединённые ассеты).
+
+Отличие от `clearPageCache()`: чистит **только** страницу с указанным ID, а не весь кеш. Используется при сохранении одной страницы или при её публикации/архивации — чтобы не сбрасывать кеш всего сайта.
+
+```php
+clearPageCacheById('about');
+// Удаляет cache/pages/about.html
+// Удаляет cache/assets/about.css, cache/assets/about.js
+```
+
+**Особенность:** для главной страницы (getHomePageId()) ключ кеша — home, а не реальный ID. Учитывается автоматически.
+
+**Используется в:**
+
+handleSavePage() — при сохранении страницы.
+
+handleCronPublishAction() — при автопубликации / архивации.
+
+---
+
+## ⏰ Cron-публикация
+
+### `handleCronPublishAction(string $token): void`
+
+**Логика крона публикации страниц.** Вызывается из `config/cron/publish.php`.
+
+**Что делает:**
+
+1. Проверяет `token` через `getCronToken()`.
+2. Проходит по всем файлам `data/pages/*.json`.
+3. Применяет переходы:
+   - `scheduled` + `publish_at <= now` → `published`, `publish_at = null`.
+   - Если при этом `unpublish_at` уже в прошлом — сразу `archived` (без промежуточного `published`).
+   - `published` + `unpublish_at <= now` → `archived`, `unpublish_at = null`.
+4. Сбрасывает кеш затронутых страниц через `clearPageCacheById()`.
+5. Логирует переходы (`page_publish`, `page_archive`).
+6. Отдаёт plain-text: `Status: OK, published: N, archived: M`.
+
+**Не использует** `handleSavePage()` — для крона простая прямая запись через `savePageData()` (без POST-валидации).
+
+---
+
+### `getLastCronPublishTime(): int`
+
+**Время последнего запуска виртуального крона публикации** (Unix timestamp).  
+`0` — если ни разу не запускался.
+
+```php
+$last = getLastCronPublishTime();
+setLastCronPublishTime(int $timestamp): void
+```
+**Сохраняет время последнего запуска** виртуального крона публикации в data/settings.json.
+
+---
+
+### `setLastCronPublishTime(int $timestamp): void`
+**Сохраняет время последнего запуска** виртуального крона публикации в data/settings.json.
+
+```php
+setLastCronPublishTime(time());
+```
+**Используется в** config/index.php перед асинхронным вызовом крона — ограничивает частоту (не чаще 1 раза в 5 минут).
+
+--- 
+
+### `getCronToken(): string`
+**Возвращает общий токен** для cron/backup.php и cron/publish.php.
+Если в settings.json токена нет — генерирует bin2hex(random_bytes(16)) и сохраняет.
+
+```php
+$token = getCronToken();
+```
+---
+
+### `regenerateCronToken(): string`
+**Принудительно генерирует новый токен** и сохраняет в settings.json.
+**Внимание:** сломает все настроенные крон-задачи (бэкап + публикация).
+
+```php
+$newToken = regenerateCronToken();
+```
+**Вызывается** из формы «Интеграция с планировщиком» в Настройках сайта (через AJAX-эндпоинт `generate_cron_token` + сохранение формы).
 
 ---
 
@@ -581,6 +680,31 @@ logAction('auth_failed', 'Неудачная попытка', 'WARNING');
 ### `getPlainText(): string`
 
 **Название** **сайта** **без** **HTML-тегов**.
+
+---
+
+## 🏷 Статусы страниц
+
+### `getPageStatusBadge(array $page): array`
+
+**Возвращает** метку, CSS-классы и иконку для бейджа статуса страницы.
+
+```php
+$badge = getPageStatusBadge($page);
+// ['label' => 'Опубликована', 'class' => 'text-emerald-800 bg-emerald-50', 'icon' => 'icon-circle-check']
+```
+
+**Логика:**
+
+| Условие | Label | Класс |
+|---------|-------|-------|
+| `draft` | Черновик | amber |
+| `scheduled` | Запланирована | blue |
+| `published` + `unpublish_at` в будущем | Снятие запланировано | orange |
+| `published` (без `unpublish_at` или оно в прошлом) | Опубликована | emerald |
+| `archived` | Снята с публикации | slate |
+
+**Используется** в `pages.php` — и в десктопной таблице, и в мобильных карточках.
 
 ---
 

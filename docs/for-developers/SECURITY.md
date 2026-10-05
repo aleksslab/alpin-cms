@@ -554,6 +554,89 @@ if (!file_exists($htaccessFile) ||
 
 ---
 
+## 🗝 Токен крона
+
+### Где хранится
+
+**`data/settings.json`** — поле **`cron_token`**.
+
+**Не в `config/data/backup_config.json`** (как было до v1.3.0). Причина: токен **общий** для бэкапов и публикации страниц, а `backup_config.json` — конфиг только бэкапов.
+
+### Как генерируется
+
+```php
+function getCronToken(): string {
+    $settings = getSettingsData();
+    if (!empty($settings['cron_token'])) {
+        return (string)$settings['cron_token'];
+    }
+    return regenerateCronToken();  // bin2hex(random_bytes(16))
+}
+```
+
+**32 hex-символа** (`bin2hex(random_bytes(16))`). Хранится в открытом виде — токен **не секрет уровня пароля**, он лишь отделяет «свой» запрос от чужого.
+
+### Где используется
+
+**Два эндпоинта:**
+
+| URL | Обработчик |
+|-----|-----------|
+| `/config/cron/backup.php?token=...` | `handleCronBackupAction()` |
+| `/config/cron/publish.php?token=...` | `handleCronPublishAction()` |
+
+**Оба сравнивают переданный токен с `getCronToken()`:**
+
+```php
+if ($clientToken === '' || $clientToken !== getCronToken()) {
+    header('HTTP/1.1 403 Forbidden');
+    die('Error: Access denied');
+}
+```
+
+### Зачем токен вообще
+
+**Защита от случайного/чужого вызова крона.** Эндпоинты `cron/*.php` доступны из браузера. Без токена любой мог бы дёргать бэкап или публикацию.
+
+**Что токен **не** защищает:**
+- Не защищает `backup_config.json` (если утёк — там нет токена).
+- Не защищает от DoS — злоумышленник может долбить endpoint, но получить 403.
+
+### Перегенерация
+
+**Где:** Настройки сайта → секция «Интеграция с планировщиком».
+
+**Что делает:** сгенерировать новый токен и сохранить его **только при нажатии «Сохранить настройки»** (не мгновенно).
+
+**UI:**
+1. Клик «Перегенерировать» → подтверждение с предупреждением.
+2. AJAX `generate_cron_token` возвращает новый токен (без сохранения).
+3. JS подставляет новый токен в поле и в URL кронов.
+4. Токен **записывается в `settings.json`** только при сохранении формы.
+
+**Последствия:** все настроенные внешние крон-задачи сломаются — надо обновить URL в планировщике хостинга. Предупреждение в UI явно об этом говорит.
+
+### Сохранение в handleSaveSettings
+
+**Важно:** `handleSaveSettings()` **полностью пересобирает** `$newSettings`. Без явного сохранения `cron_token` и `last_cron_publish` — они **теряются** при любом сохранении настроек сайта.
+
+**Решение** (в блоке «СОХРАНЯЕМ ПОЛЯ, КОТОРЫЕ НЕ В ФОРМЕ»):
+
+```php
+'cron_token' => (function() {
+    $posted = trim($_POST['cron_token'] ?? '');
+    if (preg_match('/^[a-f0-9]{32}$/i', $posted)) {
+        return $posted;  // валидный новый токен из формы
+    }
+    return getCronToken();  // текущий
+})(),
+'last_cron_publish' => getLastCronPublishTime(),
+```
+
+**Валидация `preg_match`** — защита от записи произвольной строки в `cron_token` через POST.
+
+---
+
 ## 📋 Чек-лист при добавлении кода
 
 - [ ] **POST** — проверка `csrf_token`.
@@ -566,6 +649,7 @@ if (!file_exists($htaccessFile) ||
 - [ ] **ZipArchive** — `detectZipSlip` **перед** `extractTo`.
 - [ ] **File write** — `safeFileWrite` (**flock**).
 - [ ] **Логирование** — `logAction`.
+- [ ] **Токен крона** — если добавляешь новый крон-эндпоинт, используй `getCronToken()` для проверки; храни только в `settings.json`, не в конфигах подсистем.
 - [ ] **Ошибки** — не **раскрывать** **пути**/**данные**.
 
 ---

@@ -2,6 +2,49 @@
 
 Все значимые изменения проекта.
 
+## [Release version 1.3.0] — 2026-10-05
+
+### Добавлено
+
+- **Планирование публикации** — 4 статуса страницы:
+  - `draft` — черновик, невидим на фронте.
+  - `scheduled` — запланирована, станет видимой в `publish_at`.
+  - `published` — опубликована.
+  - `archived` — снята с публикации (вручную или по `unpublish_at`).
+- **Поля страницы** `publish_at` / `unpublish_at` (Unix timestamp в JSON).
+- **Cron-публикация** — `config/cron/publish.php`:
+  - `scheduled + publish_at <= now` → `published`.
+  - `published + unpublish_at <= now` → `archived`.
+- **Виртуальный крон публикации** — асинхронный вызов при заходе админа (не чаще 1 раза в 5 минут).
+- **UI в форме редактирования страницы** — 4 radio + два `datetime-local`.
+- **Бейджи статусов** в списке страниц (5 вариантов).
+- **Секция «Интеграция с планировщиком»** в Настройках сайта (токен, URL кронов, перегенерация).
+
+### Изменено
+
+- **Токен крона** перенесён из `config/data/backup_config.json` в `data/settings.json`.
+  Один токен используется и для бэкапов, и для публикации страниц.
+- **`cron_backup.php`** → **`config/cron/backup.php`**. URL изменился.
+- **`handleSavePage`** — валидация дат и 4 статусов.
+- **`loadPage`** — проверка `unpublish_at` (подстраховка от задержки cron).
+- **`handleSaveSettings`** — сохраняет `cron_token` и `last_cron_publish` (не теряет при сохранении).
+
+### Технические детали
+
+- **`getCronToken()`** / **`regenerateCronToken()`** — управление токеном.
+- **`handleCronPublishAction()`** — логика крона публикации.
+- **`clearPageCacheById()`** — сброс кеша одной страницы (без полного сброса).
+- **`getPageStatusBadge()`** — единая логика бейджей статусов.
+- **`getLastCronPublishTime()`** / **`setLastCronPublishTime()`** — трекинг запусков виртуального крона.
+- **AJAX-эндпоинт** `generate_cron_token` — генерация токена без сохранения (запись только через форму).
+
+### Исправлено
+
+- **Потеря `cron_token`** при сохранении настроек сайта (полная пересборка `settings.json`).
+- **Потеря `publish_at` / `unpublish_at`** при смене статуса на `draft` / `archived` (обнуление).
+- **Fatal error** в `cron_backup.php` — `admin_controller.php` теперь самодостаточен (`require functions.php`).
+
+
 ## [Release version 1.2.0] — 2026-09-24
 
 ### Добавлено

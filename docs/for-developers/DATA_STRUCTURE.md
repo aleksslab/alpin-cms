@@ -14,6 +14,7 @@
 | `config/data/modules.json` | Список модулей |
 | `config/data/templates.json` | Список шаблонов |
 | `config/data/backup_config.json` | Настройки бэкапов |
+| `config/data/login_attempts.json` | Логин-попытки, баны IP |
 
 ---
 
@@ -78,8 +79,127 @@
 
     "home_page_id": "home",
     "main_menu": "header_main"
+    "cron_token": "a1b2c3d4e5f6...",
+    "last_cron_publish": 1735689600
 }
 ```
+
+### Поля
+
+**Контактная информация:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `name` | string | Название сайта. HTML разрешён (валидация + `sanitizeHtml`). |
+| `slogan` | string | Слоган. HTML разрешён. |
+| `phone` | string | Телефон. Только `0-9+`. Формат при выводе — `formatPhone()`. |
+| `email` | string | Email. Валидация `FILTER_VALIDATE_EMAIL`. |
+| `address` | string | Адрес. HTML вырезается при выводе. |
+
+**Визуальные элементы:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `logo` | string | Путь к логотипу, относительно корня: `images/logo.png`. |
+| `favicon` | string | Путь к favicon: `images/favicon.png`. |
+
+**Цветовая схема (`theme`):**
+
+| Поле | Тип | Значения |
+|------|-----|----------|
+| `theme.primary_color` | string | HEX, например `#10B981` |
+| `theme.primary_dark` | string | HEX, hover-цвет кнопок |
+| `theme.bg_main` | string | HEX, фон страницы |
+| `theme.bg_card` | string | HEX, фон карточек |
+| `theme.bg_section` | string | HEX, фон секций |
+| `theme.text_main` | string | HEX, основной текст |
+| `theme.text_muted` | string | HEX, второстепенный текст |
+| `theme.border_color` | string | HEX, границы |
+
+**Хедер:**
+
+| Поле | Тип | Значения |
+|------|-----|----------|
+| `header_variant` | string | `default` / `centered` / `minimal` / `with-cta` |
+| `header_fixed` | bool | Фиксация хедера при скролле |
+| `burger_enabled` | bool | Мобильное бургер-меню |
+| `burger_breakpoint` | string | `sm` / `md` / `lg` / `xl` |
+
+**Футер:**
+
+| Поле | Тип | Значения |
+|------|-----|----------|
+| `footer_variant` | string | `default` / `minimal` / `dark` / `light` |
+| `footer_copyright` | string | HTML разрешён. Если пусто — выводится `© {YEAR} {name}. Все права защищены.` |
+
+**SEO:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `meta_title` | string | Глобальный meta title. Если пусто — берётся из страницы. |
+| `meta_description` | string | Глобальный meta description. |
+| `meta_keywords` | string | Ключевые слова через запятую. |
+
+**Open Graph:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `og_title` | string | Если пусто — `meta_title` |
+| `og_description` | string | Если пусто — `meta_description` |
+| `og_image` | string | Путь: `images/og-image.jpg`. Рекомендуется 1200×630. |
+| `og_url` | string | Канонический URL. Если пусто — генерируется из `HTTP_HOST`. |
+
+**Twitter Card:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `twitter_title` | string | Если пусто — `og_title` |
+| `twitter_description` | string | Если пусто — `og_description` |
+| `twitter_image` | string | Если пусто — `og_image` |
+
+**Социальные сети (`socials`):**
+
+Массив объектов `{ "id": "vk", "url": "https://..." }`. ID — из `getSocialNetworks()` (13 сетей). Пустые URL не сохраняются.
+
+**Произвольный код:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `custom_css` | string | Вставляется в `<style>` в `<head>` сайта. **Санитайзер не применяется.** |
+| `custom_js` | string | Вставляется в `<script>` перед `</body>`. **Санитайзер не применяется.** |
+
+**Ассеты:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `assets_minify` | bool | Минификация CSS/JS модулей |
+| `assets_combine` | bool | Объединение всех CSS/JS страницы в один файл |
+| `minify_exceptions` | object | Карта `{ "module_id": { "css": bool, "js": bool } }`. Исключения из минификации по модулям. |
+
+**Кеширование:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `cache_enabled` | bool | Кеширование HTML-страниц |
+| `cache_ttl` | int | TTL кеша в секундах. `0` — бессрочно до изменения страницы. |
+
+**Системные привязки:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `home_page_id` | string | ID главной страницы. По умолчанию `home`. |
+| `main_menu` | string | ID главного меню. Если не задано — хедер без меню. |
+
+### Служебные поля
+
+Эти поля **не редактируются вручную** через админку — управляются кодом:
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `cron_token` | string | Общий токен для `config/cron/backup.php` и `config/cron/publish.php`. Генерируется автоматически (`bin2hex(random_bytes(16))`) при первом обращении к `getCronToken()`, если отсутствует. Перегенерация — в секции «Интеграция с планировщиком» в Настройках сайта. **Один токен для обеих крон-задач.** |
+| `last_cron_publish` | int | Unix timestamp последнего запуска виртуального крона публикации. Ограничивает частоту — не чаще **1 раза в 5 минут** при заходе админа в админку (`getLastCronPublishTime()` / `setLastCronPublishTime()`). |
+
+**Важно:** оба поля **сохраняются** при сохранении настроек сайта через `handleSaveSettings()`. Не теряются при перезаписи `settings.json`.
 
 ---
 
@@ -92,6 +212,8 @@
     "slug": "about",
     "template": "full-width",
     "status": "published",
+    "publish_at": null,
+    "unpublish_at": null,
     "created": "2025-01-15 12:00:00",
     "updated": "2025-01-15 14:30:00",
     "meta": {
@@ -139,13 +261,45 @@
 | `title` | string | ✅ |
 | `slug` | string | ✅ |
 | `template` | string | ✅ |
-| `status` | `published` / `draft` | ✅ |
+| `status` | `draft` / `scheduled` / `published` / `archived` | ✅ |
+| `publish_at` | int (Unix timestamp) \| null | Для `scheduled` — обязательно |
+| `unpublish_at` | int (Unix timestamp) \| null | Опционально для `scheduled` / `published` |
 | `created` | `Y-m-d H:i:s` | Опционально |
 | `updated` | `Y-m-d H:i:s` | Опционально |
 | `meta` | object | Опционально |
 | `show_header` | bool | Опционально |
 | `show_footer` | bool | Опционально |
 | `rows` | array | Опционально |
+
+### Статусы страниц
+
+| Статус | Видна на фронте | `publish_at` | `unpublish_at` |
+|--------|-----------------|--------------|----------------|
+| `draft` | Нет | Всегда `null` | Всегда `null` |
+| `scheduled` | Станет видна в `publish_at` | Обязателен, в будущем | Опционально, > `publish_at` |
+| `published` | Да (до `unpublish_at`, если задан) | Всегда `null` | Опционально, в будущем |
+| `archived` | Нет | Всегда `null` | Всегда `null` |
+
+**Переходы статусов:**
+
+- **Вручную** — через форму редактирования страницы (4 radio).
+- **Автоматически** — через `cron/publish.php`:
+  - `scheduled` → `published`, когда `publish_at <= now`.
+  - `published` → `archived`, когда `unpublish_at <= now`.
+
+**Очистка дат при сохранении:**
+
+- `draft` / `archived` → `publish_at` и `unpublish_at` обнуляются.
+- `published` → `publish_at` обнуляется, `unpublish_at` сохраняется.
+- `scheduled` → обе даты актуальны.
+
+**Подстраховка на фронте:**
+
+`loadPage()` в `functions.php` отдаёт страницу только если:
+- `status === 'published'`, и
+- `unpublish_at` не задан или ещё не наступил.
+
+Это защита на случай, если cron не сработал (отключён, упал) — страница всё равно не будет видна после истечения `unpublish_at`.
 
 ---
 
@@ -289,10 +443,11 @@
     "cron_enabled": false,
     "cron_virtual": false,
     "cron_period": 24,
-    "cron_token": "abc123...",
     "last_backup_time": 1705321200
 }
 ```
+
+**Что было убрано из этого файла в v1.3.0:** поле `cron_token` **удалено** из `config/data/backup_config.json` и перенесено в `settings.json`, потому что теперь это **общий** токен для бэкапов и публикации страниц.
 
 ---
 

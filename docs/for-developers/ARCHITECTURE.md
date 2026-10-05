@@ -73,9 +73,12 @@ config/
 ├── index.php              # Точка входа, роутинг по tab
 ├── config.php             # Константы, сессии, DEBUG
 ├── login.php              # Форма логина
-├── cron_backup.php        # Эндпоинт для планировщика
 ├── .htaccess              # RewriteEngine Off + Options -Indexes
 │
+├── cron/                  # Эндпоинты для планировщика (хостинг)
+│   ├── backup.php         # Крон бэкапов
+│   └── publish.php        # Крон публикации/архивации страниц
+|
 ├── core/
 │   ├── functions.php      # ЧТЕНИЕ данных + утилиты
 │   ├── admin_auth.php     # Авторизация, brute-force
@@ -243,7 +246,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 checkAdminSessionTimeout($bfData);
 ```
 
-### 5. Роутинг по `$_GET['tab']`
+### 5. Виртуальные кроны
+
+При заходе админа в админку асинхронно дёргаются два виртуальных крона:
+
+**Крон бэкапов** (если включён `cron_virtual` в `backup_config.json`):
+
+```php
+$cronSettings = getBackupSettingsData();
+if (!empty($cronSettings['cron_virtual'])) {
+    $lastCronBackup = intval($cronSettings['last_backup_time'] ?? 0);
+    $cronPeriodHours = intval($cronSettings['cron_period'] ?? 24);
+
+    if (time() >= ($lastCronBackup + ($cronPeriodHours * 3600))) {
+        $cronUrl = $protocol . $safeHost . dirname($_SERVER['SCRIPT_NAME'])
+                 . '/cron/backup.php?token=' . urlencode(getCronToken());
+
+        $cronContext = stream_context_create([
+            'http' => ['timeout' => 1.0, 'ignore_errors' => true]
+        ]);
+        @file_get_contents($cronUrl, false, $cronContext);
+    }
+}
+```
+
+**Крон публикации** (без отдельной настройки — работает всегда, но не чаще 1 раза в 5 минут):
+
+```php
+$lastPublish = getLastCronPublishTime();
+if (time() >= ($lastPublish + 300)) {
+    setLastCronPublishTime(time());
+
+    $publishUrl = $protocol . $safeHost . dirname($_SERVER['SCRIPT_NAME'])
+                . '/cron/publish.php?token=' . urlencode(getCronToken());
+
+    $publishContext = stream_context_create([
+        'http' => ['timeout' => 1.0, 'ignore_errors' => true]
+    ]);
+    @file_get_contents($publishUrl, false, $publishContext);
+}
+```
+
+**Особенности:**
+- Запросы асинхронные (`@file_get_contents` с таймаутом 1 секунда) — страница админки открывается мгновенно.
+- Для бэкапа — интервал из настроек (по умолчанию 24 часа).
+- Для публикации — фиксированные 5 минут (`getCronPublishMinInterval()`).
+- Время публикации обновляется **до** запроса — защита от долбёжки при F5.
+
+---
+
+### 6. Роутинг по `$_GET['tab']`
 
 ```php
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'module_settings') {
@@ -258,7 +310,7 @@ if (isset($_POST['save_settings'])) {
 // ...
 ```
 
-### 6. Включение модуля
+### 7. Включение модуля
 
 ```php
 $adminModuleFile = __DIR__ . '/modules/' . $currentTab . '.php';
@@ -274,9 +326,9 @@ if (file_exists($adminModuleFile)) {
 ### Чтение
 
 ```
-data/settings.json ────┐
-data/pages/*.json ─────┼──► functions.php ──► index.php ──► шаблон
-data/menus/*.json ─────┤    (getData,          (роутинг,    (base.php)
+data/settings.json  ────┐
+data/pages/*.json  ─────┼──► functions.php ──► index.php ──► шаблон
+data/menus/*.json  ─────┤    (getData,          (роутинг,    (base.php)
 config/data/modules.json│    loadPage,          рендер)
                        │    getMenuItems)
 ```
@@ -306,7 +358,8 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `sanitizeHtml()` | Очистка HTML (whitelist) |
 | `getData()` | Чтение JSON с кешем |
 | `getSettingsData()` | Настройки сайта |
-| `loadPage()`, `loadPageById()` | Загрузка страницы |
+| `loadPage()` | Загрузка опубликованной страницы (проверяет `status` + `unpublish_at`) |
+| `loadPageById()` | Загрузка страницы по ID (без проверки статуса, для админки) |
 | `loadTemplate()` | Загрузка шаблона |
 | `getPagesList()`, `getPagesListPaginated()` | Список страниц |
 | `getMenuItems()`, `loadMenu()` | Меню |
@@ -349,8 +402,15 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `handleProcessBackupStep()` | Пошаговая архивация |
 | `handleRestoreBackup()` | Восстановление |
 | `handleDownloadBackup()` | Скачивание |
-| `handleCronBackupAction()` | Системный крон |
-| `clearPageCache()` | Очистка кеша |
+| `handleCronBackupAction()` | Системный крон бэкапов |
+| `handleCronPublishAction()` | Системный крон публикации/архивации страниц |
+| `getCronToken()` | Общий токен для кронов (из `settings.json`) |
+| `regenerateCronToken()` | Принудительная перегенерация токена |
+| `getLastCronPublishTime()` | Время последнего запуска виртуального крона |
+| `setLastCronPublishTime()` | Сохранение времени запуска |
+| `getPageStatusBadge()` | Метка/класс/иконка бейджа статуса |
+| `clearPageCache()` | Очистка всего кеша |
+| `clearPageCacheById()` | Очистка кеша одной страницы |
 | `logAction()` | Логирование |
 
 ### `filemanager_api.php` — API проводника
