@@ -604,6 +604,47 @@
             alert('Ошибка соединения');
         });
     };
+    
+    // ===== КРОН: ЗАПРОС НОВОГО ТОКЕНА (без сохранения) =====
+    window.regenerateCronToken = function() {
+        if (!confirm('⚠️ Сгенерировать новый токен крона?\n\nОн вступит в силу только после нажатия «Сохранить настройки». После этого все настроенные крон-задачи (бэкап, автопубликация) сломаются — придётся заново настроить планировщики на хостинге.')) {
+            return;
+        }
+
+        fetch('index.php?tab=config_vars&ajax=generate_cron_token', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success || !data.token) {
+                alert('Ошибка генерации токена');
+                return;
+            }
+
+            var newToken = data.token;
+            var baseUrl = window.location.protocol + '//' + window.location.host;
+
+            var display = document.getElementById('cron-token-display');
+            if (display) display.value = newToken;
+
+            var hidden = document.getElementById('cron-token-hidden');
+            if (hidden) hidden.value = newToken;
+
+            var backupUrl = document.getElementById('cron-backup-url');
+            var publishUrl = document.getElementById('cron-publish-url');
+            if (backupUrl) backupUrl.value = baseUrl + '/config/cron/backup.php?token=' + newToken;
+            if (publishUrl) publishUrl.value = baseUrl + '/config/cron/publish.php?token=' + newToken;
+
+            if (display) {
+                display.classList.add('ring-2', 'ring-amber-300');
+                setTimeout(function() { display.classList.remove('ring-2', 'ring-amber-300'); }, 2000);
+            }
+        })
+        .catch(function() {
+            alert('Ошибка соединения');
+        });
+    };
 
     // ===== ИНИЦИАЛИЗАЦИЯ =====
     if (document.readyState === 'loading') {

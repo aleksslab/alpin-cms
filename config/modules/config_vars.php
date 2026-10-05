@@ -71,7 +71,8 @@ $token = $_SESSION['csrf_token'] ?? '';
             'og',
             'social',
             'assets',
-            'cache', 
+            'cache',
+            'cron', 
             'custom'
         ];
         

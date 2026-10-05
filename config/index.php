@@ -107,7 +107,7 @@ if ($isAuth) {
                 $safeHost = 'localhost';
             }
 
-            $cronUrl = $cronProtocol . $safeHost . dirname($_SERVER['SCRIPT_NAME']) . '/cron_backup.php?token=' . urlencode($cronSettings['cron_token'] ?? '');
+            $cronUrl = $cronProtocol . $safeHost . dirname($_SERVER['SCRIPT_NAME']) . '/cron/backup.php?token=' . urlencode(getCronToken());
 
             // Выставляем таймаут ровно в 1 секунду.
             // Страница админки откроется мгновенно, а сам авто-бэкап продолжит собираться в фоне сервера!
@@ -167,7 +167,7 @@ if ($isAuth) {
         exit;
     }
     
-    // --- ОБРАБОТКА AJAX-ЗАПРОСОВ ЛОГОВ ---
+    // --- ОБРАБОТКА ЗАПРОСОВ ЛОГОВ (AJAX) ---
     if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_logs' && isset($_GET['tab']) && $_GET['tab'] === 'logs') {
         require_once 'core/admin_controller.php';
         handleGetLogs();
@@ -178,6 +178,14 @@ if ($isAuth) {
     if (isset($_GET['action']) && $_GET['action'] === 'get_minify_stats' && isset($_GET['tab']) && $_GET['tab'] === 'config_vars') {
         require_once 'core/admin_controller.php';
         handleGetMinifyStats();
+        exit;
+    }
+    
+    // --- ГЕНЕРАЦИЯ НОВОГО ТОКЕНА КРОНА (AJAX) ---
+    if (isset($_GET['ajax']) && $_GET['ajax'] === 'generate_cron_token') {
+        header('Content-Type: application/json; charset=utf-8');
+        $newToken = bin2hex(random_bytes(16));
+        echo json_encode(['success' => true, 'token' => $newToken]);
         exit;
     }
 

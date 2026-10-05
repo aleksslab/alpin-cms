@@ -1,5 +1,10 @@
 <?php
 
+// Самодостаточность: подтягиваем functions.php, если ещё не подключён
+if (!function_exists('getSettingsData')) {
+    require_once __DIR__ . '/functions.php';
+}
+
 // --- Контроллер контента и настроек ---
 /**
  * 1. ГЛОБАЛЬНЫЕ ФУНКЦИИ
@@ -23,6 +28,34 @@ function cms_transliterate(string $text): string {
         '_'
     ];
     return str_replace($cyr, $lat, $text);
+}
+
+/**
+ * Возвращает общий токен для кронов (бэкапы + автопубликация страниц).
+ * Если токен отсутствует в settings.json — генерирует и сохраняет.
+ *
+ * @return string 32-символьный hex-токен
+ */
+function getCronToken(): string {
+    $settings = getSettingsData();
+    if (!empty($settings['cron_token'])) {
+        return (string)$settings['cron_token'];
+    }
+    return regenerateCronToken();
+}
+
+/**
+ * Принудительно перегенерирует токен крона и сохраняет его в settings.json.
+ * Внимание: сломает все существующие внешние крон-задачи.
+ *
+ * @return string Новый токен
+ */
+function regenerateCronToken(): string {
+    $token = bin2hex(random_bytes(16));
+    $settings = getSettingsData();
+    $settings['cron_token'] = $token;
+    saveData('settings', $settings);
+    return $token;
 }
 
 /**
@@ -471,6 +504,16 @@ function handleSaveSettings(): array {
         // === СОХРАНЯЕМ ПОЛЯ, КОТОРЫЕ НЕ В ФОРМЕ ===
         'home_page_id' => getHomePageId(),
         'main_menu'    => getMainMenuId(),
+        'cron_token'   => (function() {
+            // Если пришёл новый токен из формы (после «Перегенерировать») — берём его
+            $posted = trim($_POST['cron_token'] ?? '');
+            // Валидация: 32 hex-символа
+            if (preg_match('/^[a-f0-9]{32}$/i', $posted)) {
+                return $posted;
+            }
+            // Иначе — сохраняем текущий
+            return getCronToken();
+        })(),
     ];
     
     $oldSettings = getSettingsData(true);
@@ -779,7 +822,6 @@ function getBackupSettingsData(): array {
             'cron_enabled' => false,
             'cron_virtual' => false,
             'cron_period' => 24,
-            'cron_token' => bin2hex(random_bytes(16)),
             'last_backup_time' => 0
         ];
     }
@@ -1013,9 +1055,6 @@ function handleSaveBackupSettings(): array {
         }
     }
 
-    // Фиксируем токен Крона. Если он уже был сгенерирован ранее — берем его, если нет — создаем один раз
-    $cronToken = !empty($current['cron_token']) ? $current['cron_token'] : bin2hex(random_bytes(16));
-
     // === СОХРАНЯЕМ ПУТЬ ===
     $storagePath = trim($_POST['storage_path'] ?? 'config/backups/');
 
@@ -1060,7 +1099,6 @@ function handleSaveBackupSettings(): array {
         'cron_enabled'     => isset($_POST['cron_enabled']),
         'cron_virtual'     => isset($_POST['cron_virtual']),
         'cron_period'      => intval($_POST['cron_period'] ?? 24), 
-        'cron_token'       => $cronToken, // Пишем зафиксированный токен вместо перезаписи пустотой из $_POST
         'last_backup_time' => intval($current['last_backup_time'] ?? 0) // Бережно сохраняем время прошлого бэкапа
     ];
 
@@ -1351,7 +1389,7 @@ function handleCronBackupAction(string $clientToken): void {
         die('Error: Feature disabled');
     }
 
-    if (empty($settings['cron_token']) || $clientToken !== $settings['cron_token']) {
+    if ($clientToken === '' || $clientToken !== getCronToken()) {
         header('HTTP/1.1 403 Forbidden');
         die('Error: Access denied');
     }
