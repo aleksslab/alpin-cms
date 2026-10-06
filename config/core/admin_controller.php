@@ -1817,6 +1817,17 @@ function handleSavePage(): array {
     if (savePageData($id, $pageData) !== false) {
         // Удаляем кеш страницы (HTML + объединённые ассеты)
         clearPageCacheById($id);
+
+        // Сохранение = previews этой страницы больше неактуальны
+        if (function_exists('cleanupSessionPagePreviews')) {
+            cleanupSessionPagePreviews(session_id(), $id);
+
+            // При создании новой страницы также чистим previews с пустым page_id
+            // (они создавались для ещё не сохранённой страницы)
+            if ($action === 'create') {
+                cleanupSessionPagePreviews(session_id(), '');
+            }
+        }
         
         $msg = 'Страница "' . $title . '" успешно ' . ($action === 'create' ? 'создана' : 'обновлена');
         logAction('page_save', $msg . ' (ID: ' . $id . ')', 'INFO');
@@ -3474,7 +3485,7 @@ function clearPageCacheById(string $id): void {
 }
 
 /**
- * ОБРАБОТКА КОРЗИНЫ (СТРАНИЦЫ И МЕНЮ
+ * ОБРАБОТКА КОРЗИНЫ (СТРАНИЦЫ И МЕНЮ)
  */
 // Папка корзины
 if (!defined('TRASH_DIR')) {
@@ -3902,5 +3913,363 @@ function handleTrashAction(): void {
     setFlash('Неизвестное действие корзины.', 'error');
     header('Location: ' . $returnUrl);
     exit;
+}
+
+/**
+ * ФУНКЦИИ ПРЕВЬЮ
+ */
+// Папка временного превью
+if (!defined('PREVIEW_DIR')) {
+    define('PREVIEW_DIR', DATA_DIR . 'preview' . DIRECTORY_SEPARATOR);
+}
+
+/**
+ * Гарантирует существование папки preview + .htaccess защиту.
+ *
+ * @return bool true если папка доступна для записи
+ */
+function ensurePreviewDir(): bool {
+    if (!is_dir(PREVIEW_DIR)) {
+        if (!@mkdir(PREVIEW_DIR, 0755, true)) {
+            return false;
+        }
+    }
+
+    $htaccess = PREVIEW_DIR . '.htaccess';
+    if (!file_exists($htaccess)) {
+        $data = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
+              . "<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n";
+        @file_put_contents($htaccess, $data);
+    }
+
+    return is_writable(PREVIEW_DIR);
+}
+
+/**
+ * Удаляет все preview-файлы.
+ * Используется при успешном логине.
+ *
+ * @return int Количество удалённых файлов
+ */
+function cleanupAllPreviews(): int {
+    if (!is_dir(PREVIEW_DIR)) {
+        return 0;
+    }
+
+    $files = glob(PREVIEW_DIR . '*.json');
+    if (empty($files)) {
+        return 0;
+    }
+
+    $deleted = 0;
+    foreach ($files as $file) {
+        if (@unlink($file)) {
+            $deleted++;
+        }
+    }
+
+    return $deleted;
+}
+
+/**
+ * Удаляет preview-файлы конкретной сессии.
+ * Используется при уходе из редактора.
+ *
+ * @param string $sessionId ID сессии (session_id())
+ * @return int Количество удалённых файлов
+ */
+function cleanupSessionPreviews(string $sessionId): int {
+    if ($sessionId === '' || !is_dir(PREVIEW_DIR)) {
+        return 0;
+    }
+
+    $files = glob(PREVIEW_DIR . '*.json');
+    if (empty($files)) {
+        return 0;
+    }
+
+    $deleted = 0;
+    foreach ($files as $file) {
+        $data = json_decode(file_get_contents($file), true);
+        if (!is_array($data)) {
+            @unlink($file);
+            continue;
+        }
+
+        $fileSessionId = $data['_preview']['session_id'] ?? '';
+        if ($fileSessionId === $sessionId) {
+            if (@unlink($file)) {
+                $deleted++;
+            }
+        }
+    }
+
+    return $deleted;
+}
+
+/**
+ * Удаляет preview-файлы конкретной сессии для конкретной страницы.
+ * Используется при заходе на edit.php и при сохранении.
+ *
+ * @param string $sessionId ID сессии
+ * @param string $pageId    ID страницы
+ * @return int Количество удалённых файлов
+ */
+function cleanupSessionPagePreviews(string $sessionId, string $pageId): int {
+    if ($sessionId === '' || !is_dir(PREVIEW_DIR)) {
+        return 0;
+    }
+
+    $files = glob(PREVIEW_DIR . '*.json');
+    if (empty($files)) {
+        return 0;
+    }
+
+    $deleted = 0;
+    foreach ($files as $file) {
+        $data = json_decode(file_get_contents($file), true);
+        if (!is_array($data)) {
+            @unlink($file);
+            continue;
+        }
+
+        $meta = $data['_preview'] ?? [];
+        $fileSessionId = $meta['session_id'] ?? '';
+        $filePageId    = $meta['page_id'] ?? '';
+
+        if ($fileSessionId === $sessionId && $filePageId === $pageId) {
+            if (@unlink($file)) {
+                $deleted++;
+            }
+        }
+    }
+
+    return $deleted;
+}
+
+/**
+ * Создаёт или перезаписывает preview-файл для пары (session + page).
+ *
+ * @param array       $pageData         Данные страницы (title, slug, template, rows, meta, ...)
+ * @param string      $sessionId        ID сессии админа
+ * @param string      $pageId           ID страницы (может быть '' для новой)
+ * @param string|null $existingPreviewId Если был preview с этим ID — перезаписываем его (при совпадении session + page)
+ * @param string      $createdBy        Логин админа
+ * @return array ['success' => bool, 'preview_id' => string, 'error' => string]
+ */
+function createPreview(array $pageData, string $sessionId, string $pageId,
+    ?string $existingPreviewId = null, string $createdBy = 'system'): array {
+    if ($sessionId === '') {
+        return ['success' => false, 'preview_id' => '', 'error' => 'Невалидная сессия.'];
+    }
+
+    if (!ensurePreviewDir()) {
+        return ['success' => false, 'preview_id' => '', 'error' => 'Папка preview недоступна для записи.'];
+    }
+
+    $previewId = '';
+    $targetPath = '';
+
+    // Проверяем, можно ли перезаписать существующий
+    if ($existingPreviewId !== null && preg_match('/^[a-f0-9]{32}$/i', $existingPreviewId)) {
+        $existingPath = PREVIEW_DIR . $existingPreviewId . '.json';
+        if (file_exists($existingPath)) {
+            $existingData = json_decode(file_get_contents($existingPath), true);
+            if (is_array($existingData)) {
+                $meta = $existingData['_preview'] ?? [];
+                if (($meta['session_id'] ?? '') === $sessionId
+                    && ($meta['page_id'] ?? '') === $pageId
+                ) {
+                    // Совпадает — перезаписываем
+                    $previewId = $existingPreviewId;
+                    $targetPath = $existingPath;
+                }
+            }
+        }
+    }
+
+    // Если не нашли существующий — создаём новый ID
+    if ($previewId === '') {
+        $previewId = bin2hex(random_bytes(16));
+        $targetPath = PREVIEW_DIR . $previewId . '.json';
+    }
+
+    // Добавляем метаданные
+    $pageData['_preview'] = [
+        'preview_id' => $previewId,
+        'session_id' => $sessionId,
+        'page_id'    => $pageId,
+        'created_at' => time(),
+        'created_by' => $createdBy,
+    ];
+
+    $json = json_encode($pageData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if (!safeFileWrite($targetPath, $json)) {
+        return ['success' => false, 'preview_id' => '', 'error' => 'Не удалось записать preview-файл.'];
+    }
+
+    return ['success' => true, 'preview_id' => $previewId, 'error' => ''];
+}
+
+/**
+ * Формирует URL preview-страницы.
+ * Для сохранённой страницы — /{slug}?preview={id}.
+ * Для новой (без slug) — /?preview={id}.
+ *
+ * @param string $previewId 32 hex-символа
+ * @param string $slug      Slug страницы (может быть '')
+ * @return string Относительный URL
+ */
+function getPreviewUrl(string $previewId, string $slug = ''): string {
+    $base = '/';
+    if ($slug !== '') {
+        $base = '/' . trim($slug, '/');
+    }
+    return $base . '?preview=' . $previewId;
+}
+
+/**
+ * Возвращает preview_token страницы (или пустую строку, если не задан).
+ *
+ * @param string $pageId
+ * @return string
+ */
+function getPagePreviewToken(string $pageId): string {
+    if (!preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
+        return '';
+    }
+
+    $page = loadPageById($pageId);
+    if (!$page) {
+        return '';
+    }
+
+    return (string)($page['preview_token'] ?? '');
+}
+
+/**
+ * Внутренняя логика генерации нового preview-токена.
+ * Без побочных эффектов — только чтение, генерация, сохранение.
+ *
+ * @param string $pageId
+ * @return array ['success' => bool, 'token' => string, 'error' => string]
+ */
+function _regeneratePagePreviewTokenLogic(string $pageId): array {
+    if (!preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
+        return ['success' => false, 'token' => '', 'error' => 'Невалидный ID страницы.'];
+    }
+
+    $page = loadPageById($pageId);
+    if (!$page) {
+        return ['success' => false, 'token' => '', 'error' => 'Страница не найдена.'];
+    }
+
+    $token = bin2hex(random_bytes(16));
+    $page['preview_token'] = $token;
+
+    if (!savePageData($pageId, $page)) {
+        return ['success' => false, 'token' => '', 'error' => 'Не удалось сохранить токен.'];
+    }
+
+    return ['success' => true, 'token' => $token, 'error' => ''];
+}
+
+/**
+ * Обработчик: перегенерация preview-токена + flash + log + redirect.
+ * Вызывается из config/index.php.
+ *
+ * @param string $pageId
+ * @return void
+ */
+function handleRegeneratePagePreviewToken(string $pageId): void {
+    $result = _regeneratePagePreviewTokenLogic($pageId);
+
+    if ($result['success']) {
+        logAction('page_preview_token', 'Preview-токен обновлён для ID: ' . $pageId, 'INFO');
+        setFlash('Preview-ссылка создана.');
+    } else {
+        logAction('page_preview_token', 'Ошибка: ' . $result['error'] . ' (ID: ' . $pageId . ')', 'ERROR');
+        setFlash($result['error'], 'error');
+    }
+
+    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
+    exit;
+}
+
+/**
+ * Обработчик: удаление preview-токена + flash + log + redirect.
+ *
+ * @param string $pageId
+ * @return void
+ */
+function handleDeletePagePreviewToken(string $pageId): void {
+    $result = clearPagePreviewToken($pageId);
+
+    if ($result['success']) {
+        logAction('page_preview_token', 'Preview-токен удалён для ID: ' . $pageId, 'INFO');
+        setFlash('Preview-ссылка удалена.');
+    } else {
+        logAction('page_preview_token', 'Ошибка удаления: ' . $result['error'] . ' (ID: ' . $pageId . ')', 'ERROR');
+        setFlash($result['error'], 'error');
+    }
+
+    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
+    exit;
+}
+
+/**
+ * Удаляет preview_token страницы.
+ *
+ * @param string $pageId
+ * @return array ['success' => bool, 'error' => string]
+ */
+function clearPagePreviewToken(string $pageId): array {
+    if (!preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
+        return ['success' => false, 'error' => 'Невалидный ID страницы.'];
+    }
+
+    $page = loadPageById($pageId);
+    if (!$page) {
+        return ['success' => false, 'error' => 'Страница не найдена.'];
+    }
+
+    if (empty($page['preview_token'])) {
+        return ['success' => true, 'error' => ''];  // уже нет
+    }
+
+    $page['preview_token'] = null;
+
+    if (!savePageData($pageId, $page)) {
+        return ['success' => false, 'error' => 'Не удалось сохранить изменения.'];
+    }
+
+    return ['success' => true, 'error' => ''];
+}
+
+/**
+ * Формирует полный preview-URL для сохранённой страницы.
+ *
+ * @param string $pageId
+ * @param string $token preview_token
+ * @return string URL вида https://host/{slug}?preview={token}
+ */
+function getPagePreviewUrl(string $pageId, string $token): string {
+    $page = loadPageById($pageId);
+    $slug = $page['slug'] ?? '';
+
+    // Протокол и хост
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    if (!preg_match('#^[a-z0-9\-\.]+(:\d+)?$#i', $host)) {
+        $host = 'localhost';
+    }
+
+    $base = '/' . trim($slug, '/');
+    if ($slug === '') {
+        $base = '/';
+    }
+
+    return $protocol . '://' . $host . $base . '?preview=' . $token;
 }
 

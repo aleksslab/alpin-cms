@@ -16,6 +16,11 @@ if ($isEdit) {
         header('Location: ?tab=pages');
         exit;
     }
+
+    // Чистим previews этой сессии для этой страницы.
+    if (function_exists('cleanupSessionPagePreviews')) {
+        cleanupSessionPagePreviews(session_id(), $pageId);
+    }
 }
 
 $token = $_SESSION['csrf_token'] ?? '';
@@ -157,6 +162,65 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
                             </div>
                         </div>
                     </div>
+                    <?php
+                    // Preview-токен: только для существующих страниц
+                    if ($isEdit) {
+                        $existingToken = getPagePreviewToken($pageId);
+                        $previewUrl = $existingToken !== ''
+                            ? getPagePreviewUrl($pageId, $existingToken)
+                            : '';
+                    }
+                    ?>
+
+                    <?php if ($isEdit): ?>
+                    <div class="editor-row" style="align-items: flex-start !important;">
+                        <div class="editor-field">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                Ссылка для согласования (preview)
+                            </label>
+
+                            <div id="js-page-preview-block">
+                                <?php if ($existingToken !== ''): ?>
+                                    <!-- Ссылка есть -->
+                                    <div class="flex flex-col lg:flex-row gap-2 mb-2">
+                                        <input type="text"
+                                               readonly
+                                               id="js-page-preview-url"
+                                               value="<?php echo e($previewUrl); ?>"
+                                               class="flex-1 min-w-0 px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono text-slate-600 select-all focus:outline-none">
+                                        <button type="button"
+                                                onclick="window.copyPagePreviewUrl()"
+                                                class="w-full lg:w-auto lg:flex-initial lg:w-[140px] px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-200 transition-all whitespace-nowrap flex items-center justify-center gap-2">
+                                            <span class="icon-copy text-sm"></span> Копировать
+                                        </button>
+                                        <button type="button"
+                                                onclick="window.deletePagePreviewToken()"
+                                                class="w-full lg:w-auto lg:flex-initial lg:w-[140px] px-4 py-2.5 bg-rose-50 border border-rose-200 text-rose-600 text-sm font-bold rounded-xl hover:bg-rose-100 transition-all whitespace-nowrap flex items-center justify-center gap-2">
+                                            <span class="icon-trash-2 text-sm"></span> Удалить
+                                        </button>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400">
+                                        Ссылка открывает страницу в любом статусе. Не индексируется поисковиками.
+                                        Нажмите «Удалить», чтобы отозвать доступ.
+                                    </p>
+                                <?php else: ?>
+                                    <!-- Ссылки нет -->
+                                    <button type="button"
+                                            onclick="window.regeneratePagePreviewToken()"
+                                            class="w-full lg:w-auto px-4 py-2.5 bg-[var(--primary-color)] text-white text-sm font-bold rounded-xl hover:bg-[var(--primary-dark)] transition-all whitespace-nowrap flex items-center justify-center gap-2">
+                                        <span class="icon-link text-sm"></span> Создать preview-ссылку
+                                    </button>
+                                    <p class="text-[10px] text-slate-400 mt-2">
+                                        Создаёт постоянную ссылку для согласования с заказчиком.
+                                        Работает для черновиков, запланированных и снятых страниц.
+                                    </p>
+                                <?php endif; ?>
+                            </div>
+
+                            <input type="hidden" name="page_id_for_preview" value="<?php echo e($pageId); ?>">
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

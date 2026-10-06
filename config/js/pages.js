@@ -140,6 +140,113 @@
             }
         });
     }
+    
+    // ===== PREVIEW-ССЫЛКА СТРАНИЦЫ (постоянная) =====
+    window.copyPagePreviewUrl = function() {
+        var input = document.getElementById('js-page-preview-url');
+        if (!input) return;
+
+        input.select();
+        input.setSelectionRange(0, 99999);  // для мобилок
+
+        try {
+            navigator.clipboard.writeText(input.value).then(function() {
+                // Визуальный feedback
+                var btn = event.target.closest('button');
+                if (btn) {
+                    var original = btn.innerHTML;
+                    btn.innerHTML = '<span class="icon-check text-sm"></span> Скопировано';
+                    setTimeout(function() { btn.innerHTML = original; }, 1500);
+                }
+            });
+        } catch (e) {
+            // Fallback
+            document.execCommand('copy');
+        }
+    };
+
+    window.regeneratePagePreviewToken = function() {
+        var pageIdInput = document.querySelector('input[name="page_id_for_preview"]');
+        if (!pageIdInput) return;
+
+        var pageId = pageIdInput.value;
+        if (!pageId) return;
+
+        var hasToken = !!document.getElementById('js-page-preview-url');
+        var message = hasToken
+            ? 'Сбросить текущую preview-ссылку и создать новую?\n\nСтарая ссылка сразу перестанет работать.'
+            : 'Создать постоянную preview-ссылку для этой страницы?';
+
+        if (!confirm(message)) return;
+
+        var csrfInput = document.querySelector('input[name="csrf_token"]');
+        var csrfToken = csrfInput ? csrfInput.value : '';
+        if (!csrfToken) {
+            alert('Ошибка: CSRF-токен не найден.');
+            return;
+        }
+
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'index.php?tab=pages&action=edit&id=' + encodeURIComponent(pageId);
+
+        var inputs = {
+            csrf_token: csrfToken,
+            regenerate_page_preview_token: '1',
+            page_id: pageId
+        };
+
+        for (var key in inputs) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = inputs[key];
+            form.appendChild(input);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+    };
+    
+    window.deletePagePreviewToken = function() {
+        var pageIdInput = document.querySelector('input[name="page_id_for_preview"]');
+        if (!pageIdInput) return;
+
+        var pageId = pageIdInput.value;
+        if (!pageId) return;
+
+        if (!confirm('Удалить preview-ссылку?\n\nСтарая ссылка сразу перестанет работать. Восстановить нельзя — можно только создать новую.')) {
+            return;
+        }
+
+        var csrfInput = document.querySelector('input[name="csrf_token"]');
+        var csrfToken = csrfInput ? csrfInput.value : '';
+        if (!csrfToken) {
+            alert('Ошибка: CSRF-токен не найден.');
+            return;
+        }
+
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'index.php?tab=pages&action=edit&id=' + encodeURIComponent(pageId);
+
+        var inputs = {
+            csrf_token: csrfToken,
+            delete_page_preview_token: '1',
+            page_id: pageId
+        };
+
+        for (var key in inputs) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = inputs[key];
+            form.appendChild(input);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+    };
 
     // ===== ПЕРЕКЛЮЧЕНИЕ ПОЛЕЙ СТАТУСА ПУБЛИКАЦИИ =====
     window.toggleStatusFields = function() {

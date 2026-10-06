@@ -1242,16 +1242,90 @@ if (typeof PageConstructor === 'undefined') {
             return true;
         }
 
-        preview() {
-            if (!this.pageId) return;
+        /**
+         * Открывает предпросмотр текущего состояния конструктора.
+         * 
+         * 1. Собирает данные формы (title, slug, template, meta, rows).
+         * 2. POST на config/preview.php — создаёт/перезаписывает preview-файл.
+         * 3. Открывает URL превью в новой вкладке.
+         * 4. Запоминает preview_id в sessionStorage для перезаписи.
+         * 
+         * Работает как для сохранённых страниц, так и для новых (без pageId).
+         */
+        async preview() {
+           // === Собираем состояние формы ===
+           const title          = document.querySelector('input[name="title"]')?.value || '';
+           const slug           = document.querySelector('input[name="slug"]')?.value || '';
+           const template       = document.getElementById('template-hidden')?.value
+                               || document.getElementById('constructor-template-select')?.value
+                               || 'full-width';
+           const showHeader     = document.querySelector('input[name="show_header"]')?.checked ? '1' : '0';
+           const showFooter     = document.querySelector('input[name="show_footer"]')?.checked ? '1' : '0';
+           const metaDescription = document.querySelector('textarea[name="meta_description"]')?.value || '';
+           const metaKeywords    = document.querySelector('input[name="meta_keywords"]')?.value || '';
+           const rowsJson        = document.getElementById('rows-json-input')?.value || '[]';
 
-            // Валидация ID страницы: только латиница, цифры, дефис, подчёркивание, слэш
-            if (!/^[a-z0-9\-_\/]+$/i.test(this.pageId)) {
-                alert('Некорректный ID страницы для предпросмотра.');
-                return;
-            }
+           // CSRF
+           const csrfInput = document.querySelector('input[name="csrf_token"]');
+           const csrfToken = csrfInput ? csrfInput.value : '';
+           if (!csrfToken) {
+               alert('Ошибка: CSRF-токен не найден. Обновите страницу.');
+               return;
+           }
 
-            window.open('/' + this.pageId + '?preview=1', '_blank');
+           // === Запоминаем preview_id из прошлого раза (перезапись) ===
+           const storageKey = 'preview_id_' + (this.pageId || 'new_' + slug);
+           const existingPreviewId = sessionStorage.getItem(storageKey) || '';
+
+           // === Собираем FormData ===
+           const formData = new FormData();
+           formData.append('csrf_token', csrfToken);
+           formData.append('page_id', this.pageId || '');
+           formData.append('title', title);
+           formData.append('slug', slug);
+           formData.append('template', template);
+           formData.append('show_header', showHeader);
+           formData.append('show_footer', showFooter);
+           formData.append('meta_description', metaDescription);
+           formData.append('meta_keywords', metaKeywords);
+           formData.append('rows_json', rowsJson);
+           if (existingPreviewId) {
+               formData.append('existing_preview_id', existingPreviewId);
+           }
+
+           // === Открываем пустое окно ЗАРАНЕЕ (чтобы браузер не блокировал popup) ===
+           const previewWindow = window.open('about:blank', '_blank');
+
+           try {
+               const response = await fetch('/config/preview.php', {
+                   method: 'POST',
+                   body: formData,
+                   credentials: 'same-origin'
+               });
+
+               const data = await response.json();
+
+               if (!data.success || !data.preview_id || !data.url) {
+                   if (previewWindow) previewWindow.close();
+                   alert('Ошибка создания превью: ' + (data.error || 'неизвестная ошибка'));
+                   return;
+               }
+
+               // Запоминаем preview_id для перезаписи
+               sessionStorage.setItem(storageKey, data.preview_id);
+
+               // Открываем URL превью
+               if (previewWindow) {
+                   previewWindow.location.href = data.url;
+               } else {
+                   // Fallback: если popup заблокирован — переходим в текущей вкладке
+                   window.location.href = data.url;
+               }
+
+           } catch (error) {
+               if (previewWindow) previewWindow.close();
+               alert('Ошибка сети при создании превью: ' + error.message);
+           }
         }
     }
 

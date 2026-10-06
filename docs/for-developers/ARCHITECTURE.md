@@ -72,6 +72,7 @@
 config/
 ├── index.php              # Точка входа, роутинг по tab
 ├── config.php             # Константы, сессии, DEBUG
+├── preview.php            # Эндпоинт создания preview (POST)
 ├── login.php              # Форма логина
 ├── .htaccess              # RewriteEngine Off + Options -Indexes
 │
@@ -167,6 +168,18 @@ function loadPage(string $slug): ?array {
     $page = _jsonToArray($filePath);
     if ($page['status'] !== 'published') return null;
     return $page;
+}
+```
+
+```php
+// Проверка preview: временный или постоянный
+$previewToken = trim($_GET['preview'] ?? '');
+if ($previewToken !== '') {
+    $previewData = loadPreviewById($previewToken)
+                ?? loadPageByPreviewToken($previewToken);
+    if ($previewData) {
+        // Режим preview: рендер без учёта status, кеш отключён, noindex
+    }
 }
 ```
 
@@ -367,6 +380,8 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `render_module()` | Рендер модуля |
 | `getModuleAssets()`, `getCombinedAssets()` | Ассеты |
 | `safeFileWrite()` | Атомарная запись с flock |
+| `loadPreviewById()` | Чтение временного preview |
+| `loadPageByPreviewToken()` | Поиск страницы по постоянному токену |
 
 ### `admin_auth.php` — авторизация
 
@@ -412,6 +427,14 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `clearPageCache()` | Очистка всего кеша |
 | `clearPageCacheById()` | Очистка кеша одной страницы |
 | `logAction()` | Логирование |
+| `createPreview()` | Создание/перезапись временного preview |
+| `cleanupAllPreviews()` | Очистка всех previews |
+| `cleanupSessionPreviews()` | Очистка previews сессии |
+| `cleanupSessionPagePreviews()` | Очистка previews сессии для страницы |
+| `getPagePreviewToken()` | Чтение постоянного токена |
+| `handleRegeneratePagePreviewToken()` | Создание/перегенерация токена |
+| `handleDeletePagePreviewToken()` | Удаление токена |
+| `getPagePreviewUrl()` | Формирование URL постоянного preview |
 
 ### `filemanager_api.php` — API проводника
 

@@ -11,6 +11,7 @@
 | `data/menus/{id}.json` | Меню |
 | `data/logs/admin.log` | Логи (**не** JSON) |
 | `data/trash/*.json` | Корзина (удалённые страницы и меню) |
+| `data/preview/{preview_id}.json` | Временные preview (из конструктора) |
 | `config/data/credentials.json` | Логин/хеш |
 | `config/data/modules.json` | Список модулей |
 | `config/data/templates.json` | Список шаблонов |
@@ -215,6 +216,7 @@
     "status": "published",
     "publish_at": null,
     "unpublish_at": null,
+    "preview_token": null,
     "created": "2025-01-15 12:00:00",
     "updated": "2025-01-15 14:30:00",
     "meta": {
@@ -265,12 +267,15 @@
 | `status` | `draft` / `scheduled` / `published` / `archived` | ✅ |
 | `publish_at` | int (Unix timestamp) \| null | Для `scheduled` — обязательно |
 | `unpublish_at` | int (Unix timestamp) \| null | Опционально для `scheduled` / `published` |
+| `preview_token` | string (32 hex) \| null | Постоянный preview-токен для согласования |
 | `created` | `Y-m-d H:i:s` | Опционально |
 | `updated` | `Y-m-d H:i:s` | Опционально |
 | `meta` | object | Опционально |
 | `show_header` | bool | Опционально |
 | `show_footer` | bool | Опционально |
 | `rows` | array | Опционально |
+
+**Поле `preview_token`:** создаётся/удаляется **только по кнопке** в `edit.php`. При сохранении страницы **не трогается**. Открывает страницу в любом статусе по URL `/{slug}?preview={token}`.
 
 ### Статусы страниц
 
@@ -421,6 +426,63 @@
 - Кнопка **«Удалить выбранные»** в модалке.
 - Кнопка **«Очистить корзину»**.
 - Автоочистки по TTL — **нет**.
+
+---
+
+## 📄 `data/preview/{preview_id}.json`
+
+Временные preview-файлы из конструктора. Создаются кнопкой «Предпросмотр», живут до срабатывания одного из триггеров очистки.
+
+**Структура имени:** `{preview_id}.json`, где `preview_id` = 32 hex-символа.
+
+**Структура JSON:**
+
+Содержимое — **то же, что у страницы** + служебный блок `_preview`:
+
+```json
+{
+    "id": "about",
+    "title": "О компании",
+    "slug": "about",
+    "template": "full-width",
+    "status": "published",
+    "publish_at": null,
+    "unpublish_at": null,
+    "meta": { ... },
+    "show_header": true,
+    "show_footer": true,
+    "rows": [ ... ],
+
+    "_preview": {
+        "preview_id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+        "session_id": "abc123...",
+        "page_id": "about",
+        "created_at": 1735689600,
+        "created_by": "admin"
+    }
+}
+```
+
+**Поля `_preview`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `preview_id` | string | 32 hex |
+| `session_id` | string | ID сессии админа, создавшего preview |
+| `page_id` | string | ID страницы (или `''` для новой) |
+| `created_at` | int | Unix timestamp |
+| `created_by` | string | Логин админа |
+
+**Жизненный цикл:**
+
+- **Создаётся** — POST из `constructor.js`.
+- **Перезаписывается** — повторное нажатие «Предпросмотр» для той же `session + page`.
+- **Удаляется**:
+  1. При успешном логине — **всё**.
+  2. При заходе на `edit.php?id=X` — previews **текущей сессии** для `X`.
+  3. При сохранении `X` — previews **текущей сессии** для `X` (+ `''` при create).
+
+**Никакой автоочистки по TTL нет.**
 
 ---
 

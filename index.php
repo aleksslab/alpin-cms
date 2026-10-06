@@ -15,18 +15,45 @@ if (strpos($requestUri, '?') !== false) {
 // Убираем ведущий и trailing слеши
 $slug = trim($requestUri, '/');
 
-// Пытаемся загрузить страницу (теперь из data/pages/{slug}.json)
-$page = loadPage($slug);
-
-// --- ЕСЛИ СТРАНИЦА НАЙДЕНА — РЕНДЕРИМ ---
+// --- ИНИЦИАЛИЗАЦИЯ ---
 $isNewPage = false;
+$isPreview = false;
 $usedModules = [];
 $template = null;
+$page = null;
 
-if ($page && $page['status'] === 'published') {
-    $isNewPage = true;
-    $template = loadTemplate($page['template'] ?? 'full-width');
-    $usedModules = getUsedModules($page);
+// --- PREVIEW MODE ---
+$previewToken = trim($_GET['preview'] ?? '');
+
+if ($previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
+    // 1. Временный preview (из конструктора)
+    $previewData = loadPreviewById($previewToken);
+
+    // 2. Fallback: постоянный preview-токен страницы
+    if (!$previewData) {
+        $previewData = loadPageByPreviewToken($previewToken);
+    }
+
+    if ($previewData) {
+        $page = $previewData;
+        $isPreview = true;
+        $isNewPage = true;
+        $template = loadTemplate($page['template'] ?? 'full-width');
+        $usedModules = getUsedModules($page);
+
+        header('X-Robots-Tag: noindex, nofollow, noarchive');
+    }
+}
+
+// --- ОБЫЧНЫЙ РОУТИНГ ---
+if (!$isPreview) {
+    $page = loadPage($slug);
+
+    if ($page && $page['status'] === 'published') {
+        $isNewPage = true;
+        $template = loadTemplate($page['template'] ?? 'full-width');
+        $usedModules = getUsedModules($page);
+    }
 }
 
 // --- ЕСЛИ СТРАНИЦА НЕ НАЙДЕНА — РЕДИРЕКТ НА ГЛАВНУЮ ---
@@ -36,7 +63,7 @@ if (!$isNewPage) {
         exit;
     }
     
-    // Если главная страница не найдена — создаём заглушку
+    // Заглушка для главной
     $page = [
         'id' => 'home',
         'title' => 'Главная',
@@ -68,8 +95,8 @@ $cacheTTL = $settings['cache_ttl'] ?? 86400;
 $cacheDir = APP_ROOT . '/cache/pages/';
 $cacheFile = $cacheDir . ($slug ?: 'home') . '.html';
 
-// Проверяем кеш
-if ($cacheEnabled && file_exists($cacheFile)) {
+// Проверяем кеш. В preview-режиме кеш ОТКЛЮЧАЕМ полностью
+if ($cacheEnabled && !$isPreview && file_exists($cacheFile)) {
     $cacheAge = time() - filemtime($cacheFile);
     if ($cacheTTL === 0 || $cacheAge < $cacheTTL) {
         if (defined('DEBUG_SITE') && DEBUG_SITE) {
@@ -84,7 +111,12 @@ if ($cacheEnabled && file_exists($cacheFile)) {
 ob_start();
 
 // Определяем текущий URL для OG
-$currentUrl = 'https://' . $_SERVER['HTTP_HOST'] . ($slug ? '/' . $slug : '');
+$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$safeHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+if (!preg_match('#^[a-z0-9\-\.]+(:\d+)?$#i', $safeHost)) {
+    $safeHost = 'localhost';
+}
+$currentUrl = $protocol  . '://' . $safeHost . ($slug ? '/' . $slug : '');
 
 // Мета-данные страницы с приоритетом на глобальные настройки
 $pageTitle = !empty(SITE_META_TITLE) ? SITE_META_TITLE : ($page['title'] ?? 'Название компании');
@@ -176,7 +208,13 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
         <?php echo $customCss; ?>
     </style>    
     
-    <?php 
+    <?php  
+        // В preview-режиме отключаем объединение ассетов,
+        // чтобы не создавать временные cache/assets/{preview_id}.{css,js}
+        if ($isPreview) {
+            $settings['assets_combine'] = false;
+        }
+        
         $assets = getModuleAssets($usedModules, $settings, $page['id'] ?? 'home');
     ?>
     <?php foreach ($assets['css'] as $cssUrl): ?>
@@ -185,6 +223,16 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
 
 </head>
 <body>
+    <?php if ($isPreview): ?>
+    <div class="fixed top-0 left-0 right-0 z-[9999] bg-amber-400 text-amber-900 text-center py-2.5 px-4 text-sm font-bold shadow-md">
+        <span class="inline-flex items-center gap-2">
+            <span class="icon-eye text-base"></span>
+            Предпросмотр — страница не опубликована
+        </span>
+    </div>
+    <div style="height: 44px;"></div>
+    <?php endif; ?>
+    
     <?php 
     // --- Рендерим страницу через шаблон ---
     $templateFile = APP_ROOT . '/templates/' . ($template['id'] ?? 'full-width') . '.php';
@@ -238,7 +286,8 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
 // ===== СОХРАНЯЕМ КЕШ =====
 $html = ob_get_clean();
 
-if ($cacheEnabled) {
+// В preview-режиме НЕ сохраняем в кеш
+if ($cacheEnabled && !$isPreview) {
     if (!is_dir($cacheDir)) {
         mkdir($cacheDir, 0755, true);
     }

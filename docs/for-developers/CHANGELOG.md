@@ -2,6 +2,43 @@
 
 Все значимые изменения проекта.
 
+## [Release version 1.5.0] — 2026-10-06
+
+### Добавлено
+
+- **Временный предпросмотр из конструктора** — кнопка «Предпросмотр» показывает страницу с текущим (несохранённым) состоянием:
+  - Работает для сохранённых страниц и для новых (в процессе создания).
+  - Файлы — в `data/preview/{preview_id}.json`.
+  - Не затрагивает основную БД, не индексируется, не кешируется.
+- **Постоянная preview-ссылка для согласования** — с заказчиком:
+  - Хранится в `data/pages/{id}.json` как поле `preview_token`.
+  - Создаётся/удаляется по кнопке в `edit.php`.
+  - Открывает страницу в любом статусе (черновик, запланирована, снята).
+- **Обработка `?preview=xxx` в `index.php`** — приоритет временного preview, fallback на постоянный.
+- **Жёлтая плашка превью** — фиксированный баннер сверху.
+- **X-Robots-Tag: noindex** — preview не индексируется.
+- **Отключение кеша в preview** — не отдаём из кеша, не пишем в кеш.
+- **Отключение assets_combine в preview** — чтобы не создавать временные `cache/assets/{preview_id}.css`.
+- **Очистка previews** — 3 триггера:
+  1. Успешный логин → удалить всё.
+  2. Заход на `edit.php?id=X` → удалить previews сессии для `X`.
+  3. Сохранение страницы `X` → удалить previews сессии для `X`.
+
+### Технические детали
+
+- **`config/preview.php`** — эндпоинт POST для создания временного preview.
+- **Функции в `admin_controller.php`**:
+  - `cleanupAllPreviews()`, `cleanupSessionPreviews()`, `cleanupSessionPagePreviews()`.
+  - `createPreview()`, `ensurePreviewDir()`.
+  - `getPagePreviewToken()`, `handleRegeneratePagePreviewToken()`, `handleDeletePagePreviewToken()`.
+  - `getPreviewUrl()`, `getPagePreviewUrl()`.
+- **Функции в `functions.php`**:
+  - `loadPreviewById()` — чтение временного preview (нужна фронту).
+  - `loadPageByPreviewToken()` — поиск страницы по постоянному токену.
+- **JS**: `window.previewPage()` в `constructor.js` — async POST + открытие новой вкладки.
+- **JS**: `copyPagePreviewUrl()`, `regeneratePagePreviewToken()`, `deletePagePreviewToken()` в `pages.js`.
+
+
 ## [Release version 1.4.0] — 2026-10-06
 
 ### Добавлено

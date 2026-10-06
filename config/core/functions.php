@@ -416,6 +416,68 @@ function loadPageById(string $id): ?array {
 }
 
 /**
+ * Ищет страницу по preview_token.
+ * Возвращает страницу в ЛЮБОМ статусе (published, draft, scheduled, archived).
+ *
+ * @param string $token 32 hex-символа
+ * @return array|null Данные страницы или null
+ */
+function loadPageByPreviewToken(string $token): ?array {
+    if (!preg_match('/^[a-f0-9]{32}$/i', $token)) {
+        return null;
+    }
+
+    $pagesDir = DATA_DIR . 'pages/';
+    if (!is_dir($pagesDir)) {
+        return null;
+    }
+
+    $files = glob($pagesDir . '*.json');
+    if (empty($files)) {
+        return null;
+    }
+
+    foreach ($files as $file) {
+        $page = _jsonToArray($file);
+        if (!empty($page['preview_token']) && hash_equals($page['preview_token'], $token)) {
+            return $page;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Загружает preview-файл по его ID.
+ * Возвращает данные без служебного блока _preview.
+ *
+ * @param string $previewId 32 hex-символа
+ * @return array|null Данные страницы или null
+ */
+function loadPreviewById(string $previewId): ?array {
+    if (!preg_match('/^[a-f0-9]{32}$/i', $previewId)) {
+        return null;
+    }
+
+    $previewDir = DATA_DIR . 'preview' . DIRECTORY_SEPARATOR;
+    $filePath = $previewDir . $previewId . '.json';
+
+    if (!file_exists($filePath)) {
+        return null;
+    }
+
+    $data = _jsonToArray($filePath);
+    if (empty($data) || empty($data['_preview'])) {
+        return null;
+    }
+
+    // Убираем служебный блок
+    unset($data['_preview']);
+
+    return $data;
+}
+
+/**
  * Загружает шаблон из config/data/templates.json по его ID
  *
  * @param string $id Идентификатор шаблона

@@ -136,7 +136,11 @@ function verifyAdminCredentials(string $login, string $password): bool {
 function handleSuccessfulLogin(string $userIp, array $bfData): void {
     session_regenerate_id(true); 
     $_SESSION['last_activity'] = time();
-    $_SESSION['admin_auth'] = true;
+    $_SESSION['admin_auth'] = true;    
+
+    // Флаг: при следующем запросе в админку очистить все preview-файлы.
+    // Реальное удаление — в config/index.php (там уже подключён admin_controller.php).
+    $_SESSION['preview_cleanup_all_pending'] = true;
     
     if (isset($bfData['attempts'][$userIp])) {
         unset($bfData['attempts'][$userIp]);

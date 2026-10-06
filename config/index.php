@@ -33,8 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
     
     // Компактный и плоский сценарий вызова
     if (checkIpBlockStatus($userIp, $bfData) && verifyAdminCredentials($login, $password)) {
-        handleSuccessfulLogin($userIp, $bfData);
         $_SESSION['admin_login'] = preg_replace('/[\r\n\t]+/', '', $login);
+        handleSuccessfulLogin($userIp, $bfData);
     } else {
         handleFailedLogin($userIp, $bfData);
         $error = admin_error(); // Забираем текст ошибки из центрального реестра
@@ -90,7 +90,16 @@ if ($isAuth) {
     $bfData = getLoginAttemptsData();
     checkAdminSessionTimeout($bfData);
     
-    require_once 'core/admin_controller.php';
+    require_once 'core/admin_controller.php';    
+    
+    // === PREVIEW CLEANUP TRIGGERS ===
+    
+    // Успешный логин — очистка ВСЕГО
+    // Флаг устанавливается в handleSuccessfulLogin, обрабатывается здесь
+    if (!empty($_SESSION['preview_cleanup_all_pending'])) {
+        cleanupAllPreviews();
+        unset($_SESSION['preview_cleanup_all_pending']);
+    }
     
     // --- ВИРТУАЛЬНЫЙ КРОН БЭКАПА ---
     $cronSettings = getBackupSettingsData();
@@ -249,6 +258,8 @@ if ($isAuth) {
         elseif (isset($_POST['menu_set_main']))  { handleSetMainMenu(); exit; }
         
         elseif (isset($_POST['trash_action'])) { handleTrashAction(); exit; }
+        elseif (isset($_POST['regenerate_page_preview_token'])) { handleRegeneratePagePreviewToken($_POST['page_id'] ?? ''); exit; }
+        elseif (isset($_POST['delete_page_preview_token'])) { handleDeletePagePreviewToken($_POST['page_id'] ?? ''); exit; }
         
         elseif (isset($_POST['unpack_module']))    { echo json_encode(unpackModule($_POST['module_id'] ?? '')); exit; }
         elseif (isset($_POST['rebuild_min']))      { handleRebuildModuleMin($_POST['module_id'] ?? ''); exit; }

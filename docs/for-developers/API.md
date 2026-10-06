@@ -1,18 +1,5 @@
 # API функций AlPin CMS
 
-## 📖 Оглавление
-
-- [Утилиты (`functions.php`)](#утилиты)
-- [Чтение данных](#чтение-данных)
-- [Загрузка контента](#загрузка-контента)
-- [Рендер](#рендер)
-- [Запись данных (`admin_controller.php`)](#запись-данных)
-- [Безопасность](#безопасность)
-- [Файловый менеджер](#файловый-менеджер)
-- [Логирование](#логирование)
-
----
-
 ## 🛠 Утилиты
 
 ### `e(?string $str): string`
@@ -625,6 +612,103 @@ if (!ensureTrashDir()) {
     return ['success' => false, 'error' => 'Папка корзины недоступна для записи.'];
 }
 ```
+
+---
+
+## 👁 Предпросмотр
+
+### Временный preview (из конструктора)
+
+#### `createPreview(array $pageData, string $sessionId, string $pageId, ?string $existingPreviewId, string $createdBy): array`
+
+Создаёт/перезаписывает preview-файл.
+
+```php
+$result = createPreview($pageData, session_id(), 'about', null, 'admin');
+// ['success' => true, 'preview_id' => 'a1b2...', 'error' => '']
+```
+
+Перезапись — если `$existingPreviewId` задан и совпадает `session_id + page_id`.
+
+#### `loadPreviewById(string $previewId): ?array`
+
+Читает preview-файл, **убирает** служебный блок `_preview`.
+
+```php
+$page = loadPreviewById('a1b2c3...');
+```
+
+**Живёт в `functions.php`** — нужна и фронту.
+
+#### `cleanupAllPreviews(): int`
+
+Удаляет **все** preview-файлы. Используется при логине.
+
+#### `cleanupSessionPreviews(string $sessionId): int`
+
+Удаляет previews конкретной сессии.
+
+#### `cleanupSessionPagePreviews(string $sessionId, string $pageId): int`
+
+Удаляет previews сессии **для** конкретной страницы.
+
+#### `ensurePreviewDir(): bool`
+
+Создаёт `data/preview/` + `.htaccess`.
+
+#### `getPreviewUrl(string $previewId, string $slug = ''): string`
+
+Формирует URL вида `/{slug}?preview={id}` или `/?preview={id}`.
+
+---
+
+### Постоянный preview-токен (для согласования)
+
+#### `getPagePreviewToken(string $pageId): string`
+
+Читает `preview_token` из JSON страницы. Пустая строка, если не задан.
+
+#### `handleRegeneratePagePreviewToken(string $pageId): void`
+
+Генерирует новый токен, сохраняет, делает flash+log+redirect. Вызывается из `config/index.php`.
+
+#### `handleDeletePagePreviewToken(string $pageId): void`
+
+Удаляет токен. Вызывается из `config/index.php`.
+
+#### `getPagePreviewUrl(string $pageId, string $token): string`
+
+Формирует **полный** URL: `{protocol}://{host}/{slug}?preview={token}`.
+
+#### `loadPageByPreviewToken(string $token): ?array`
+
+Ищет страницу по `preview_token`. Возвращает в **любом** статусе. **Живёт в `functions.php`.**
+
+---
+
+### Эндпоинт `config/preview.php`
+
+POST-эндпоинт для создания временного preview.
+
+**Вход (POST):**
+- `csrf_token` — обязательно.
+- `page_id` — ID страницы (пусто для новой).
+- `title`, `slug`, `template`.
+- `show_header`, `show_footer`.
+- `meta_description`, `meta_keywords`.
+- `rows_json` — JSON конструктора.
+- `existing_preview_id` — опционально (перезапись).
+
+**Выход (JSON):**
+```json
+{
+    "success": true,
+    "preview_id": "a1b2c3...",
+    "url": "/about?preview=a1b2c3..."
+}
+```
+
+**Требует авторизации и CSRF.**
 
 ---
 
