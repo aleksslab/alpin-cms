@@ -2,6 +2,41 @@
 
 Все значимые изменения проекта.
 
+## [Release version 1.4.0] — 2026-10-06
+
+### Добавлено
+
+- **Корзина для страниц и меню** — мягкое удаление:
+  - Удалённые сущности перемещаются в `data/trash/` вместо физического удаления.
+  - Восстановление в один клик (с авторазрешением конфликта ID: `{id}-restored`).
+  - Окончательное удаление (по одному, несколько, или вся корзина сразу).
+- **UI корзины** — кнопка «Корзина (N)» в шапке вкладок «Страницы» и «Меню» + модалка со списком.
+- **Метаданные в корзине** — `_trash.type`, `_trash.original_id`, `_trash.deleted_at`, `_trash.deleted_by`, `_trash.size_bytes`.
+- **Логин админа в сессии** (`$_SESSION['admin_login']`) — устанавливается при успешном входе, используется для `deleted_by` и `logAction()`.
+
+### Изменено
+
+- **`handleDeletePage`** — вместо `unlink` перемещает в корзину через `trashPage()`.
+- **`handleDeleteMenu`** — аналогично через `trashMenu()`.
+- **`deleteMenu()`** — удалена как мёртвая функция.
+- **Логи действий** — `page_trash` / `menu_trash` вместо `page_delete` / `menu_delete`.
+
+### Технические детали
+
+- **`trashEntity()`** — общая логика перемещения сущности в корзину (используется `trashPage` / `trashMenu`).
+- **`restoreFromTrash()`** — восстановление с разрешением конфликта ID.
+- **`deleteFromTrash()`** / **`clearTrash()`** — окончательное удаление.
+- **`getTrashList(?string $type)`** / **`getTrashCount(?string $type)`** — списки и счётчики (фильтр по типу).
+- **`handleTrashAction()`** — обработчик POST-действий корзины (`restore`, `delete_selected`, `clear_all`).
+- **`config/core/trash_modal.php`** — общая модалка для страниц и меню.
+- **`config/js/trash_modal.js`** — логика корзины (open/close, select, submit).
+- **`ensureTrashDir()`** — создание папки `data/trash/` + `.htaccess` защита.
+
+### Удалено
+
+- **`deleteMenu()`** — мёртвый код (не вызывается после перехода на корзину).
+
+
 ## [Release version 1.3.0] — 2026-10-05
 
 ### Добавлено

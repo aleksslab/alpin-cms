@@ -10,6 +10,7 @@
 | `data/pages/{id}.json` | Страницы |
 | `data/menus/{id}.json` | Меню |
 | `data/logs/admin.log` | Логи (**не** JSON) |
+| `data/trash/*.json` | Корзина (удалённые страницы и меню) |
 | `config/data/credentials.json` | Логин/хеш |
 | `config/data/modules.json` | Список модулей |
 | `config/data/templates.json` | Список шаблонов |
@@ -301,6 +302,8 @@
 
 Это защита на случай, если cron не сработал (отключён, упал) — страница всё равно не будет видна после истечения `unpublish_at`.
 
+**Удаление:** при удалении страницы файл **не удаляется физически**, а перемещается в `data/trash/page_{id}_{timestamp}.json` (см. раздел «`data/trash/`»). Восстановление — через модалку «Корзина» в админке.
+
 ---
 
 ## 📄 `data/menus/{id}.json`
@@ -355,6 +358,69 @@
 | `custom` | `label`, `url` |
 | `dropdown` | `label`, `children[]` |
 | `divider` | — |
+
+**Удаление:** аналогично страницам — файл перемещается в `data/trash/menu_{id}_{timestamp}.json`. **Главное меню** нельзя удалить (защита в `handleDeleteMenu`), в корзину не попадает.
+
+---
+
+## 📄 `data/trash/{type}_{id}_{timestamp}.json`
+
+Корзина удалённых сущностей. Один файл — одна удалённая страница или меню.
+
+**Структура имени файла:**
+
+- `{type}` — `page` или `menu`.
+- `{id}` — оригинальный ID сущности.
+- `{timestamp}` — Unix timestamp момента удаления.
+
+**Примеры:**
+- `page_home_1735689600.json`
+- `menu_footer_help_1735689601.json`
+
+**Структура JSON:**
+
+Содержимое — **то же, что у оригинала** (`data/pages/{id}.json` или `data/menus/{id}.json`) **+ поле `_trash`**:
+
+```json
+{
+    "id": "about",
+    "title": "О компании",
+    "slug": "about",
+    "rows": [ ... ],
+
+    "_trash": {
+        "type": "page",
+        "original_id": "about",
+        "deleted_at": 1735689600,
+        "deleted_by": "admin",
+        "size_bytes": 4096
+    }
+}
+```
+
+**Поля `_trash`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `type` | string | `page` или `menu` |
+| `original_id` | string | Исходный ID сущности |
+| `deleted_at` | int | Unix timestamp удаления |
+| `deleted_by` | string | Логин админа, удалившего сущность |
+| `size_bytes` | int | Размер оригинала в байтах (для UI) |
+
+**Что происходит при восстановлении:**
+
+1. Файл читается из `data/trash/`.
+2. Убирается поле `_trash`.
+3. `id` (и `slug` для страниц) заменяется на `{original_id}`, если он **свободен**, иначе — на `{original_id}-restored`, `{original_id}-restored-2`, ...
+4. Файл записывается в `data/pages/` или `data/menus/`.
+5. Файл из корзины удаляется.
+
+**Очистка корзины — только вручную:**
+
+- Кнопка **«Удалить выбранные»** в модалке.
+- Кнопка **«Очистить корзину»**.
+- Автоочистки по TTL — **нет**.
 
 ---
 

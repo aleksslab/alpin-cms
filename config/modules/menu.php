@@ -18,17 +18,32 @@ $menusList = getMenusList();
 
 // Получаем ID главного меню из настроек
 $mainMenuId = getMainMenuId();
+$trashCountMenus = getTrashCount('menu');
 ?>
 
-<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+<div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
     <div>
-        <h1 class="text-3xl font-bold text-slate-800 mb-2">Управление меню</h1>
-        <p class="text-slate-500 text-sm">Создание, редактирование и управление меню сайта.</p>
+        <h1 class="text-3xl font-bold text-slate-800 mb-2">Меню сайта</h1>
+        <p class="text-slate-500 text-sm">Создание, редактирование и управление навигацией сайта.</p>
     </div>
-    
-    <a href="?tab=menu&action=create" class="w-full md:w-auto px-6 py-3 bg-[var(--primary-color)] text-white font-bold rounded-xl hover:bg-[var(--primary-dark)] transition-all shadow-lg shadow-[var(--primary-color)]/20 flex items-center justify-center gap-2 text-sm">
-        <span class="icon-plus text-base"></span> Создать меню
-    </a>
+
+    <div class="flex flex-row gap-2 w-full lg:w-auto">
+        <button type="button" onclick="window.openTrashModal()"
+                class="flex-1 lg:flex-initial lg:w-[140px] px-4 py-3 bg-slate-100 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-2 text-sm whitespace-nowrap"
+                title="Корзина удалённых меню">
+            <span class="icon-trash-2 text-base"></span>
+            <span>Корзина</span>
+            <?php if ($trashCountMenus > 0): ?>
+                <span class="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-bold rounded-full"><?php echo $trashCountMenus; ?></span>
+            <?php endif; ?>
+        </button>
+
+        <a href="?tab=menu&action=create"
+           class="flex-1 lg:flex-initial lg:w-[140px] px-4 py-3 bg-[var(--primary-color)] text-white font-bold rounded-xl hover:bg-[var(--primary-dark)] transition-all shadow-lg shadow-[var(--primary-color)]/20 flex items-center justify-center gap-2 text-sm whitespace-nowrap">
+            <span class="icon-plus text-base"></span>
+            <span>Создать</span>
+        </a>
+    </div>
 </div>
 
 <?php renderFlash() ?>
@@ -82,7 +97,7 @@ $mainMenuId = getMainMenuId();
                                         <input type="hidden" name="csrf_token" value="<?php echo e($token); ?>">
                                         <input type="hidden" name="id" value="<?php echo e($menu['id']); ?>">
                                         <?php if (!$isMain): ?>
-                                            <button type="submit" name="menu_delete" value="1" class="w-8 h-8 rounded-lg flex items-center justify-center border border-rose-100 text-rose-500 hover:text-rose-800 bg-white hover:bg-rose-50 transition-all" title="Удалить" onclick="return confirm('Удалить меню &quot;<?php echo e($menu['name']); ?>&quot;? Это действие необратимо.')">
+                                            <button type="submit" name="menu_delete" value="1" class="w-8 h-8 rounded-lg flex items-center justify-center border border-rose-100 text-rose-500 hover:text-rose-800 bg-white hover:bg-rose-50 transition-all" title="Удалить" onclick="return confirm('Удалить меню &quot;<?php echo e($menu['name']); ?>&quot;?')">
                                                 <span class="icon-trash-2 text-sm"></span>
                                             </button>
                                         <?php else: ?>
@@ -144,7 +159,7 @@ $mainMenuId = getMainMenuId();
                         <input type="hidden" name="csrf_token" value="<?php echo e($token); ?>">
                         <input type="hidden" name="id" value="<?php echo e($menu['id']); ?>">
                         <?php if (!$isMain): ?>
-                            <button type="submit" name="menu_delete" value="1" class="w-10 h-10 flex-shrink-0 bg-white border border-rose-100 text-rose-500 rounded-lg flex items-center justify-center transition-all cursor-pointer hover:bg-rose-50" title="Удалить" onclick="return confirm('Удалить меню &quot;<?php echo e($menu['name']); ?>&quot;? Это действие необратимо.')">
+                            <button type="submit" name="menu_delete" value="1" class="w-10 h-10 flex-shrink-0 bg-white border border-rose-100 text-rose-500 rounded-lg flex items-center justify-center transition-all cursor-pointer hover:bg-rose-50" title="Удалить" onclick="return confirm('Удалить меню &quot;<?php echo e($menu['name']); ?>&quot;?')">
                                 <span class="icon-trash-2 text-sm"></span>
                             </button>
                         <?php else: ?>
@@ -158,3 +173,10 @@ $mainMenuId = getMainMenuId();
         <?php endforeach; ?>
     <?php endif; ?>
 </div>
+
+<?php
+// Модалка корзины
+$trashContext   = 'menu';
+$trashReturnUrl = '?tab=menu';
+include APP_ROOT . '/config/core/trash_modal.php';
+?>

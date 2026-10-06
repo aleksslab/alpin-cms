@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
     // Компактный и плоский сценарий вызова
     if (checkIpBlockStatus($userIp, $bfData) && verifyAdminCredentials($login, $password)) {
         handleSuccessfulLogin($userIp, $bfData);
+        $_SESSION['admin_login'] = preg_replace('/[\r\n\t]+/', '', $login);
     } else {
         handleFailedLogin($userIp, $bfData);
         $error = admin_error(); // Забираем текст ошибки из центрального реестра
@@ -246,6 +247,8 @@ if ($isAuth) {
         
         elseif (isset($_POST['menu_delete']))    { handleDeleteMenu(); exit; }
         elseif (isset($_POST['menu_set_main']))  { handleSetMainMenu(); exit; }
+        
+        elseif (isset($_POST['trash_action'])) { handleTrashAction(); exit; }
         
         elseif (isset($_POST['unpack_module']))    { echo json_encode(unpackModule($_POST['module_id'] ?? '')); exit; }
         elseif (isset($_POST['rebuild_min']))      { handleRebuildModuleMin($_POST['module_id'] ?? ''); exit; }

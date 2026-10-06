@@ -491,6 +491,143 @@ handleCronPublishAction() — при автопубликации / архива
 
 ---
 
+## 🗑 Корзина
+
+### `trashPage(string $id): array`
+
+**Перемещает страницу в корзину.** Логин для `_trash.deleted_by` берётся из `$_SESSION['admin_login']`.
+
+```php
+$result = trashPage('about');
+// ['success' => true, 'error' => '']
+```
+
+**Валидация:** тип `page`, ID по regex `[a-z0-9\-_]+`.
+
+---
+
+### `trashMenu(string $id): array`
+
+**Перемещает меню в корзину.** Аналогично `trashPage`, но для `data/menus/`.
+
+```php
+$result = trashMenu('footer_help');
+```
+
+---
+
+### `trashEntity(string $type, string $id, string $sourceDir): array`
+
+**Общая функция перемещения сущности в корзину.** Используется `trashPage()` и `trashMenu()`. Напрямую обычно не вызывается.
+
+**Что делает:**
+1. Валидирует тип и ID.
+2. Читает исходный JSON.
+3. Добавляет `_trash` с метаданными.
+4. Записывает в `data/trash/{type}_{id}_{timestamp}.json`.
+5. Удаляет оригинал.
+6. **Откат:** если не удалось удалить оригинал — удаляет файл из корзины.
+
+---
+
+### `getTrashList(?string $type = null): array`
+
+**Возвращает список файлов в корзине с метаданными.** Отсортировано по `deleted_at` (свежие сверху).
+
+```php
+$list = getTrashList('page');
+// [
+//   ['file' => 'page_home_1735689600.json', 'type' => 'page', 'original_id' => 'home', 'title' => 'Главная', 'deleted_at' => 1735689600, 'deleted_by' => 'admin', 'size_bytes' => 4096],
+//   ...
+// ]
+```
+
+**Фильтр `$type`:** `'page'` / `'menu'` / `null` (все).
+
+---
+
+### `getTrashCount(?string $type = null): int`
+
+**Возвращает количество файлов в корзине.**
+
+```php
+$total = getTrashCount();          // все
+$pages = getTrashCount('page');    // только страницы
+$menus = getTrashCount('menu');    // только меню
+```
+
+Для фильтра по типу использует `glob("{$type}_*.json")` — быстро.
+
+---
+
+### `restoreFromTrash(string $trashFileName): array`
+
+**Восстанавливает сущность из корзины.**
+
+```php
+$result = restoreFromTrash('page_about_1735689600.json');
+// ['success' => true, 'message' => 'Страница восстановлена как "about-restored" (оригинальный ID был занят).', 'error' => '', 'new_id' => 'about-restored']
+```
+
+**Разрешение конфликта ID:**
+1. Если `original_id` свободен — восстанавливает под ним.
+2. Иначе — `{original_id}-restored`, `{original_id}-restored-2`, ... до 100 попыток.
+
+**Для страниц** slug **всегда пересчитывается** в `{new_id}` — чтобы URL не конфликтовал.
+
+---
+
+### `deleteFromTrash(array $fileNames): array`
+
+**Окончательно удаляет указанные файлы из корзины.**
+
+```php
+$result = deleteFromTrash(['page_home_1735689600.json', 'menu_x_1735689601.json']);
+// ['success' => true, 'deleted' => 2, 'error' => '']
+```
+
+**Валидация имён файлов:** regex `^[a-z]+_[a-z0-9\-_]+_\d+\.json$`.
+
+---
+
+### `clearTrash(): array`
+
+**Полностью очищает корзину.**
+
+```php
+$result = clearTrash();
+// ['success' => true, 'deleted' => 5, 'error' => '']
+```
+
+---
+
+### `handleTrashAction(): void`
+
+**Обработчик POST-действий корзины.** Вызывается из `config/index.php` при `$_POST['trash_action']`.
+
+**Действия:**
+- `restore` — восстановить выбранные.
+- `delete_selected` — удалить выбранные.
+- `clear_all` — очистить всё.
+
+**Дополнительные поля формы:** `trash_context` (`page` / `menu`), `trash_return_url`, `trash_files[]`.
+
+**Редирект** — всегда, в конце. `flash` — success / warning / error.
+
+---
+
+### `ensureTrashDir(): bool`
+
+**Гарантирует существование `data/trash/` + `.htaccess` защиту.** Вызывается из `trashEntity()`.
+
+```php
+if (!ensureTrashDir()) {
+    return ['success' => false, 'error' => 'Папка корзины недоступна для записи.'];
+}
+```
+
+---
+
 ## ⏰ Cron-публикация
 
 ### `handleCronPublishAction(string $token): void`
