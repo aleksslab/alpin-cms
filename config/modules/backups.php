@@ -166,9 +166,7 @@ if ($realStorageDir && is_dir($realStorageDir)) {
         <!-- ИСПРАВЛЕНО: Добавлен ID и класс hidden через PHP для строки ссылки системного крона -->
         <div class="editor-row mt-4">
             <?php
-            $cronProtocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $cronHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $cronBaseUrl = $cronProtocol . '://' . $cronHost;
+            $cronBaseUrl = getBaseUrl();
             ?>
             <div id="js-backup-cron-link-zone" class="editor-field <?php echo empty($backupSettings['cron_enabled']) ? 'hidden' : ''; ?>">
                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Ссылка для планировщика хостинга (Cron URL)</label>

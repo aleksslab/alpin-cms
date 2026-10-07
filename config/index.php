@@ -112,13 +112,7 @@ if ($isAuth) {
         if (time() >= ($lastCronBackup + ($cronPeriodHours * 3600))) {
 
             // Тихо и асинхронно вызываем наш готовый файл Крона через внутренний поток PHP
-            $cronProtocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-            $safeHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            if (!preg_match('#^[a-z0-9\-\.]+(:\d+)?$#i', $safeHost)) {
-                $safeHost = 'localhost';
-            }
-
-            $cronUrl = $cronProtocol . $safeHost . dirname($_SERVER['SCRIPT_NAME']) . '/cron/backup.php?token=' . urlencode(getCronToken());
+            $cronUrl = getBaseUrl() . dirname($_SERVER['SCRIPT_NAME']) . '/cron/backup.php?token=' . urlencode(getCronToken());
 
             // Выставляем таймаут ровно в 1 секунду.
             // Страница админки откроется мгновенно, а сам авто-бэкап продолжит собираться в фоне сервера!
@@ -142,13 +136,7 @@ if ($isAuth) {
         // чтобы следующий F5 не отправил второй запрос.
         setLastCronPublishTime(time());
 
-        $cronProtocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-        $safeHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        if (!preg_match('#^[a-z0-9\-\.]+(:\d+)?$#i', $safeHost)) {
-            $safeHost = 'localhost';
-        }
-
-        $publishUrl = $cronProtocol . $safeHost . dirname($_SERVER['SCRIPT_NAME']) . '/cron/publish.php?token=' . urlencode(getCronToken());
+        $publishUrl = getBaseUrl() . dirname($_SERVER['SCRIPT_NAME']) . '/cron/publish.php?token=' . urlencode(getCronToken());
 
         $publishContext = stream_context_create([
             'http' => [

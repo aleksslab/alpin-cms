@@ -131,12 +131,7 @@ if ($cacheEnabled && !$isPreview && file_exists($cacheFile)) {
 ob_start();
 
 // Определяем текущий URL для OG
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$safeHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
-if (!preg_match('#^[a-z0-9\-\.]+(:\d+)?$#i', $safeHost)) {
-    $safeHost = 'localhost';
-}
-$currentUrl = $protocol  . '://' . $safeHost . ($slug ? '/' . $slug : '');
+$currentUrl = getBaseUrl() . ($slug ? '/' . $slug : '');
 
 // Мета-данные страницы с приоритетом на глобальные настройки
 $pageTitle = !empty(SITE_META_TITLE) ? SITE_META_TITLE : ($page['title'] ?? 'Название компании');

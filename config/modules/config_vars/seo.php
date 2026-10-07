@@ -119,7 +119,7 @@
                         <div class="flex flex-col lg:flex-row gap-2">
                             <input type="text"
                                    readonly
-                                   value="https://<?php echo e($_SERVER['HTTP_HOST'] ?? 'localhost'); ?>/config/cron/seo.php?token=<?php echo e(getCronToken()); ?>"
+                                   value="<?php echo e(getBaseUrl()); ?>/config/cron/seo.php?token=<?php echo e(getCronToken()); ?>"
                                    class="w-full min-w-0 px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-600 select-all focus:outline-none">
                             <button type="button"
                                     onclick="copyToClipboard(this)"

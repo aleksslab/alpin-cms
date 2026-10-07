@@ -4359,20 +4359,12 @@ function getPagePreviewUrl(string $pageId, string $token): string {
     $page = loadPageById($pageId);
     $slug = $page['slug'] ?? '';
 
-    // Протокол и хост
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    if (!preg_match('#^[a-z0-9\-\.]+(:\d+)?$#i', $host)) {
-        $host = 'localhost';
-    }
-
     $base = '/' . trim($slug, '/');
     if ($slug === '') {
         $base = '/';
     }
 
-    return $protocol . '://' . $host . $base . '?preview=' . $token;
+    return getBaseUrl() . $base . '?preview=' . $token;
 }
 
 /**

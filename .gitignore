@@ -47,6 +47,7 @@ desktop.ini
 /fonts/youtube.svg
 *.tmp
 *.bak
+*.bat
 *.swp
 *~
 *_.php

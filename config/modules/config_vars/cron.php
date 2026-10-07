@@ -1,7 +1,5 @@
 <?php
-$cronProtocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$cronHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$cronBaseUrl = $cronProtocol . '://' . $cronHost;
+$cronBaseUrl = getBaseUrl();
 $currentToken = getCronToken();
 ?>
 <!-- СЕКЦИЯ: Интеграция с планировщиком -->
