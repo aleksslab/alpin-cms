@@ -645,6 +645,69 @@
             alert('Ошибка соединения');
         });
     };
+    
+    // ===== SEO: ПЕРЕСБОРКА SITEMAP/ROBOTS =====
+    window.regenerateSeoFiles = function() {
+        var csrfInput = document.querySelector('input[name="csrf_token"]');
+        var csrfToken = csrfInput ? csrfInput.value : '';
+        if (!csrfToken) {
+            alert('Ошибка: CSRF-токен не найден. Обновите страницу.');
+            return;
+        }
+
+        var btn = event.target.closest('button');
+        var originalHtml = btn ? btn.innerHTML : '';
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="icon-refresh-cw text-sm inline-block animate-spin"></span> Генерация...';
+        }
+
+        fetch('index.php?tab=config_vars', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'regenerate_seo_files=1&csrf_token=' + encodeURIComponent(csrfToken)
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+
+            if (data.success) {
+                // Перезагружаем страницу, чтобы обновить дату и ссылки
+                window.location.reload();
+            } else {
+                alert(data.error || 'Ошибка генерации');
+            }
+        })
+        .catch(function() {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+            alert('Ошибка соединения');
+        });
+    };
+    
+    window.copyToClipboard = function(btn) {
+        var input = btn.closest('div').querySelector('input');
+        if (!input) return;
+
+        input.select();
+        input.setSelectionRange(0, 99999);
+
+        try {
+            navigator.clipboard.writeText(input.value).then(function() {
+                var original = btn.innerHTML;
+                btn.innerHTML = '<span class="icon-check text-sm"></span> Скопировано';
+                setTimeout(function() { btn.innerHTML = original; }, 1500);
+            });
+        } catch (e) {
+            document.execCommand('copy');
+        }
+    };
 
     // ===== ИНИЦИАЛИЗАЦИЯ =====
     if (document.readyState === 'loading') {

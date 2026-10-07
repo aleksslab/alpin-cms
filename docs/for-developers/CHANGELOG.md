@@ -2,6 +2,48 @@
 
 Все значимые изменения проекта.
 
+## [Release version 1.6.0] — 2026-10-07
+
+### Добавлено
+
+- **301-редиректы при смене slug**:
+  - Поле `slug_history` в JSON страницы (пишется при переименовании).
+  - Функция `findPageBySlugHistory()` — поиск по старым slug'ам.
+  - Редирект срабатывает в `index.php` (обычный роутинг + preview).
+  - Работает автоматически, без настройки.
+- **Автогенерация `sitemap.xml` и `robots.txt`**:
+  - Функции `generateSitemap()`, `generateRobots()`, `generateSeoFiles()`.
+  - UI в Настройках сайта → SEO → «Технический SEO».
+  - 3 галочки: sitemap, robots, автообновление.
+  - Кнопка «Пересобрать сейчас».
+  - Ссылки на актуальные файлы + дата последней генерации.
+  - **Крон-эндпоинт `config/cron/seo.php`** — общий токен, рекомендуемая частота раз в сутки.
+- **Хелпер `getBaseUrl()`** в `functions.php` — единый протокол + хост.
+
+### Изменено
+
+- **`loadPage()`** — fallback по `slug_history` + вынесение дефолтов в `applyPageDefaults()`.
+- **`handleSavePage()`** — запись старого slug в `slug_history` при переименовании.
+- **`handleSaveSettings()`** — сохранение `seo_*` и `last_seo_regenerate`.
+- **`restoreFromTrash()`** / **`handleClonePage()`** — клон не копирует `slug_history` и `preview_token`.
+- **5 функций** (`handleSavePage`, `handleDeletePage`, `restoreFromTrash`, `handleClonePage`, `handleSetHomePage`) — вызывают `maybeRegenerateSeoFiles()`.
+
+### Исправлено
+
+- **Главная страница** — исправлена ошибка. Читается из `data/settings.json`, а не `data/globals.json`.
+- **Смена главной** — сброс кеша обеих страниц (старой и новой).
+
+### Технические детали
+
+- **Новые функции в `admin_controller.php`**:
+  - `generateSitemap()`, `generateRobots()`, `generateSeoFiles()`, `maybeRegenerateSeoFiles()`.
+- **Новые функции в `functions.php`**:
+  - `findPageBySlugHistory()`, `applyPageDefaults()`, `getBaseUrl()`.
+- **Новый файл:** `config/cron/seo.php`.
+- **UI:** блок «Технический SEO» в `config_vars/seo.php`.
+- **JS:** `regenerateSeoFiles()`, `copyToClipboard()` в `config_vars.js`.
+
+
 ## [Release version 1.5.0] — 2026-10-06
 
 ### Добавлено

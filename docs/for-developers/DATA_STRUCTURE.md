@@ -82,7 +82,11 @@
     "home_page_id": "home",
     "main_menu": "header_main"
     "cron_token": "a1b2c3d4e5f6...",
-    "last_cron_publish": 1735689600
+    "last_cron_publish": 1735689600,
+    "seo_sitemap_enabled": true,
+    "seo_robots_enabled": true,
+    "seo_auto_regenerate": false,
+    "last_seo_regenerate": 0
 }
 ```
 
@@ -141,6 +145,11 @@
 | `meta_title` | string | Глобальный meta title. Если пусто — берётся из страницы. |
 | `meta_description` | string | Глобальный meta description. |
 | `meta_keywords` | string | Ключевые слова через запятую. |
+| **SEO: технический** | | |
+| `seo_sitemap_enabled` | bool | Генерировать sitemap.xml |
+| `seo_robots_enabled` | bool | Генерировать robots.txt |
+| `seo_auto_regenerate` | bool | Автообновлять при изменении страниц |
+| `last_seo_regenerate` | int | Unix timestamp последней генерации |
 
 **Open Graph:**
 
@@ -217,6 +226,7 @@
     "publish_at": null,
     "unpublish_at": null,
     "preview_token": null,
+    "slug_history": [],
     "created": "2025-01-15 12:00:00",
     "updated": "2025-01-15 14:30:00",
     "meta": {
@@ -268,6 +278,7 @@
 | `publish_at` | int (Unix timestamp) \| null | Для `scheduled` — обязательно |
 | `unpublish_at` | int (Unix timestamp) \| null | Опционально для `scheduled` / `published` |
 | `preview_token` | string (32 hex) \| null | Постоянный preview-токен для согласования |
+| `slug_history` | array | История старых slug'ов (для 301-редиректов) |
 | `created` | `Y-m-d H:i:s` | Опционально |
 | `updated` | `Y-m-d H:i:s` | Опционально |
 | `meta` | object | Опционально |
@@ -276,6 +287,8 @@
 | `rows` | array | Опционально |
 
 **Поле `preview_token`:** создаётся/удаляется **только по кнопке** в `edit.php`. При сохранении страницы **не трогается**. Открывает страницу в любом статусе по URL `/{slug}?preview={token}`.
+
+**Поле `slug_history`:** массив старых slug'ов. Заполняется автоматически при переименовании страницы. Используется для 301-редиректов: старый URL → актуальный. Если поле пустое — не создаётся. Лимит — 50 записей (старые удаляются).
 
 ### Статусы страниц
 
@@ -483,6 +496,24 @@
   3. При сохранении `X` — previews **текущей сессии** для `X` (+ `''` при create).
 
 **Никакой автоочистки по TTL нет.**
+
+---
+
+## 📄 `sitemap.xml` и `robots.txt` (корень)
+
+Генерируются функциями `generateSitemap()` и `generateRobots()`.
+
+**Управление:** Настройки сайта → SEO → «Технический SEO».
+
+**Триггеры генерации:**
+1. Вручную — кнопка «Пересобрать».
+2. При сохранении настроек SEO (если галочки менялись).
+3. При сохранении/удалении/восстановлении/клонировании страницы — если `seo_auto_regenerate = true`.
+4. Крон — `config/cron/seo.php?token=xxx`.
+
+**Если галочка выключена** — соответствующий файл **удаляется** (если был).
+
+**Не путать с динамической отдачей:** никаких `.htaccess`-правил для sitemap/robots. Файлы — физические.
 
 ---
 

@@ -261,6 +261,20 @@ if ($isAuth) {
         elseif (isset($_POST['regenerate_page_preview_token'])) { handleRegeneratePagePreviewToken($_POST['page_id'] ?? ''); exit; }
         elseif (isset($_POST['delete_page_preview_token'])) { handleDeletePagePreviewToken($_POST['page_id'] ?? ''); exit; }
         
+        elseif (isset($_POST['regenerate_seo_files'])) {
+            $result = generateSeoFiles();
+
+            if ($result['sitemap']['success'] || $result['robots']['success']) {
+                logAction('seo_regenerate', 'Пересобраны SEO-файлы', 'INFO');
+                echo json_encode(['success' => true, 'message' => 'Файлы пересобраны']);
+            } else {
+                $error = $result['sitemap']['error'] ?: ($result['robots']['error'] ?? 'Неизвестная ошибка');
+                logAction('seo_regenerate', 'Ошибка: ' . $error, 'ERROR');
+                echo json_encode(['success' => false, 'error' => $error]);
+            }
+            exit;
+        }
+        
         elseif (isset($_POST['unpack_module']))    { echo json_encode(unpackModule($_POST['module_id'] ?? '')); exit; }
         elseif (isset($_POST['rebuild_min']))      { handleRebuildModuleMin($_POST['module_id'] ?? ''); exit; }
         elseif (isset($_POST['rebuild_min_all']))  { handleRebuildAllMin($_POST['minify_exclude_css'] ?? [], $_POST['minify_exclude_js'] ?? []); exit; }

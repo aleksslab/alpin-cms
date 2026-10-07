@@ -53,6 +53,8 @@
 ```
 /
 ├── index.php              # Фронтенд (роутинг + рендер)
+├── sitemap.xml            # Генерируется автоматически
+├── robots.txt             # Генерируется автоматически
 ├── .htaccess              # ЧПУ + защита
 ├── README.md
 ├── docs/                  # Документация
@@ -79,6 +81,7 @@ config/
 ├── cron/                  # Эндпоинты для планировщика (хостинг)
 │   ├── backup.php         # Крон бэкапов
 │   └── publish.php        # Крон публикации/архивации страниц
+│   └── seo.php            # Крон генерации sitemap/robots
 |
 ├── core/
 │   ├── functions.php      # ЧТЕНИЕ данных + утилиты
@@ -121,105 +124,223 @@ require_once 'config/config.php';
 
 $requestUri = $_SERVER['REQUEST_URI'];
 $slug = trim($requestUri, '/');
-$page = loadPage($slug);
 ```
 
-**`config.php`** **загружает**:
+**`config.php`** загружает:
 - **DEBUG_SITE**/**DEBUG_ADMIN**.
-- **Сессии** (**`session_start`**).
+- **Сессии** (`session_start`).
 - **CSRF-токен**.
-- **Динамические** **константы** (`SITE_NAME`, `SITE_PHONE`, ...).
+- **Динамические** константы (`SITE_NAME`, `SITE_PHONE`, ...).
+- **`getBaseUrl()`** — хелпер для протокола + хоста.
 
-### 2. Валидация `$slug`
+### 2. Инициализация
 
 ```php
-if ($slug !== '') {
-    if (!preg_match('~^[a-z0-9\-_/]+$~i', $slug) ||
-        strpos($slug, '..') !== false ||
-        strpos($slug, '//') !== false) {
-        header('HTTP/1.1 404 Not Found');
+$isNewPage = false;
+$isPreview = false;
+$usedModules = [];
+$template = null;
+$page = null;
+```
+
+Переменные-флаги, которые определяют дальнейшую логику.
+
+### 3. Проверка preview (приоритет)
+
+```php
+$previewToken = trim($_GET['preview'] ?? '');
+
+if ($previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
+    // 1. Временный preview (из конструктора)
+    $previewData = loadPreviewById($previewToken);
+
+    // 2. Fallback: постоянный preview-токен страницы
+    if (!$previewData) {
+        $previewData = loadPageByPreviewToken($previewToken);
+    }
+
+    if ($previewData) {
+        // 301, если slug в URL не совпадает с актуальным
+        $actualSlug = $previewData['slug'] ?? '';
+        if ($slug !== $actualSlug) {
+            $redirectUrl = ($actualSlug !== '' ? '/' . $actualSlug : '/')
+                         . '?preview=' . urlencode($previewToken);
+            header('Location: ' . $redirectUrl, true, 301);
+            exit;
+        }
+
+        $page = $previewData;
+        $isPreview = true;
+        $isNewPage = true;
+        $template = loadTemplate($page['template'] ?? 'full-width');
+        $usedModules = getUsedModules($page);
+
+        // Preview не индексируется
+        header('X-Robots-Tag: noindex, nofollow, noarchive');
+    }
+}
+```
+
+**Что делает:**
+- Ищет preview по токену: **сначала временный, потом постоянный**.
+- Если нашли и slug в URL неактуален — **301** на правильный URL.
+- Устанавливает `$isPreview = true` — это отключает кеш и включает жёлтую плашку.
+
+### 4. Обычный роутинг
+
+```php
+if (!$isPreview) {
+    $page = loadPage($slug);
+
+    if ($page && $page['status'] === 'published') {
+        $actualSlug = $page['slug'] ?? $page['id'] ?? '';
+
+        // 301, если страница найдена по slug_history
+        if ($slug !== '' && $slug !== $actualSlug) {
+            header('Location: /' . $actualSlug, true, 301);
+            exit;
+        }
+
+        $isNewPage = true;
+        $template = loadTemplate($page['template'] ?? 'full-width');
+        $usedModules = getUsedModules($page);
+    }
+}
+```
+
+**Как работает `loadPage`:**
+1. **Прямой путь:** `data/pages/{slug}.json` — если файл есть, читаем.
+2. **Fallback:** `findPageBySlugHistory($slug)` — ищем по `slug_history` в других страницах.
+
+**Редирект 301 срабатывает, если:**
+- Страница найдена **по истории** (а не по прямому файлу), **и**
+- Запрошенный slug **непустой**, **и**
+- Запрошенный slug **не совпадает** с актуальным.
+
+### 5. Страница не найдена
+
+```php
+if (!$isNewPage) {
+    if ($slug !== '') {
+        header('Location: /', true, 301);
         exit;
     }
+
+    // Заглушка для главной, если home.json отсутствует
+    $page = [
+        'id'       => 'home',
+        'title'    => 'Главная',
+        'template' => 'full-width',
+        'status'   => 'published',
+        'zones'    => ['main' => ['rows' => []]]
+    ];
+    $isNewPage = true;
+    $template = loadTemplate('full-width');
 }
 ```
 
-**Защита** **от** **Path Traversal** **через** `$slug`.
+**Логика:**
+- **Несуществующий slug** (`/nonexistent`) → **301** на главную.
+- **Главная (`/`), но `home.json` отсутствует** → отдаётся заглушка.
 
-### 3. `loadPage($slug)`
+### 6. Настройки для хедера и футера
 
 ```php
-function loadPage(string $slug): ?array {
-    // Валидация
-    if ($slug !== '') {
-        if (!preg_match('~^[a-z0-9\-_/]+$~i', $slug) ||
-            strpos($slug, '..') !== false) {
-            return null;
-        }
-    }
-    
-    if ($slug === '') {
-        $homeId = getHomePageId();
-        return loadPageById($homeId);
-    }
-    
-    $filePath = DATA_DIR . 'pages/' . $slug . '.json';
-    if (!file_exists($filePath)) return null;
-    
-    $page = _jsonToArray($filePath);
-    if ($page['status'] !== 'published') return null;
-    return $page;
-}
+$settings = getSettingsData();
+$site_name = $settings['name'] ?? SITE_NAME;
+$siteNamePlain = getPlainText($site_name);
+// ... и т. д.
 ```
 
-```php
-// Проверка preview: временный или постоянный
-$previewToken = trim($_GET['preview'] ?? '');
-if ($previewToken !== '') {
-    $previewData = loadPreviewById($previewToken)
-                ?? loadPageByPreviewToken($previewToken);
-    if ($previewData) {
-        // Режим preview: рендер без учёта status, кеш отключён, noindex
-    }
-}
-```
-
-### 4. Кеш
+### 7. Кеш страниц
 
 ```php
+$cacheEnabled = $settings['cache_enabled'] ?? false;
+$cacheTTL = $settings['cache_ttl'] ?? 86400;
 $cacheFile = $cacheDir . ($slug ?: 'home') . '.html';
-if ($cacheEnabled && file_exists($cacheFile)) {
-    if ($cacheTTL === 0 || (time() - filemtime($cacheFile)) < $cacheTTL) {
-        header('X-Cache: HIT');
+
+// В preview-режиме кеш ОТКЛЮЧАЕМ
+if ($cacheEnabled && !$isPreview && file_exists($cacheFile)) {
+    $cacheAge = time() - filemtime($cacheFile);
+    if ($cacheTTL === 0 || $cacheAge < $cacheTTL) {
+        if (DEBUG_SITE) header('X-Cache: HIT');
         readfile($cacheFile);
         exit;
     }
 }
+
 ob_start();  // начало буферизации
 ```
 
-### 5. Рендер
+**Ключевое:**
+- **Preview не читает кеш** (`!$isPreview`).
+- **Preview не пишет в кеш** — то же условие в конце.
+- В preview `assets_combine` отключается — не создавать временные `cache/assets/{preview_id}.css`.
+
+### 8. Мета-данные и OG
 
 ```php
-$template = loadTemplate($page['template'] ?? 'full-width');
-$usedModules = getUsedModules($page);
-$assets = getModuleAssets($usedModules, $settings, $page['id']);
-include APP_ROOT . '/templates/' . $template['id'] . '.php';
+$pageTitle = !empty(SITE_META_TITLE) ? SITE_META_TITLE : ($page['title'] ?? 'Название компании');
+$ogUrl = !empty(OG_URL) ? OG_URL : $currentUrl;
 ```
 
-**`base.php`** **включает**:
+**Данные страницы** имеют **приоритет** ниже глобальных настроек — если в настройках SEO указано, оно перекрывает.
+
+### 9. Рендер
+
+```php
+$templateFile = APP_ROOT . '/templates/' . ($template['id'] ?? 'full-width') . '.php';
+if (file_exists($templateFile)) {
+    include $templateFile;
+}
+```
+
+**`base.php`** включает:
 - **Хедер** (`templates/headers/{variant}/header.php`).
-- **Зоны** **шаблона** (`$template['zones']`).
-- **Ряды**/**колонки**/**модули** (`include modules/{type}.php`).
+- **Зоны шаблона** (`$template['zones']`).
+- **Ряды/колонки/модули** (`include modules/{type}.php`).
 - **Футер** (`templates/footers/{variant}/footer.php`).
 
-### 6. Сохранение в кеш
+### 10. Сохранение в кеш
 
 ```php
 $html = ob_get_clean();
-if ($cacheEnabled) {
+
+if ($cacheEnabled && !$isPreview) {
     file_put_contents($cacheFile, $html);
 }
+
 echo $html;
+```
+
+**Preview не сохраняется** в кеш — каждый раз генерируется заново.
+
+### Схема (кратко)
+
+```
+HTTP-запрос
+    │
+    ├─→ ?preview=xxx?
+    │       ├─ Да → loadPreviewById / loadPageByPreviewToken
+    │       │       ├─ Найдено → 301 при несовпадении slug → рендер
+    │       │       └─ Не найдено → обычный роутинг
+    │       │
+    │       └─ Нет → обычный роутинг
+    │               │
+    │               └─ loadPage(slug)
+    │                       ├─ Прямой файл → рендер
+    │                       ├─ slug_history → 301 → рендер
+    │                       └─ Не найдено → 301 на главную
+    │
+    ├─→ Кеш (только если !$isPreview)
+    │       ├─ HIT → readfile + exit
+    │       └─ MISS → ob_start()
+    │
+    ├─→ Мета + OG + Twitter
+    │
+    ├─→ Рендер (base.php → хедер → модули → футер)
+    │
+    └─→ Сохранение в кеш (только если !$isPreview) → echo
 ```
 
 ---
@@ -382,6 +503,9 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `safeFileWrite()` | Атомарная запись с flock |
 | `loadPreviewById()` | Чтение временного preview |
 | `loadPageByPreviewToken()` | Поиск страницы по постоянному токену |
+| `findPageBySlugHistory()` | Поиск страницы по slug_history |
+| `applyPageDefaults()` | Дефолты для страницы |
+| `getBaseUrl()` | Протокол + хост сайта |
 
 ### `admin_auth.php` — авторизация
 
@@ -435,6 +559,10 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `handleRegeneratePagePreviewToken()` | Создание/перегенерация токена |
 | `handleDeletePagePreviewToken()` | Удаление токена |
 | `getPagePreviewUrl()` | Формирование URL постоянного preview |
+| `generateSitemap()` | Генерация sitemap.xml |
+| `generateRobots()` | Генерация robots.txt |
+| `generateSeoFiles()` | Обе генерации + удаление при выключенных галочках |
+| `maybeRegenerateSeoFiles()` | Обёртка с проверкой auto |
 
 ### `filemanager_api.php` — API проводника
 

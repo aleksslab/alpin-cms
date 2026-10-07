@@ -40,7 +40,7 @@ $currentToken = getCronToken();
                        value="<?php echo e($currentToken); ?>">
 
                 <p class="text-[10px] text-slate-400 mt-1">
-                    Один токен используется и для бэкапов, и для автопубликации страниц.
+                    Один токен используется для всех крон-задач: резервное копирование, автопубликация, обновление sitemap/robots.
                     Новый токен вступит в силу <strong>после нажатия «Сохранить настройки»</strong>.
                     После этого все ранее настроенные крон-задачи сломаются.
                 </p>
@@ -59,12 +59,21 @@ $currentToken = getCronToken();
                            class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-600 select-all focus:outline-none">
                 </div>
 
-                <div class="editor-field">
+                <div class="editor-field mb-3">
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Автопубликация страниц</label>
                     <input type="text"
                            id="cron-publish-url"
                            readonly
                            value="<?php echo e($cronBaseUrl); ?>/config/cron/publish.php?token=<?php echo e($currentToken); ?>"
+                           class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-600 select-all focus:outline-none">
+                </div>
+                
+                <div class="editor-field">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Обновление sitemap.xml и robots.txt</label>
+                    <input type="text"
+                           id="cron-seo-url"
+                           readonly
+                           value="<?php echo e($cronBaseUrl); ?>/config/cron/seo.php?token=<?php echo e($currentToken); ?>"
                            class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-600 select-all focus:outline-none">
                 </div>
             </div>

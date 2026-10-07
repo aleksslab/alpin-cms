@@ -712,6 +712,98 @@ POST-эндпоинт для создания временного preview.
 
 ---
 
+## 🔍 SEO
+
+### `generateSitemap(): array`
+
+Генерирует `sitemap.xml` в корне сайта.
+
+```php
+$result = generateSitemap();
+// ['success' => true, 'count' => 25, 'error' => '']
+```
+
+Включает только `published`-страницы без истёкшего `unpublish_at`. Главная — `priority 1.0`, остальные — `0.8`.
+
+---
+
+### `generateRobots(): array`
+
+Генерирует `robots.txt` в корне.
+
+```php
+$result = generateRobots();
+// ['success' => true, 'error' => '']
+```
+
+Содержит `Disallow` для `/config/`, `/data/`, `/cache/`, `/*?preview=` + `Sitemap:`.
+
+---
+
+### `generateSeoFiles(): array`
+
+Генерирует оба файла (с учётом галочек `seo_sitemap_enabled` / `seo_robots_enabled`).
+
+```php
+$result = generateSeoFiles();
+// ['sitemap' => ['success' => true, 'skipped' => false, 'error' => ''],
+//  'robots'  => ['success' => true, 'skipped' => false, 'error' => '']]
+```
+
+При выключенной галочке — **удаляет** соответствующий файл.
+
+Обновляет `last_seo_regenerate` в `settings.json`.
+
+---
+
+### `maybeRegenerateSeoFiles(): void`
+
+Обёртка: проверяет `seo_auto_regenerate` и вызывает `generateSeoFiles()`, если включено.
+
+Вызывается из `handleSavePage`, `handleDeletePage`, `restoreFromTrash`, `handleClonePage`, `handleSetHomePage`.
+
+---
+
+### `findPageBySlugHistory(string $slug): ?array`
+
+Ищет страницу по slug в `slug_history` других страниц.
+
+**Живёт в `functions.php`.**
+
+```php
+$page = findPageBySlugHistory('about');  // находит страницу с актуальным slug 'o-kompanii', если в её истории есть 'about'
+```
+
+**Возвращает страницу в любом статусе** — проверка статуса на уровне вызывающего (`loadPage`).
+
+---
+
+### `applyPageDefaults(array $page): array`
+
+Заполняет пропущенные поля страницы значениями по умолчанию. **Живёт в `functions.php`.**
+
+---
+
+### `getBaseUrl(): string`
+
+Возвращает `{protocol}://{host}` без слэша на конце. **Живёт в `functions.php`.**
+
+```php
+$baseUrl = getBaseUrl();  // 'https://alpincms.ru'
+```
+
+---
+
+### Крон `config/cron/seo.php`
+
+URL: `/config/cron/seo.php?token=xxx`.
+
+Токен — **общий** (`getCronToken()`).
+
+Отдаёт plain-text: `Status: OK, sitemap: ok, robots: skip` — где `ok` (сгенерирован), `skip` (галочка выключена), `error` (ошибка генерации).
+
+---
+
 ## ⏰ Cron-публикация
 
 ### `handleCronPublishAction(string $token): void`

@@ -92,6 +92,23 @@ function escapeJsString(?string $str): string {
 }
 
 /**
+ * Возвращает базовый URL сайта: {protocol}://{host}.
+ * Без слэша на конце.
+ *
+ * @return string Например, "https://example.com"
+ */
+function getBaseUrl(): string {
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    if (!preg_match('#^[a-z0-9\-\.]+(:\d+)?$#i', $host)) {
+        $host = 'localhost';
+    }
+
+    return $protocol . '://' . $host;
+}
+
+/**
  * Проверяет URL на безопасность (whitelist схем).
  * 
  * @param string $url URL для проверки
