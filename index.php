@@ -35,6 +35,16 @@ if ($previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
     }
 
     if ($previewData) {
+        // Проверка slug: если он не совпадает с актуальным — 301 на правильный
+        $actualSlug = $previewData['slug'] ?? '';
+        if ($slug !== $actualSlug) {
+            // Главную с пустым slug редиректим на корень без параметра slug
+            $redirectUrl = ($actualSlug !== '' ? '/' . $actualSlug : '/')
+                         . '?preview=' . urlencode($previewToken);
+            header('Location: ' . $redirectUrl, true, 301);
+            exit;
+        }
+
         $page = $previewData;
         $isPreview = true;
         $isNewPage = true;
@@ -50,6 +60,16 @@ if (!$isPreview) {
     $page = loadPage($slug);
 
     if ($page && $page['status'] === 'published') {
+        // Проверка: страница найдена по старому slug?
+        $actualSlug = $page['slug'] ?? $page['id'] ?? '';
+
+        // Если запрошенный slug непустой и не совпадает с актуальным —
+        // значит, нашли через slug_history. Редирект на актуальный.
+        if ($slug !== '' && $slug !== $actualSlug) {
+            header('Location: /' . $actualSlug, true, 301);
+            exit;
+        }
+
         $isNewPage = true;
         $template = loadTemplate($page['template'] ?? 'full-width');
         $usedModules = getUsedModules($page);

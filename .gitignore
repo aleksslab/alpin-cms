@@ -5,6 +5,7 @@
 /data/logs/*.log
 /data/logs/archive/
 data/trash/*.json
+data/preview/*.json
 
 # === Системные данные ===
 /config/data/*.json

@@ -1731,21 +1731,66 @@ function handleSavePage(): array {
             if ($slug !== $id) {
                 $targetFile = $pagesDir . $slug . '.json';
                 $oldFile = $pagesDir . $id . '.json';
-                
+
                 // Проверяем, не занято ли новое ЧПУ кем-то другим
                 if (file_exists($targetFile)) {
                     return ['success' => '', 'error' => 'Страница с таким ЧПУ уже существует.'];
                 }
-                
+
+                // Загружаем старую версию страницы, чтобы взять оттуда актуальный slug
+                // (не $id, а именно поле slug — они могут различаться)
+                $oldPage = _jsonToArray($oldFile);
+                $oldSlug = $oldPage['slug'] ?? $id;
+
+                // Восстанавливаем историю slug'ов из старого JSON
+                // (чтобы не потерять её при перезаписи)
+                if (!isset($rows) || !is_array($rows)) {
+                    $rows = [];
+                }
+                $slugHistory = $oldPage['slug_history'] ?? [];
+                if (!is_array($slugHistory)) {
+                    $slugHistory = [];
+                }
+
                 // Физически переименовываем файл на диске
                 if (file_exists($oldFile)) {
                     if (!rename($oldFile, $targetFile)) {
                         return ['success' => '', 'error' => 'Не удалось переименовать файл страницы. Проверьте права.'];
                     }
                 }
-                
-                // Обновляем текущий ID на новое ЧПУ, чтобы запись пошла в переименованный файл
+
+                // Обновляем текущий ID на новое ЧПУ
                 $id = $slug;
+
+                // === РАБОТА С ИСТОРИЕЙ SLUG'ОВ ===
+
+                // 1. Удаляем новый slug из истории, если он там был раньше (циклическая смена)
+                $slugHistory = array_values(array_filter($slugHistory, function($s) use ($slug) {
+                    return $s !== $slug;
+                }));
+
+                // 2. Добавляем старый slug в историю, если:
+                //    - он непустой (не главная страница)
+                //    - его там ещё нет
+                //    - он отличается от нового
+                if ($oldSlug !== '' && $oldSlug !== $slug && !in_array($oldSlug, $slugHistory, true)) {
+                    $slugHistory[] = $oldSlug;
+                }
+
+                // 3. Ограничиваем историю (защита от роста)
+                if (count($slugHistory) > 50) {
+                    $slugHistory = array_slice($slugHistory, -50);
+                }
+
+                // Сохраняем для последующей записи в $pageData
+                $computedSlugHistory = $slugHistory;
+            } else {
+                // Slug не менялся — сохраняем существующую историю
+                $existingPage = _jsonToArray($pagesDir . $id . '.json');
+                $computedSlugHistory = $existingPage['slug_history'] ?? [];
+                if (!is_array($computedSlugHistory)) {
+                    $computedSlugHistory = [];
+                }
             }
         }
     }
@@ -1812,6 +1857,11 @@ function handleSavePage(): array {
         'show_footer' => $showFooter,
         'rows' => $rows
     ];
+
+    // Slug history (для 301-редиректов)
+    if (!empty($computedSlugHistory)) {
+        $pageData['slug_history'] = $computedSlugHistory;
+    }
     
     // Сохраняем файл через безопасную атомарную функцию ядра
     if (savePageData($id, $pageData) !== false) {
@@ -2029,6 +2079,16 @@ function handleSetHomePage(): void {
     $page['slug'] = '';
     savePageData($pageId, $page);
     
+    // Сбрасываем кеш старой и новой главной
+    clearPageCacheById($oldHomeId);  // было home.html
+    clearPageCacheById($pageId);     // станет home.html
+
+    // Плюс: общий кеш главной (/)
+    $homeCacheFile = APP_ROOT . '/cache/pages/home.html';
+    if (file_exists($homeCacheFile)) {
+        @unlink($homeCacheFile);
+    }
+    
     logAction('page_set_home', 'Страница "' . $page['title'] . '" назначена главной (ID: ' . $pageId . ')', 'INFO');
     setFlash('Страница "' . $page['title'] . '" теперь главная!');
     header('Location: ?tab=pages');
@@ -2067,6 +2127,13 @@ function handleClonePage(): void {
     $newPage['title'] = $page['title'] . ' (копия)';
     $newPage['slug'] = $newId;
     $newPage['status'] = 'draft'; // Копия создаётся как черновик
+
+    // Slug history НЕ копируем — клон это новая страница.
+    // При публикации клона старые URL должны вести на оригинал, не на копию.
+    unset($newPage['slug_history']);
+
+    // Preview-токен тоже не копируем
+    unset($newPage['preview_token']);
     
     // Сохраняем новую страницу
     $filePath = DATA_DIR . 'pages/' . $newId . '.json';

@@ -341,43 +341,13 @@ function getHomePageId(): string {
 }
 
 /**
- * Загружает страницу из data/pages/{slug}.json по её ЧПУ (slug)
- * 
- * @param string $slug ЧПУ страницы (пустая строка означает главную)
- * @return array|null Массив с данными страницы или null, если страница не найдена
+ * Заполняет пропущенные поля страницы значениями по умолчанию.
+ * Используется и в прямом чтении, и в fallback по slug_history.
+ *
+ * @param array $page
+ * @return array
  */
-function loadPage(string $slug): ?array {
-    if ($slug !== '') {
-        if (!preg_match('#^[a-z0-9\-_/]+$#i', $slug) ||
-            strpos($slug, '..') !== false ||
-            strpos($slug, '//') !== false) {
-            return null;
-        }
-    }
-    
-    if ($slug === '') {
-        $globals = getData('globals');
-        $homeId = $globals['home_page_id'] ?? 'home';
-        return loadPageById($homeId);
-    }
-    
-    $filePath = DATA_DIR . 'pages/' . $slug . '.json';
-    if (!file_exists($filePath)) {
-        return null;
-    }
-    
-    $page = _jsonToArray($filePath);
-    if (empty($page['status']) || $page['status'] !== 'published') {
-        return null;
-    }
-
-    // Страховка: если срок снятия с публикации истёк, но cron ещё не отработал —
-    // страница уже невидима.
-    if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] <= time()) {
-        return null;
-    }
-    
-    // Добавляем поля по умолчанию, если их нет
+function applyPageDefaults(array $page): array {
     if (!isset($page['show_header'])) {
         $page['show_header'] = true;
     }
@@ -393,8 +363,57 @@ function loadPage(string $slug): ?array {
     if (!isset($page['rows'])) {
         $page['rows'] = [];
     }
-    
     return $page;
+}
+
+/**
+ * Загружает страницу из data/pages/{slug}.json по её ЧПУ (slug)
+ * 
+ * @param string $slug ЧПУ страницы (пустая строка означает главную)
+ * @return array|null Массив с данными страницы или null, если страница не найдена
+ */
+function loadPage(string $slug): ?array {
+    if ($slug !== '') {
+        if (!preg_match('#^[a-z0-9\-_/]+$#i', $slug) ||
+            strpos($slug, '..') !== false ||
+            strpos($slug, '//') !== false) {
+            return null;
+        }
+    }
+    
+    if ($slug === '') {
+        $globals = getData('settings');
+        $homeId = $globals['home_page_id'] ?? 'home';
+        return loadPageById($homeId);
+    }
+    
+    // 1. Прямой путь: data/pages/{slug}.json
+    $filePath = DATA_DIR . 'pages/' . $slug . '.json';
+    if (file_exists($filePath)) {
+        $page = _jsonToArray($filePath);
+        if (empty($page['status']) || $page['status'] !== 'published') {
+            return null;
+        }
+        if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] <= time()) {
+            return null;
+        }
+        return applyPageDefaults($page);
+    }
+
+    // 2. Fallback: поиск в slug_history других страниц
+    $page = findPageBySlugHistory($slug);
+    if (!$page) {
+        return null;
+    }
+
+    if (empty($page['status']) || $page['status'] !== 'published') {
+        return null;
+    }
+    if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] <= time()) {
+        return null;
+    }
+
+    return applyPageDefaults($page);
 }
 
 /**
@@ -413,6 +432,58 @@ function loadPageById(string $id): ?array {
         return null;
     }
     return _jsonToArray($filePath);
+}
+
+/**
+ * Ищет страницу по slug, сохранённому в slug_history.
+ * Возвращает страницу в ЛЮБОМ статусе (проверка статуса — на уровне вызывающего).
+ *
+ * ВАЖНО: сначала проверяется, что актуальный slug страницы НЕ равен искомому.
+ * Это защита от случая «slug вернули к старому значению».
+ *
+ * @param string $slug Искомый slug (старый)
+ * @return array|null Данные страницы или null
+ */
+function findPageBySlugHistory(string $slug): ?array {
+    if ($slug === '') {
+        return null;  // пустой slug — только главная, не ищем в истории
+    }
+
+    $pagesDir = DATA_DIR . 'pages/';
+    if (!is_dir($pagesDir)) {
+        return null;
+    }
+
+    $files = glob($pagesDir . '*.json');
+    if (empty($files)) {
+        return null;
+    }
+
+    foreach ($files as $file) {
+        $page = _jsonToArray($file);
+        if (empty($page)) {
+            continue;
+        }
+
+        // Актуальный slug совпал — не история (значит, страница сама так называется)
+        // Это защита от ситуации «slug вернули к старому значению»
+        $actualSlug = $page['slug'] ?? $page['id'] ?? '';
+        if ($actualSlug === $slug) {
+            continue;
+        }
+
+        // Проверяем историю
+        $history = $page['slug_history'] ?? [];
+        if (!is_array($history)) {
+            continue;
+        }
+
+        if (in_array($slug, $history, true)) {
+            return $page;
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -605,7 +676,6 @@ function findModuleUsage(string $id): array {
     
     return $usedIn;
 }
-
 
 /**
  * Загружает описание модуля из config/modules/modules.json по его ID
