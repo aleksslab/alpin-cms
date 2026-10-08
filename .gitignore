@@ -6,8 +6,11 @@
 /data/logs/archive/
 data/trash/*.json
 data/preview/*.json
+data/history/*
 
 # === Системные данные ===
+!.gitkeep
+!.htaccess
 /config/data/*.json
 /config/data/.pepper
 !/config/data/modules.json
@@ -23,7 +26,6 @@ data/preview/*.json
 
 # === Загруженные картинки ===
 /images/*
-!/images/.htaccess
 
 # === IDE ===
 .vscode/
@@ -67,7 +69,6 @@ desktop.ini
 !/config/modules/pages/
 !/config/modules/previews/
 /config/modules/previews/*
-!/config/modules/previews/.gitkeep
 
 # Сайт
 /modules/*.php 

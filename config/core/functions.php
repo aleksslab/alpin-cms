@@ -33,13 +33,21 @@ function clearDataCache(string $fileName): void {
  */
 function formatPhone(string $phone): string {
     $clean = preg_replace('/[^0-9]/', '', $phone);
+
+    if ($clean === '') {
+        return '';
+    }
+
     if (strlen($clean) === 11 && ($clean[0] === '7' || $clean[0] === '8')) {
         $clean = substr($clean, 1);
     }
+
     if (strlen($clean) === 10) {
         return "+7 (" . substr($clean, 0, 3) . ") " . substr($clean, 3, 3) . "-" . substr($clean, 6, 2) . "-" . substr($clean, 8, 2);
     }
-    return '+' . $clean;
+
+    // Локальный/короткий номер — возвращаем как есть, без префиксов
+    return $clean;
 }
 
 /**

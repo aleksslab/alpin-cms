@@ -214,6 +214,14 @@ if ($isAuth) {
         echo json_encode(['success' => true, 'token' => $newToken]);
         exit;
     }
+    
+    // --- ГЕНЕРАЦИЯ НОВОГО PREVIEW-ТОКЕНА (AJAX, без сохранения) ---
+    if (isset($_GET['ajax']) && $_GET['ajax'] === 'generate_preview_token') {
+        header('Content-Type: application/json; charset=utf-8');
+        $newToken = bin2hex(random_bytes(16));
+        echo json_encode(['success' => true, 'token' => $newToken]);
+        exit;
+    }
 
     // Блок Б: Единый барьер для ВСЕХ POST-запросов в системе (и формы, и AJAX Проводника)
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -246,8 +254,11 @@ if ($isAuth) {
         elseif (isset($_POST['menu_set_main']))  { handleSetMainMenu(); exit; }
         
         elseif (isset($_POST['trash_action'])) { handleTrashAction(); exit; }
-        elseif (isset($_POST['regenerate_page_preview_token'])) { handleRegeneratePagePreviewToken($_POST['page_id'] ?? ''); exit; }
-        elseif (isset($_POST['delete_page_preview_token'])) { handleDeletePagePreviewToken($_POST['page_id'] ?? ''); exit; }
+        
+        elseif (isset($_POST['restore_page_version'])) { handleRestorePageVersion($_POST['page_id'] ?? '', intval($_POST['version_ts'] ?? 0)); exit; }
+        elseif (isset($_POST['delete_history_version'])) { handleDeleteHistoryVersion($_POST['page_id'] ?? '', intval($_POST['version_ts'] ?? 0)); exit; }
+        elseif (isset($_POST['clear_page_history'])) { handleClearPageHistory($_POST['page_id'] ?? ''); exit; }
+        elseif (isset($_POST['clear_all_history'])) { handleClearAllHistory(); exit; }
         
         elseif (isset($_POST['regenerate_seo_files'])) {
             $result = generateSeoFiles();

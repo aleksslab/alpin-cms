@@ -201,7 +201,7 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
                                     </div>
                                     <p class="text-[10px] text-slate-400">
                                         Ссылка открывает страницу в любом статусе. Не индексируется поисковиками.
-                                        Нажмите «Удалить», чтобы отозвать доступ.
+                                        Изменения вступят в силу <strong>после сохранения страницы</strong>.
                                     </p>
                                 <?php else: ?>
                                     <!-- Ссылки нет -->
@@ -212,14 +212,46 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
                                     </button>
                                     <p class="text-[10px] text-slate-400 mt-2">
                                         Создаёт постоянную ссылку для согласования с заказчиком.
-                                        Работает для черновиков, запланированных и снятых страниц.
+                                        Ссылка будет записана <strong>после сохранения страницы</strong>.
                                     </p>
                                 <?php endif; ?>
-                            </div>
 
-                            <input type="hidden" name="page_id_for_preview" value="<?php echo e($pageId); ?>">
+                                <!-- Скрытое поле с текущим токеном (уходит в POST при сохранении) -->
+                                <input type="hidden"
+                                       name="preview_token"
+                                       id="js-preview-token-hidden"
+                                       value="<?php echo e($existingToken); ?>">
+                            </div>
                         </div>
                     </div>
+                    
+                    <?php if (isHistoryEnabled()): ?>
+                    <div class="editor-row" style="align-items: flex-start !important;">
+                        <div class="editor-field">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                История изменений
+                            </label>
+                            <?php
+                            $historyKeyForBtn = $editPage['history_key'] ?? '';
+                            $historyCountForBtn = ($historyKeyForBtn !== '' && preg_match('/^[a-f0-9]{16}$/i', $historyKeyForBtn))
+                                ? count(getPageHistory($historyKeyForBtn))
+                                : 0;
+                            ?>
+                            <button type="button"
+                                    onclick="window.openHistoryModal()"
+                                    class="w-full lg:w-auto px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-200 transition-all whitespace-nowrap flex items-center justify-center gap-2">
+                                <span class="icon-history text-sm"></span>
+                                Открыть историю
+                                <?php if ($historyCountForBtn > 0): ?>
+                                    <span class="px-2 py-0.5 bg-slate-700 text-white text-[10px] font-bold rounded-full"><?php echo $historyCountForBtn; ?></span>
+                                <?php endif; ?>
+                            </button>
+                            <p class="text-[10px] text-slate-400 mt-2">
+                                Сохранённые версии страницы. Откат восстанавливает контент, не меняя URL и preview-ссылку.
+                            </p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -284,6 +316,15 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
 <?php 
 include __DIR__ . '/modals.php'; 
 ?>
+
+<!-- ===== МОДАЛКА ИСТОРИИ ===== -->
+<?php
+if ($isEdit) {
+    $historyPageId = $pageId;
+    include APP_ROOT . '/config/core/history_modal.php';
+}
+?>
+
 <!-- ===== ПОДКЛЮЧЕНИЕ СКРИПТОВ ===== -->
 <script src="js/main.js?v=<?php echo filemtime('js/main.js'); ?>"></script>
 <script src="js/pages.js?v=<?php echo filemtime('js/pages.js'); ?>"></script>

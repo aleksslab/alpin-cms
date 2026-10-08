@@ -2,6 +2,59 @@
 
 Все значимые изменения проекта.
 
+## [Release version 1.7.0] — 2026-10-08
+
+### Добавлено
+
+- **История изменений страниц** — снапшоты при сохранении и откат на любую версию:
+  - Хранилище `data/history/{history_key}/{timestamp}.json`.
+  - Ключ `history_key` в JSON страницы — генерируется при создании, не меняется при переименовании slug, сбрасывается при клонировании.
+  - Снапшот создаётся **перед** перезаписью страницы.
+  - **Дедупликация:** снапшот не пишется, если пользователь ничего не менял или такое же состояние уже есть в последнем снапшоте.
+  - **Откат восстанавливает только контент:** `title`, `template`, `meta`, `show_header`, `show_footer`, `rows`.
+  - **Не восстанавливаются:** `status`, `publish_at`, `unpublish_at`, `slug`, `slug_history`, `preview_token`, `id`, `history_key`.
+  - **Обратимость:** перед откатом сохраняется снапшот текущего состояния — можно откатить откат.
+  - **Лимит версий** на страницу — настраивается, по умолчанию 20 (диапазон 1–100).
+  - **Очистка истории** — кнопки «Удалить версию» и «Очистить всю историю» в модалке.
+  - **Чистка при удалении из корзины** — при окончательном удалении страницы её история удаляется.
+- **Секция настроек «История изменений»** в Настройках сайта:
+  - Галочка «Хранить историю изменений страниц».
+  - Лимит версий.
+  - Статистика: страниц / версий / объём.
+  - Кнопка «Очистить всю историю».
+- **Модалка истории** в редакторе страницы (`config/core/history_modal.php` + `config/js/history_modal.js`).
+- **Кнопка «Открыть историю»** в `edit.php` (только при включённой галочке в настройках), с бейджем количества версий.
+- **AJAX-эндпоинт** `generate_preview_token` — генерация preview-токена без сохранения (запись только при сохранении страницы).
+
+### Изменено
+
+- **Preview-токен страницы** — генерируется AJAX-кнопкой, но **записывается в JSON только при сохранении страницы**. Кнопка «Удалить» очищает поле в форме; реальное удаление — при сохранении.
+- **`handleSavePage`** — сохраняет `preview_token` из POST (если валидный 32-hex), иначе при перезаписи файла токен удаляется.
+- **`handleSaveSettings`** — сохраняет `history_enabled` и `history_limit`.
+- **`formatPhone`** — пустая строка → пустая (без `+`); короткий номер → без `+`.
+- **`handleSaveSettings`** — защита от «голых плюсов» в поле телефона.
+
+### Удалено
+
+- **AJAX-обработчики** `regenerate_page_preview_token` и `delete_page_preview_token` — заменены на единый `generate_preview_token` (без сохранения) + запись при сохранении.
+- **Функции** `_regeneratePagePreviewTokenLogic`, `handleRegeneratePagePreviewToken`, `handleDeletePagePreviewToken`, `clearPagePreviewToken`.
+- **Поле** `page_id_for_preview` в `edit.php` — больше не нужно.
+
+### Технические детали
+
+- **Новые функции в `admin_controller.php`**:
+  - `isHistoryEnabled()`, `getHistoryLimit()`, `getHistoryDir()`.
+  - `ensureHistoryDir()`, `getOrCreateHistoryKey()`, `savePageSnapshot()`, `rotatePageHistory()`.
+  - `getPageHistory()`, `getHistorySnapshot()`, `getHistoryContentFields()`, `extractHistoryContent()`, `normalizeHistoryContent()`, `normalizeHistorySort()`.
+  - `deleteHistoryVersion()`, `clearPageHistory()`, `getHistoryStats()`.
+  - `restorePageFromHistory()`, `handleRestorePageVersion()`, `handleDeleteHistoryVersion()`, `handleClearPageHistory()`, `handleClearAllHistory()`.
+- **Новые файлы:** `config/core/history_modal.php`, `config/js/history_modal.js`, `config/modules/config_vars/history.php`.
+- **Сигнатура `savePageSnapshot($oldPage, $newPage, $savedBy)`** — второй аргумент нужен для дедупликации «старое ≡ новое».
+- **Поле `history_key`** в `data/pages/{id}.json` (16 hex, генерируется при создании).
+- **Поля `history_enabled` / `history_limit`** в `data/settings.json`.
+- **Папка `data/history/`** — с автосозданием `.htaccess`.
+- **Секция «История изменений»** в `config_vars.php` — между «Кеширование» и «Интеграция с планировщиком».
+
 ## [Release version 1.6.0] — 2026-10-07
 
 ### Добавлено

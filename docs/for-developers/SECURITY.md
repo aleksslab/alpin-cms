@@ -515,6 +515,9 @@ if ($loginMatch && $passwordMatch) {
 - `config/data/.htaccess` — `Require all denied`.
 - `config/backups/.htaccess` — `Require all denied`.
 - `data/.htaccess` — `Require all denied`.
+- `data/history/.htaccess` — `Require all denied`.
+- `data/trash/.htaccess` — `Require all denied`.
+- `data/preview/.htaccess` — `Require all denied`.
 - `cache/.htaccess` — `Require all denied` + whitelist `.css`/`.js`.
 - `modules/.htaccess` — `<FilesMatch "\.php$">` denied.
 - `templates/.htaccess` — то же.
@@ -712,6 +715,38 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 **Что не индексируется как дубликат:**
 - Старый URL отдаёт **301** → crawler переходит на актуальный. **Не индексирует старый.**
 - В `sitemap.xml` только актуальные URL.
+
+---
+
+## 🕘 История изменений
+
+### Что хранится
+
+Снапшоты страниц — `data/history/{history_key}/{timestamp}.json`. Каждый файл содержит **полный JSON страницы** + служебный блок `_history`.
+
+**Что попадает в снапшот:** заголовок, содержимое, SEO-настройки, шаблон, хедер/футер, `slug_history`, `preview_token`, `id`, `slug`, `history_key`.
+
+### Защита
+
+- **Папка** `data/history/` + вложенные — `.htaccess` `Require all denied` (автосоздание в `ensureHistoryDir`).
+- **Валидация `history_key`** — regex `^[a-f0-9]{16}$`. Иначе — пустая строка / отказ.
+- **Валидация `timestamp`** — `(int)`, `> 0`.
+- **Валидация `page_id`** — regex `^[a-z0-9\-_]+$`.
+- **AJAX/POST** — CSRF-токен.
+- **Авторизация** — только админ (как и все страницы редактора).
+- **Не индексируется** — история недоступна из браузера, только через `?tab=pages&action=edit`.
+
+### Удаление истории
+
+- **Ручное** — кнопки «Удалить» / «Очистить всю» в модалке (с CSRF).
+- **Автоматическое** — ротация по лимиту (`history_limit`).
+- **Каскадное** — при окончательном удалении страницы из корзины (`deleteFromTrash`, `clearTrash`).
+
+### Откат — что защищает
+
+- **Обратимость:** перед откатом сохраняется снапшот текущего состояния. Откат отката возможен.
+- **Только контент:** `status` / `publish_at` / `unpublish_at` / `slug` / `slug_history` / `preview_token` **не восстанавливаются** — не «откатится» случайно опубликованное.
+- **Логирование:** каждое действие (`page_restore`, `page_history_delete`, `page_history_clear`, `history_clear`) — в `logAction`.
 
 ---
 

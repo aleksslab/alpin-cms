@@ -397,6 +397,10 @@ function getToastScript(): string {
  */
 function handleSaveSettings(): array {
     $cleanPhone = preg_replace('/[^0-9+]/', '', $_POST['set_phone'] ?? '');
+    // Если остались только символы «+» без цифр — считаем пустым
+    if (preg_replace('/[^0-9]/', '', $cleanPhone) === '') {
+        $cleanPhone = '';
+    }
     
     // === ВАЛИДАЦИЯ HTML-ПОЛЕЙ ===
     $name = trim($_POST['set_name'] ?? '');
@@ -507,6 +511,10 @@ function handleSaveSettings(): array {
         'seo_sitemap_enabled'  => isset($_POST['seo_sitemap_enabled']) && $_POST['seo_sitemap_enabled'] == '1',
         'seo_robots_enabled'   => isset($_POST['seo_robots_enabled']) && $_POST['seo_robots_enabled'] == '1',
         'seo_auto_regenerate'  => isset($_POST['seo_auto_regenerate']) && $_POST['seo_auto_regenerate'] == '1',
+        
+        // История изменений
+        'history_enabled' => isset($_POST['history_enabled']) && $_POST['history_enabled'] == '1',
+        'history_limit'   => max(1, min(100, intval($_POST['history_limit'] ?? 20))),
         
         // БЛОК 8: Социальные сети (массив)
         'socials' => $socials,
@@ -1877,6 +1885,34 @@ function handleSavePage(): array {
     // Slug history (для 301-редиректов)
     if (!empty($computedSlugHistory)) {
         $pageData['slug_history'] = $computedSlugHistory;
+    }
+
+    // === ИСТОРИЯ ИЗМЕНЕНИЙ ===
+    if ($action === 'create') {
+        // Новая страница — генерируем history_key
+        $pageData['history_key'] = bin2hex(random_bytes(8));
+    } else {
+        // Редактирование — сохраняем history_key из старой версии
+        $oldPageForHistory = loadPageById($id);
+        if ($oldPageForHistory) {
+            $oldKey = (string)($oldPageForHistory['history_key'] ?? '');
+            if (preg_match('/^[a-f0-9]{16}$/i', $oldKey)) {
+                $pageData['history_key'] = $oldKey;
+            } else {
+                // Fallback для страниц без ключа
+                $pageData['history_key'] = bin2hex(random_bytes(8));
+            }
+
+            // Снапшот текущего состояния ПЕРЕД перезаписью
+            savePageSnapshot($oldPageForHistory, $pageData, $_SESSION['admin_login'] ?? 'system');
+
+            // preview_token: сохраняем, если в POST валидный 32-hex токен.
+            // Иначе — не пишем, из JSON он удалится при перезаписи.
+            $postedToken = trim($_POST['preview_token'] ?? '');
+            if (preg_match('/^[a-f0-9]{32}$/i', $postedToken)) {
+                $pageData['preview_token'] = $postedToken;
+            }
+        }
     }
     
     // Сохраняем файл через безопасную атомарную функцию ядра
@@ -3865,8 +3901,25 @@ function deleteFromTrash(array $fileNames): array {
         }
 
         $path = TRASH_DIR . $name;
-        if (file_exists($path) && @unlink($path)) {
+        if (!file_exists($path)) {
+            $errors++;
+            continue;
+        }
+
+        // Читаем ДО удаления — чтобы знать history_key
+        $trashData = _jsonToArray($path);
+        $historyKey = '';
+        if (($trashData['_trash']['type'] ?? '') === 'page') {
+            $historyKey = (string)($trashData['history_key'] ?? '');
+        }
+
+        if (@unlink($path)) {
             $deleted++;
+
+            // Чистим историю страницы
+            if ($historyKey !== '' && preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
+                clearPageHistory($historyKey);
+            }
         } else {
             $errors++;
         }
@@ -3900,8 +3953,19 @@ function clearTrash(): array {
 
     $deleted = 0;
     foreach ($files as $file) {
+        // Читаем ДО удаления — чтобы знать history_key
+        $trashData = _jsonToArray($file);
+        $historyKey = '';
+        if (($trashData['_trash']['type'] ?? '') === 'page') {
+            $historyKey = (string)($trashData['history_key'] ?? '');
+        }
+
         if (@unlink($file)) {
             $deleted++;
+
+            if ($historyKey !== '' && preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
+                clearPageHistory($historyKey);
+            }
         }
     }
 
@@ -4250,105 +4314,6 @@ function getPagePreviewToken(string $pageId): string {
 }
 
 /**
- * Внутренняя логика генерации нового preview-токена.
- * Без побочных эффектов — только чтение, генерация, сохранение.
- *
- * @param string $pageId
- * @return array ['success' => bool, 'token' => string, 'error' => string]
- */
-function _regeneratePagePreviewTokenLogic(string $pageId): array {
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
-        return ['success' => false, 'token' => '', 'error' => 'Невалидный ID страницы.'];
-    }
-
-    $page = loadPageById($pageId);
-    if (!$page) {
-        return ['success' => false, 'token' => '', 'error' => 'Страница не найдена.'];
-    }
-
-    $token = bin2hex(random_bytes(16));
-    $page['preview_token'] = $token;
-
-    if (!savePageData($pageId, $page)) {
-        return ['success' => false, 'token' => '', 'error' => 'Не удалось сохранить токен.'];
-    }
-
-    return ['success' => true, 'token' => $token, 'error' => ''];
-}
-
-/**
- * Обработчик: перегенерация preview-токена + flash + log + redirect.
- * Вызывается из config/index.php.
- *
- * @param string $pageId
- * @return void
- */
-function handleRegeneratePagePreviewToken(string $pageId): void {
-    $result = _regeneratePagePreviewTokenLogic($pageId);
-
-    if ($result['success']) {
-        logAction('page_preview_token', 'Preview-токен обновлён для ID: ' . $pageId, 'INFO');
-        setFlash('Preview-ссылка создана.');
-    } else {
-        logAction('page_preview_token', 'Ошибка: ' . $result['error'] . ' (ID: ' . $pageId . ')', 'ERROR');
-        setFlash($result['error'], 'error');
-    }
-
-    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
-    exit;
-}
-
-/**
- * Обработчик: удаление preview-токена + flash + log + redirect.
- *
- * @param string $pageId
- * @return void
- */
-function handleDeletePagePreviewToken(string $pageId): void {
-    $result = clearPagePreviewToken($pageId);
-
-    if ($result['success']) {
-        logAction('page_preview_token', 'Preview-токен удалён для ID: ' . $pageId, 'INFO');
-        setFlash('Preview-ссылка удалена.');
-    } else {
-        logAction('page_preview_token', 'Ошибка удаления: ' . $result['error'] . ' (ID: ' . $pageId . ')', 'ERROR');
-        setFlash($result['error'], 'error');
-    }
-
-    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
-    exit;
-}
-
-/**
- * Удаляет preview_token страницы.
- *
- * @param string $pageId
- * @return array ['success' => bool, 'error' => string]
- */
-function clearPagePreviewToken(string $pageId): array {
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
-        return ['success' => false, 'error' => 'Невалидный ID страницы.'];
-    }
-
-    $page = loadPageById($pageId);
-    if (!$page) {
-        return ['success' => false, 'error' => 'Страница не найдена.'];
-    }
-
-    if (empty($page['preview_token'])) {
-        return ['success' => true, 'error' => ''];  // уже нет
-    }
-
-    $page['preview_token'] = null;
-
-    if (!savePageData($pageId, $page)) {
-        return ['success' => false, 'error' => 'Не удалось сохранить изменения.'];
-    }
-
-    return ['success' => true, 'error' => ''];
-}
-
-/**
  * Формирует полный preview-URL для сохранённой страницы.
  *
  * @param string $pageId
@@ -4550,4 +4515,743 @@ function maybeRegenerateSeoFiles(): void {
     }
 }
 
+/**
+ * ИСТОРИЯ ИЗМЕНЕНИЙ СТРАНИЦ
+ */
+// Базовая папка истории
+if (!defined('HISTORY_DIR')) {
+    define('HISTORY_DIR', DATA_DIR . 'history' . DIRECTORY_SEPARATOR);
+}
+
+/**
+ * Проверяет, включено ли сохранение истории изменений.
+ *
+ * @return bool
+ */
+function isHistoryEnabled(): bool {
+    $settings = getSettingsData();
+    return !empty($settings['history_enabled']);
+}
+
+/**
+ * Возвращает максимальное количество хранимых версий одной страницы.
+ * Ограничено диапазоном 1..100.
+ *
+ * @return int
+ */
+function getHistoryLimit(): int {
+    $settings = getSettingsData();
+    $limit = intval($settings['history_limit'] ?? 20);
+    return max(1, min(100, $limit));
+}
+
+/**
+ * Возвращает путь к папке истории одной страницы (с trailing separator).
+ * Не создаёт папку — только формирует путь.
+ *
+ * @param string $historyKey Ключ истории (16 hex-символов)
+ * @return string Путь или пустая строка при невалидном ключе
+ */
+function getHistoryDir(string $historyKey): string {
+    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
+        return '';
+    }
+    return HISTORY_DIR . $historyKey . DIRECTORY_SEPARATOR;
+}
+
+/**
+ * Гарантирует существование базовой папки истории + .htaccess защиту.
+ * Также создаёт вложенную папку для конкретной страницы.
+ *
+ * @param string $historyKey Ключ истории страницы (16 hex-символов)
+ * @return bool true если папка доступна для записи
+ */
+function ensureHistoryDir(string $historyKey): bool {
+    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
+        return false;
+    }
+
+    // Базовая папка + защита
+    if (!is_dir(HISTORY_DIR)) {
+        if (!@mkdir(HISTORY_DIR, 0755, true)) {
+            return false;
+        }
+    }
+
+    $htaccess = HISTORY_DIR . '.htaccess';
+    if (!file_exists($htaccess)) {
+        $data = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
+              . "<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n";
+        @file_put_contents($htaccess, $data);
+    }
+
+    // Папка конкретной страницы
+    $pageDir = HISTORY_DIR . $historyKey . DIRECTORY_SEPARATOR;
+    if (!is_dir($pageDir)) {
+        if (!@mkdir($pageDir, 0755, true)) {
+            return false;
+        }
+    }
+
+    return is_writable($pageDir);
+}
+
+/**
+ * Возвращает history_key страницы.
+ * Если ключа нет — генерирует, сохраняет в JSON страницы и возвращает.
+ *
+ * ВНИМАНИЕ: при генерации модифицирует файл на диске.
+ * Используется как fallback для страниц, созданных до фичи.
+ *
+ * @param array $page Данные страницы (по ссылке, чтобы можно было обновить)
+ * @return string 16 hex-символов или пустая строка
+ */
+function getOrCreateHistoryKey(array &$page): string {
+    $existing = (string)($page['history_key'] ?? '');
+    if (preg_match('/^[a-f0-9]{16}$/i', $existing)) {
+        return $existing;
+    }
+
+    $key = bin2hex(random_bytes(8));
+    $page['history_key'] = $key;
+
+    // Пишем обновлённый JSON обратно в файл страницы
+    $pageId = (string)($page['id'] ?? '');
+    if ($pageId !== '' && preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
+        savePageData($pageId, $page);
+    }
+
+    return $key;
+}
+
+/**
+ * Удаляет самые старые версии, оставляя не больше $limit штук.
+ * Сортировка по имени файла (timestamp = имя).
+ *
+ * @param string $historyKey Ключ истории
+ * @param int    $limit      Максимум хранимых версий (1..100)
+ * @return int Количество удалённых файлов
+ */
+function rotatePageHistory(string $historyKey, int $limit): int {
+    $limit = max(1, min(100, $limit));
+    $dir = getHistoryDir($historyKey);
+    if ($dir === '' || !is_dir($dir)) {
+        return 0;
+    }
+
+    $files = glob($dir . '*.json');
+    if (!is_array($files) || count($files) <= $limit) {
+        return 0;
+    }
+
+    // Сортируем по имени (= timestamp), по возрастанию
+    usort($files, function($a, $b) {
+        return strcmp(basename($a), basename($b));
+    });
+
+    $toDelete = array_slice($files, 0, count($files) - $limit);
+    $deleted = 0;
+    foreach ($toDelete as $file) {
+        if (@unlink($file)) {
+            $deleted++;
+        }
+    }
+
+    return $deleted;
+}
+
+/**
+ * Сохраняет снапшот страницы в историю.
+ * Вызывается ПЕРЕД перезаписью текущего файла.
+ *
+ * Снапшот НЕ пишется, если:
+ * - история отключена;
+ * - старое состояние ≡ новое (пользователь ничего не менял);
+ * - такое же состояние уже есть в последнем снапшоте.
+ *
+ * @param array  $oldPage  Данные страницы ДО сохранения (то, что на диске)
+ * @param array  $newPage  Данные страницы ПОСЛЕ сохранения (то, что будет записано)
+ * @param string $savedBy  Логин админа (или 'system')
+ * @return bool true при успешной записи
+ */
+function savePageSnapshot(array $oldPage, array $newPage, string $savedBy = 'system'): bool {
+    // Проверка: история включена
+    if (!isHistoryEnabled()) {
+        return false;
+    }
+
+    // Если пользователь ничего не менял — снапшот не нужен
+    $oldHash = md5(json_encode(normalizeHistoryContent(extractHistoryContent($oldPage))));
+    $newHash = md5(json_encode(normalizeHistoryContent(extractHistoryContent($newPage))));
+    if ($oldHash === $newHash) {
+        return false;
+    }
+
+    $pageData = $oldPage;
+
+    $pageId = (string)($pageData['id'] ?? '');
+    if ($pageId === '' || !preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
+        return false;
+    }
+
+    // Ключ истории (создаём при необходимости — это пишет в текущий JSON)
+    $historyKey = getOrCreateHistoryKey($pageData);
+    if ($historyKey === '') {
+        return false;
+    }
+
+    if (!ensureHistoryDir($historyKey)) {
+        return false;
+    }
+
+    // === ДЕДУПЛИКАЦИЯ С ПОСЛЕДНИМ ===
+    // Если такое же состояние уже есть в свежем снапшоте — не пишем.
+    // $newHash уже посчитан выше (при сравнении old ≡ new).
+    $existingFiles = glob(HISTORY_DIR . $historyKey . DIRECTORY_SEPARATOR . '*.json');
+    if (is_array($existingFiles) && !empty($existingFiles)) {
+        // Сортируем по имени (timestamp), берём последний
+        usort($existingFiles, function($a, $b) {
+            return strcmp(basename($a), basename($b));
+        });
+        $lastFile = end($existingFiles);
+
+        $lastData = _jsonToArray($lastFile);
+        if (!empty($lastData)) {
+            $lastHash = md5(json_encode(normalizeHistoryContent(extractHistoryContent($lastData))));
+            if ($lastHash === $newHash) {
+                return false; // контент не изменился — пропускаем
+            }
+        }
+        // Если lastData пустой (битый) — продолжаем, пишем снапшот
+    }
+
+    // Формируем снапшот: полный JSON + _history
+    $snapshot = $pageData;
+    $snapshot['_history'] = [
+        'page_id'     => $pageId,
+        'snapshot_at' => time(),
+        'saved_by'    => $savedBy,
+        'size_bytes'  => 0,
+    ];
+
+    $json = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if ($json === false) {
+        return false;
+    }
+
+    // size_bytes после кодирования
+    $snapshot['_history']['size_bytes'] = strlen($json);
+    $json = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+    $timestamp = $snapshot['_history']['snapshot_at'];
+    $targetPath = HISTORY_DIR . $historyKey . DIRECTORY_SEPARATOR . $timestamp . '.json';
+
+    if (!safeFileWrite($targetPath, $json)) {
+        return false;
+    }
+
+    // Ротация: удаляем самые старые, если превышен лимит
+    rotatePageHistory($historyKey, getHistoryLimit());
+
+    return true;
+}
+
+/**
+ * Возвращает список версий страницы (свежие сверху).
+ *
+ * @param string $historyKey Ключ истории
+ * @return array Массив записей: [timestamp, snapshot_at, saved_by, size_bytes, page_id]
+ */
+function getPageHistory(string $historyKey): array {
+    $dir = getHistoryDir($historyKey);
+    if ($dir === '' || !is_dir($dir)) {
+        return [];
+    }
+
+    $files = glob($dir . '*.json');
+    if (!is_array($files) || empty($files)) {
+        return [];
+    }
+
+    $list = [];
+    foreach ($files as $file) {
+        $timestamp = (int)basename($file, '.json');
+        if ($timestamp <= 0) {
+            continue;
+        }
+
+        $data = _jsonToArray($file);
+        if (empty($data) || empty($data['_history'])) {
+            continue;
+        }
+
+        $meta = $data['_history'];
+
+        $list[] = [
+            'timestamp'   => $timestamp,
+            'snapshot_at' => (int)($meta['snapshot_at'] ?? $timestamp),
+            'saved_by'    => (string)($meta['saved_by'] ?? ''),
+            'size_bytes'  => (int)($meta['size_bytes'] ?? 0),
+            'page_id'     => (string)($meta['page_id'] ?? ''),
+        ];
+    }
+
+    // Свежие сверху
+    usort($list, function($a, $b) {
+        return $b['timestamp'] - $a['timestamp'];
+    });
+
+    return $list;
+}
+
+/**
+ * Читает конкретный снапшот версии страницы.
+ * Возвращает данные БЕЗ служебного блока _history.
+ *
+ * @param string $historyKey Ключ истории
+ * @param int    $timestamp  Unix timestamp версии
+ * @return array|null Данные страницы или null
+ */
+function getHistorySnapshot(string $historyKey, int $timestamp): ?array {
+    if ($timestamp <= 0) {
+        return null;
+    }
+
+    $dir = getHistoryDir($historyKey);
+    if ($dir === '' || !is_dir($dir)) {
+        return null;
+    }
+
+    $file = $dir . $timestamp . '.json';
+    if (!file_exists($file)) {
+        return null;
+    }
+
+    $data = _jsonToArray($file);
+    if (empty($data)) {
+        return null;
+    }
+
+    unset($data['_history']);
+
+    return $data;
+}
+
+/**
+ * Список контентных полей страницы — участвуют в снапшоте,
+ * сравнении и откате. Один источник правды.
+ *
+ * Не входят:
+ * - status, publish_at, unpublish_at — жизненный цикл, не контент.
+ * - slug_history — накопительная история адресов.
+ * - id, slug, history_key, preview_token — служебные.
+ *
+ * @return array
+ */
+function getHistoryContentFields(): array {
+    return [
+        'title',
+        'template',
+        'meta',
+        'show_header',
+        'show_footer',
+        'rows',
+    ];
+}
+
+/**
+ * Извлекает из страницы только контентные поля.
+ *
+ * @param array $page Данные страницы
+ * @return array Массив из контентных полей (отсутствующие = null)
+ */
+function extractHistoryContent(array $page): array {
+    $result = [];
+    foreach (getHistoryContentFields() as $field) {
+        $result[$field] = $page[$field] ?? null;
+    }
+    return $result;
+}
+
+/**
+ * Нормализует контент для стабильного сравнения:
+ * - вырезает служебное поле _jsId в rows[].columns[].modules[]
+ * - рекурсивно сортирует ключи через ksort
+ *
+ * @param array $content
+ * @return array
+ */
+function normalizeHistoryContent(array $content): array {
+    if (isset($content['rows']) && is_array($content['rows'])) {
+        foreach ($content['rows'] as &$row) {
+            if (!is_array($row)) continue;
+
+            unset($row['_jsId']);
+
+            if (!empty($row['columns']) && is_array($row['columns'])) {
+                foreach ($row['columns'] as &$col) {
+                    if (!is_array($col)) continue;
+
+                    unset($col['_jsId']);
+
+                    if (!empty($col['modules']) && is_array($col['modules'])) {
+                        foreach ($col['modules'] as &$mod) {
+                            if (!is_array($mod)) continue;
+                            unset($mod['_jsId']);
+                        }
+                        unset($mod);
+                    }
+                }
+                unset($col);
+            }
+        }
+        unset($row);
+    }
+
+    return normalizeHistorySort($content);
+}
+
+/**
+ * Рекурсивно сортирует ключи массива (по возрастанию) для стабильного json_encode.
+ *
+ * @param mixed $value
+ * @return mixed
+ */
+function normalizeHistorySort($value) {
+    if (!is_array($value)) {
+        return $value;
+    }
+
+    // Ассоциативный? Сортируем ключи
+    foreach ($value as &$item) {
+        $item = normalizeHistorySort($item);
+    }
+    unset($item);
+
+    ksort($value);
+    return $value;
+}
+
+/**
+ * Удаляет одну версию истории.
+ *
+ * @param string $historyKey Ключ истории
+ * @param int    $timestamp  Unix timestamp версии
+ * @return array ['success' => bool, 'error' => string]
+ */
+function deleteHistoryVersion(string $historyKey, int $timestamp): array {
+    if ($timestamp <= 0) {
+        return ['success' => false, 'error' => 'Невалидный timestamp.'];
+    }
+
+    $dir = getHistoryDir($historyKey);
+    if ($dir === '') {
+        return ['success' => false, 'error' => 'Невалидный ключ истории.'];
+    }
+
+    $file = $dir . $timestamp . '.json';
+    if (!file_exists($file)) {
+        return ['success' => false, 'error' => 'Версия не найдена.'];
+    }
+
+    if (!@unlink($file)) {
+        return ['success' => false, 'error' => 'Не удалось удалить версию.'];
+    }
+
+    return ['success' => true, 'error' => ''];
+}
+
+/**
+ * Удаляет всю историю одной страницы (все версии + папку).
+ *
+ * @param string $historyKey Ключ истории
+ * @return int Количество удалённых файлов
+ */
+function clearPageHistory(string $historyKey): int {
+    $dir = getHistoryDir($historyKey);
+    if ($dir === '' || !is_dir($dir)) {
+        return 0;
+    }
+
+    $files = glob($dir . '*.json');
+    $deleted = 0;
+    if (is_array($files)) {
+        foreach ($files as $file) {
+            if (@unlink($file)) {
+                $deleted++;
+            }
+        }
+    }
+
+    @rmdir($dir);
+
+    return $deleted;
+}
+
+/**
+ * Собирает статистику по всей истории сайта.
+ * Используется в настройках — для отображения «страниц/версий/размер».
+ *
+ * @return array ['pages' => int, 'versions' => int, 'size_bytes' => int]
+ */
+function getHistoryStats(): array {
+    $stats = ['pages' => 0, 'versions' => 0, 'size_bytes' => 0];
+
+    if (!is_dir(HISTORY_DIR)) {
+        return $stats;
+    }
+
+    $pageDirs = glob(HISTORY_DIR . '*', GLOB_ONLYDIR);
+    if (!is_array($pageDirs)) {
+        return $stats;
+    }
+
+    foreach ($pageDirs as $dir) {
+        $key = basename($dir);
+        if (!preg_match('/^[a-f0-9]{16}$/i', $key)) {
+            continue;
+        }
+
+        $files = glob($dir . DIRECTORY_SEPARATOR . '*.json');
+        if (!is_array($files) || empty($files)) {
+            continue;
+        }
+
+        $stats['pages']++;
+        $stats['versions'] += count($files);
+
+        foreach ($files as $file) {
+            $size = @filesize($file);
+            if ($size !== false) {
+                $stats['size_bytes'] += $size;
+            }
+        }
+    }
+
+    return $stats;
+}
+
+/**
+ * Восстанавливает страницу из снапшота истории.
+ * Сначала делает снапшот текущего состояния (чтобы откат был обратимым).
+ *
+ * ВАЖНО: восстанавливается только контент.
+ * id, slug, preview_token, history_key — не трогаются.
+ *
+ * @param string $pageId    ID страницы
+ * @param int    $timestamp Unix timestamp снапшота
+ * @return array ['success' => bool, 'error' => string, 'message' => string]
+ */
+function restorePageFromHistory(string $pageId, int $timestamp): array {
+    // Проверка ID
+    if (!preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
+        return ['success' => false, 'error' => 'Невалидный ID страницы.', 'message' => ''];
+    }
+
+    // Загружаем текущую страницу
+    $current = loadPageById($pageId);
+    if (!$current) {
+        return ['success' => false, 'error' => 'Страница не найдена.', 'message' => ''];
+    }
+
+    // Ключ истории
+    $historyKey = (string)($current['history_key'] ?? '');
+    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
+        return ['success' => false, 'error' => 'У страницы нет истории.', 'message' => ''];
+    }
+
+    // Читаем снапшот
+    $snapshot = getHistorySnapshot($historyKey, $timestamp);
+    if (!$snapshot) {
+        return ['success' => false, 'error' => 'Версия не найдена.', 'message' => ''];
+    }
+
+    // Снапшот текущего состояния — чтобы откат был обратимым
+    savePageSnapshot($current, $snapshot, $_SESSION['admin_login'] ?? 'system');
+
+    // Собираем новую версию страницы:
+    // контент из снапшота + служебные поля из текущей
+    $newPage = $current;
+
+    // Восстанавливаем только контентные поля (см. getHistoryContentFields)
+    foreach (getHistoryContentFields() as $field) {
+        if (array_key_exists($field, $snapshot)) {
+            $newPage[$field] = $snapshot[$field];
+        }
+    }
+
+    // Служебные поля — принудительно из текущей
+    $newPage['id']            = $current['id'];
+    $newPage['slug']          = $current['slug'] ?? '';
+    $newPage['history_key']   = $historyKey;
+
+    if (array_key_exists('preview_token', $current)) {
+        $newPage['preview_token'] = $current['preview_token'];
+    }
+
+    // Сохраняем
+    if (!savePageData($pageId, $newPage)) {
+        return ['success' => false, 'error' => 'Не удалось сохранить восстановленную версию.', 'message' => ''];
+    }
+
+    // Сброс кеша страницы
+    clearPageCacheById($pageId);
+
+    // SEO-файлы (если авторегенерация включена)
+    maybeRegenerateSeoFiles();
+
+    $dateStr = date('d.m.Y H:i', $timestamp);
+    return [
+        'success' => true,
+        'error'   => '',
+        'message' => 'Страница восстановлена к версии от ' . $dateStr . '.',
+    ];
+}
+
+/**
+ * Обработчик POST: откат страницы к версии истории.
+ * Вызывается из config/index.php.
+ *
+ * @param string $pageId
+ * @param int    $timestamp
+ * @return void
+ */
+function handleRestorePageVersion(string $pageId, int $timestamp): void {
+    $result = restorePageFromHistory($pageId, $timestamp);
+
+    if ($result['success']) {
+        logAction('page_restore', 'Страница "' . $pageId . '" восстановлена к версии от ' . date('d.m.Y H:i', $timestamp), 'INFO');
+        setFlash($result['message']);
+    } else {
+        logAction('page_restore', 'Ошибка отката: ' . $result['error'] . ' (ID: ' . $pageId . ', ts: ' . $timestamp . ')', 'ERROR');
+        setFlash($result['error'], 'error');
+    }
+
+    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
+    exit;
+}
+
+/**
+ * Обработчик POST: удаление одной версии истории.
+ * Вызывается из config/index.php.
+ *
+ * @param string $pageId
+ * @param int    $timestamp
+ * @return void
+ */
+function handleDeleteHistoryVersion(string $pageId, int $timestamp): void {
+    // Загружаем страницу, чтобы получить history_key
+    $page = loadPageById($pageId);
+    if (!$page || !preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
+        setFlash('Страница не найдена.', 'error');
+        header('Location: ?tab=pages');
+        exit;
+    }
+
+    $historyKey = (string)($page['history_key'] ?? '');
+    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
+        setFlash('У страницы нет истории.', 'error');
+        header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
+        exit;
+    }
+
+    $result = deleteHistoryVersion($historyKey, $timestamp);
+
+    if ($result['success']) {
+        logAction('page_history_delete', 'Удалена версия истории страницы "' . $pageId . '" (ts: ' . $timestamp . ')', 'INFO');
+        setFlash('Версия удалена.');
+    } else {
+        logAction('page_history_delete', 'Ошибка удаления версии: ' . $result['error'] . ' (ID: ' . $pageId . ')', 'ERROR');
+        setFlash($result['error'], 'error');
+    }
+
+    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
+    exit;
+}
+
+/**
+ * Обработчик POST: полная очистка истории одной страницы.
+ * Вызывается из config/index.php.
+ *
+ * @param string $pageId
+ * @return void
+ */
+function handleClearPageHistory(string $pageId): void {
+    $page = loadPageById($pageId);
+    if (!$page || !preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
+        setFlash('Страница не найдена.', 'error');
+        header('Location: ?tab=pages');
+        exit;
+    }
+
+    $historyKey = (string)($page['history_key'] ?? '');
+    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
+        setFlash('У страницы нет истории.', 'error');
+        header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
+        exit;
+    }
+
+    $deleted = clearPageHistory($historyKey);
+
+    if ($deleted > 0) {
+        logAction('page_history_clear', 'Очищена история страницы "' . $pageId . '" (' . $deleted . ' версий)', 'INFO');
+        setFlash('История страницы очищена. Удалено версий: ' . $deleted . '.');
+    } else {
+        setFlash('История уже пуста.');
+    }
+
+    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
+    exit;
+}
+
+/**
+ * AJAX-обработчик: полностью очищает историю всех страниц.
+ * Вызывается из секции настроек «История».
+ *
+ * @return void
+ */
+function handleClearAllHistory(): void {
+    $deletedVersions = 0;
+    $deletedPages    = 0;
+
+    if (is_dir(HISTORY_DIR)) {
+        $pageDirs = glob(HISTORY_DIR . '*', GLOB_ONLYDIR);
+        if (is_array($pageDirs)) {
+            foreach ($pageDirs as $dir) {
+                $key = basename($dir);
+                if (!preg_match('/^[a-f0-9]{16}$/i', $key)) {
+                    continue;
+                }
+
+                $files = glob($dir . DIRECTORY_SEPARATOR . '*.json');
+                if (is_array($files)) {
+                    foreach ($files as $file) {
+                        if (@unlink($file)) {
+                            $deletedVersions++;
+                        }
+                    }
+                }
+
+                if (@rmdir($dir)) {
+                    $deletedPages++;
+                }
+            }
+        }
+    }
+
+    if ($deletedVersions > 0) {
+        logAction('history_clear', 'История очищена: ' . $deletedPages . ' страниц, ' . $deletedVersions . ' версий', 'INFO');
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => true,
+        'deleted_pages'    => $deletedPages,
+        'deleted_versions' => $deletedVersions,
+        'message' => $deletedVersions > 0
+            ? 'Удалено версий: ' . $deletedVersions . ' (страниц: ' . $deletedPages . ').'
+            : 'История уже пуста.',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 

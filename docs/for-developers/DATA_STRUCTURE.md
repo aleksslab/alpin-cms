@@ -12,6 +12,7 @@
 | `data/logs/admin.log` | Логи (**не** JSON) |
 | `data/trash/*.json` | Корзина (удалённые страницы и меню) |
 | `data/preview/{preview_id}.json` | Временные preview (из конструктора) |
+| `data/history/{history_key}/*.json` | История изменений страниц (снапшоты) |
 | `config/data/credentials.json` | Логин/хеш |
 | `config/data/modules.json` | Список модулей |
 | `config/data/templates.json` | Список шаблонов |
@@ -86,7 +87,9 @@
     "seo_sitemap_enabled": true,
     "seo_robots_enabled": true,
     "seo_auto_regenerate": false,
-    "last_seo_regenerate": 0
+    "last_seo_regenerate": 0,
+    "history_enabled": false,
+    "history_limit": 20
 }
 ```
 
@@ -194,6 +197,13 @@
 | `cache_enabled` | bool | Кеширование HTML-страниц |
 | `cache_ttl` | int | TTL кеша в секундах. `0` — бессрочно до изменения страницы. |
 
+**История изменений:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `history_enabled` | bool | Хранить историю изменений страниц. По умолчанию `false`. |
+| `history_limit` | int | Максимум хранимых версий одной страницы. Диапазон 1–100, по умолчанию 20. |
+
 **Системные привязки:**
 
 | Поле | Тип | Описание |
@@ -227,6 +237,7 @@
     "unpublish_at": null,
     "preview_token": null,
     "slug_history": [],
+    "history_key": "22c915d03008950d",
     "created": "2025-01-15 12:00:00",
     "updated": "2025-01-15 14:30:00",
     "meta": {
@@ -279,6 +290,7 @@
 | `unpublish_at` | int (Unix timestamp) \| null | Опционально для `scheduled` / `published` |
 | `preview_token` | string (32 hex) \| null | Постоянный preview-токен для согласования |
 | `slug_history` | array | История старых slug'ов (для 301-редиректов) |
+| `history_key` | string (16 hex) \| null | Ключ истории. Генерируется при создании страницы. |
 | `created` | `Y-m-d H:i:s` | Опционально |
 | `updated` | `Y-m-d H:i:s` | Опционально |
 | `meta` | object | Опционально |
@@ -289,6 +301,8 @@
 **Поле `preview_token`:** создаётся/удаляется **только по кнопке** в `edit.php`. При сохранении страницы **не трогается**. Открывает страницу в любом статусе по URL `/{slug}?preview={token}`.
 
 **Поле `slug_history`:** массив старых slug'ов. Заполняется автоматически при переименовании страницы. Используется для 301-редиректов: старый URL → актуальный. Если поле пустое — не создаётся. Лимит — 50 записей (старые удаляются).
+
+**Поле `history_key`:** 16 hex-символов. Генерируется при **создании** страницы. **Не меняется** при переименовании slug. Клонирование создаёт **новый** ключ (история не наследуется). Восстановление из корзины **сохраняет** ключ. Используется как имя папки в `data/history/`.
 
 ### Статусы страниц
 
@@ -632,6 +646,83 @@
     }
 }
 ```
+
+---
+
+## 📄 `data/history/{history_key}/{timestamp}.json`
+
+История изменений страницы. Один файл = один снапшот.
+
+**Структура имени:** `{history_key}/{timestamp}.json`, где:
+- `history_key` — 16 hex-символов (ключ истории страницы).
+- `timestamp` — Unix timestamp момента сохранения.
+
+**Структура JSON:**
+
+Содержимое — **полный JSON страницы** + служебный блок `_history`:
+
+```json
+{
+    "id": "about",
+    "title": "О компании",
+    "slug": "about",
+    "template": "full-width",
+    "status": "published",
+    "publish_at": null,
+    "unpublish_at": null,
+    "meta": { ... },
+    "show_header": true,
+    "show_footer": true,
+    "rows": [ ... ],
+    "slug_history": [ ... ],
+    "history_key": "22c915d03008950d",
+    "preview_token": null,
+
+    "_history": {
+        "page_id": "about",
+        "snapshot_at": 1735689600,
+        "saved_by": "admin",
+        "size_bytes": 5752
+    }
+}
+```
+
+**Поля `_history`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `page_id` | string | ID страницы |
+| `snapshot_at` | int | Unix timestamp |
+| `saved_by` | string | Логин админа |
+| `size_bytes` | int | Размер снапшота в байтах |
+
+**Что восстанавливается при откате:**
+
+- `title`
+- `template`
+- `meta`
+- `show_header`
+- `show_footer`
+- `rows`
+
+**Что НЕ восстанавливается:**
+
+- `status`, `publish_at`, `unpublish_at` — жизненный цикл.
+- `slug`, `slug_history` — адрес и его история.
+- `preview_token` — ссылка для согласования.
+- `id`, `history_key` — служебные.
+
+**Дедупликация:** снапшот не пишется, если:
+1. Пользователь ничего не менял (контент новый = старый).
+2. Такое же состояние уже есть в **последнем** снапшоте.
+
+**Лимит версий:** при превышении `history_limit` удаляются самые старые версии.
+
+**Ротация:** по имени файла (timestamp, возрастание).
+
+**Чистка:** при окончательном удалении страницы из корзины — история удаляется.
+
+**Автоочистки по TTL нет.**
 
 ---
 

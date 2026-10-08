@@ -89,7 +89,9 @@ config/
 │   ├── admin_controller.php  # ЗАПИСЬ + логика
 │   ├── filemanager_api.php   # API проводника
 │   ├── media_modal.php       # Медиа-модалка
-│   └── icon_modal.php        # Модалка иконок
+│   ├── icon_modal.php        # Модалка иконок
+│   ├── trash_modal.php       # Модалка корзины
+│   └── history_modal.php     # Модалка истории изменений
 │
 ├── modules/               # Админские модули (вкладки)
 │   ├── config_vars.php
@@ -556,9 +558,27 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `cleanupSessionPreviews()` | Очистка previews сессии |
 | `cleanupSessionPagePreviews()` | Очистка previews сессии для страницы |
 | `getPagePreviewToken()` | Чтение постоянного токена |
-| `handleRegeneratePagePreviewToken()` | Создание/перегенерация токена |
-| `handleDeletePagePreviewToken()` | Удаление токена |
 | `getPagePreviewUrl()` | Формирование URL постоянного preview |
+| `isHistoryEnabled()` | История включена |
+| `getHistoryLimit()` | Лимит версий |
+| `getHistoryDir()` | Путь к папке истории страницы |
+| `ensureHistoryDir()` | Создание папки истории + `.htaccess` |
+| `getOrCreateHistoryKey()` | Ключ истории страницы |
+| `savePageSnapshot()` | Сохранение снапшота (с дедупликацией) |
+| `rotatePageHistory()` | Удаление старых версий |
+| `getHistoryContentFields()` | Список контентных полей |
+| `extractHistoryContent()` | Извлечение контентных полей |
+| `normalizeHistoryContent()` | Нормализация для сравнения |
+| `getPageHistory()` | Список версий страницы |
+| `getHistorySnapshot()` | Чтение конкретного снапшота |
+| `deleteHistoryVersion()` | Удаление одной версии |
+| `clearPageHistory()` | Очистка истории страницы |
+| `getHistoryStats()` | Статистика истории сайта |
+| `restorePageFromHistory()` | Откат страницы к версии |
+| `handleRestorePageVersion()` | POST-обработчик отката |
+| `handleDeleteHistoryVersion()` | POST-обработчик удаления версии |
+| `handleClearPageHistory()` | POST-обработчик очистки страницы |
+| `handleClearAllHistory()` | AJAX-обработчик очистки всей истории |
 | `generateSitemap()` | Генерация sitemap.xml |
 | `generateRobots()` | Генерация robots.txt |
 | `generateSeoFiles()` | Обе генерации + удаление при выключенных галочках |

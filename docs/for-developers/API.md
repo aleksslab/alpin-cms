@@ -668,13 +668,13 @@ $page = loadPreviewById('a1b2c3...');
 
 Читает `preview_token` из JSON страницы. Пустая строка, если не задан.
 
-#### `handleRegeneratePagePreviewToken(string $pageId): void`
+#### AJAX-эндпоинт `generate_preview_token`
 
-Генерирует новый токен, сохраняет, делает flash+log+redirect. Вызывается из `config/index.php`.
+**URL:** `index.php?tab=pages&ajax=generate_preview_token` (GET).
 
-#### `handleDeletePagePreviewToken(string $pageId): void`
+Генерирует **новый** preview-токен **без сохранения** в JSON. Возвращает `{success: true, token: "..."}`.
 
-Удаляет токен. Вызывается из `config/index.php`.
+Запись токена в `data/pages/{id}.json` — **только при сохранении страницы** (через hidden-поле `preview_token` в форме). Удаление — снятие поля при сохранении.
 
 #### `getPagePreviewUrl(string $pageId, string $token): string`
 
@@ -709,6 +709,236 @@ POST-эндпоинт для создания временного preview.
 ```
 
 **Требует авторизации и CSRF.**
+
+---
+
+## 🕘 История изменений
+
+### Настройки
+
+#### `isHistoryEnabled(): bool`
+
+Проверяет галочку `history_enabled` в `settings.json`.
+
+```php
+if (!isHistoryEnabled()) {
+    return false;
+}
+```
+
+---
+
+#### `getHistoryLimit(): int`
+
+Максимум хранимых версий на страницу. Читает `history_limit`, ограничивает диапазоном **1..100**, по умолчанию **20**.
+
+```php
+$limit = getHistoryLimit(); // 20
+```
+
+---
+
+#### `getHistoryDir(string $historyKey): string`
+
+Путь к папке истории конкретной страницы. **Не создаёт** папку — только формирует путь.
+
+```php
+$dir = getHistoryDir('22c915d03008950d');
+// /.../data/history/22c915d03008950d/
+```
+
+Валидация: `historyKey` — 16 hex-символов. Иначе — пустая строка.
+
+---
+
+#### `ensureHistoryDir(string $historyKey): bool`
+
+Создаёт `data/history/` + `.htaccess` (`Require all denied`) + вложенную папку страницы. Возвращает `true`, если папка доступна для записи.
+
+---
+
+#### `getOrCreateHistoryKey(array &$page): string`
+
+Возвращает `history_key` страницы. Если ключа нет — генерирует, **пишет в JSON страницы** и возвращает. **Модифицирует `$page` по ссылке**.
+
+Используется как fallback для страниц, созданных **до** фичи.
+
+```php
+$key = getOrCreateHistoryKey($page); // 16 hex
+```
+
+---
+
+### Запись снапшотов
+
+#### `savePageSnapshot(array $oldPage, array $newPage, string $savedBy = 'system'): bool`
+
+Сохраняет снапшот страницы. Вызывается **перед** перезаписью файла.
+
+**Дедупликация — снапшот НЕ пишется, если:**
+1. История отключена.
+2. `$oldPage` = `$newPage` (пользователь ничего не менял).
+3. Такое же состояние уже есть в **последнем** снапшоте.
+
+```php
+savePageSnapshot($oldPageForHistory, $pageData, $_SESSION['admin_login'] ?? 'system');
+```
+
+**Что делает:**
+1. Проверка `isHistoryEnabled()`.
+2. Сравнение `$oldPage` и `$newPage` по контентным полям (`extractHistoryContent`).
+3. Проверка дедупликации с последним снапшотом.
+4. Запись `data/history/{key}/{timestamp}.json` со служебным блоком `_history`.
+5. Ротация — удаление старых при превышении `getHistoryLimit()`.
+
+---
+
+#### `rotatePageHistory(string $historyKey, int $limit): int`
+
+Удаляет самые старые снапшоты, оставляя не больше `$limit`. Возвращает число удалённых файлов.
+
+---
+
+#### `getHistoryContentFields(): array`
+
+Список **контентных** полей — единый источник правды для снапшота, сравнения и отката.
+
+```php
+// ['title', 'template', 'meta', 'show_header', 'show_footer', 'rows']
+```
+
+**Не входят:** `status`, `publish_at`, `unpublish_at`, `slug`, `slug_history`, `preview_token`, `id`, `history_key`.
+
+---
+
+#### `extractHistoryContent(array $page): array`
+
+Возвращает из страницы **только контентные поля** (список выше). Отсутствующие ключи → `null`.
+
+---
+
+#### `normalizeHistoryContent(array $content): array`
+
+Нормализует контент для стабильного сравнения:
+- Вырезает служебное поле `_jsId` в `rows[].columns[].modules[]`.
+- Рекурсивно сортирует ключи через `ksort` (`normalizeHistorySort`).
+
+Используется для `md5(json_encode(...))` перед сравнением.
+
+---
+
+#### `normalizeHistorySort($value)`
+
+Рекурсивный `ksort`. Служебная функция для `normalizeHistoryContent`. Напрямую не вызывается.
+
+---
+
+### Чтение
+
+#### `getPageHistory(string $historyKey): array`
+
+Возвращает список версий страницы (свежие сверху).
+
+```php
+$list = getPageHistory('22c915d03008950d');
+// [
+//   ['timestamp' => 1735689700, 'snapshot_at' => 1735689700, 'saved_by' => 'admin', 'size_bytes' => 5752, 'page_id' => 'about'],
+//   ...
+// ]
+```
+
+Метаданные — из блока `_history` каждого файла. Битые / пустые файлы игнорируются.
+
+---
+
+#### `getHistorySnapshot(string $historyKey, int $timestamp): ?array`
+
+Читает конкретный снапшот. Возвращает данные **без** служебного блока `_history`.
+
+---
+
+### Удаление версий
+
+#### `deleteHistoryVersion(string $historyKey, int $timestamp): array`
+
+Удаляет одну версию.
+
+```php
+$result = deleteHistoryVersion('22c915d03008950d', 1735689700);
+// ['success' => true, 'error' => '']
+```
+
+---
+
+#### `clearPageHistory(string $historyKey): int`
+
+Удаляет все версии страницы + папку. Возвращает число удалённых файлов.
+
+---
+
+#### `getHistoryStats(): array`
+
+Статистика всей истории сайта. Для секции настроек.
+
+```php
+$stats = getHistoryStats();
+// ['pages' => 5, 'versions' => 87, 'size_bytes' => 342000]
+```
+
+---
+
+### Откат
+
+#### `restorePageFromHistory(string $pageId, int $timestamp): array`
+
+Восстанавливает страницу из снапшота.
+
+```php
+$result = restorePageFromHistory('about', 1735689700);
+// ['success' => true, 'error' => '', 'message' => 'Страница восстановлена к версии от 05.10.2026 14:32.']
+```
+
+**Порядок работы:**
+1. Загрузка текущей страницы.
+2. Получение `history_key`.
+3. Чтение снапшота.
+4. **Снапшот текущего состояния** — чтобы откат был обратимым.
+5. Применение контентных полей из снапшота (`getHistoryContentFields`).
+6. Служебные поля (`id`, `slug`, `history_key`, `preview_token`) — **из текущей** страницы.
+7. `savePageData`, `clearPageCacheById`, `maybeRegenerateSeoFiles`.
+
+---
+
+#### `handleRestorePageVersion(string $pageId, int $timestamp): void`
+
+POST-обработчик отката. Вызывается из `config/index.php`. Делает flash + log + redirect в `edit.php`.
+
+---
+
+#### `handleDeleteHistoryVersion(string $pageId, int $timestamp): void`
+
+POST-обработчик удаления одной версии.
+
+---
+
+#### `handleClearPageHistory(string $pageId): void`
+
+POST-обработчик очистки всей истории одной страницы.
+
+---
+
+#### `handleClearAllHistory(): void`
+
+AJAX-обработчик очистки **всей** истории сайта. Вызывается из секции настроек. Возвращает JSON с количеством удалённых версий и страниц.
+
+```json
+{
+    "success": true,
+    "deleted_pages": 5,
+    "deleted_versions": 87,
+    "message": "Удалено версий: 87 (страниц: 5)."
+}
+```
 
 ---
 
