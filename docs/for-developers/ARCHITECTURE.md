@@ -95,6 +95,22 @@ config/
 │
 ├── modules/               # Админские модули (вкладки)
 │   ├── config_vars.php
+│   ├── config_vars/       # Секции настроек сайта
+│   │   ├── contacts.php
+│   │   ├── visual.php
+│   │   ├── colors.php
+│   │   ├── header.php
+│   │   ├── footer.php
+│   │   ├── seo.php
+│   │   ├── og.php
+│   │   ├── social.php
+│   │   ├── assets.php
+│   │   ├── media.php      
+│   │   ├── cache.php
+│   │   ├── history.php
+│   │   ├── cron.php
+│   │   ├── custom.php
+│   │   └── modals.php
 │   ├── pages/
 │   ├── menu/
 │   ├── modules.php
@@ -508,6 +524,8 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `findPageBySlugHistory()` | Поиск страницы по slug_history |
 | `applyPageDefaults()` | Дефолты для страницы |
 | `getBaseUrl()` | Протокол + хост сайта |
+| `mediaLazyAttrs()` | `loading="lazy" decoding="async"` (или пусто) |
+| `mediaImageSrc()` | Подмена `src` на `.webp`, если файл есть |
 
 ### `admin_auth.php` — авторизация
 
@@ -583,6 +601,16 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `generateRobots()` | Генерация robots.txt |
 | `generateSeoFiles()` | Обе генерации + удаление при выключенных галочках |
 | `maybeRegenerateSeoFiles()` | Обёртка с проверкой auto |
+| `isWebpSupported()` | Проверка доступности WebP (GD/Imagick) |
+| `convertToWebp()` | Конвертация одного изображения в .webp |
+| `maybeConvertToWebp()` | Обёртка: настройки + поддержка → convertToWebp |
+| `getImageFiles()` | Рекурсивный сбор jpg/png (или только верхний уровень) |
+| `getWebpStats()` | Статистика .webp (count, size_bytes) |
+| `deleteAllWebp()` | Удаление всех .webp с парным оригиналом |
+| `handleDeleteAllWebp()` | AJAX-обработчик удаления |
+| `countImagesWithoutWebp()` | Сколько jpg/png без .webp |
+| `convertExistingImagesStep()` | Конвертация пачки (для AJAX-шагов) |
+| `handleConvertExistingImagesStep()` | AJAX-обработчик шага конвертации |
 
 ### `filemanager_api.php` — API проводника
 
@@ -655,6 +683,15 @@ config/modules/previews/{id}.png  # Превью
 - **Склейка** **всех** **CSS**/**JS** **модулей** **страницы**.
 - **При** `assets_combine = true`.
 - **Очистка** **при** **обновлении** **модуля**/**настроек**.
+
+### Изображения (WebP)
+
+`images/**/*.webp`:
+- **Генерируются** **рядом** **с** **оригиналами** (jpg/jpeg/png).
+- **При** `media_webp_enabled = true` — на загрузке (медиа-модалка, проводник).
+- **Вручную** — кнопка «Конвертировать существующие».
+- **Не кешируются** — отдаются **напрямую** с диска.
+- **Не очищаются** — не привязаны к кешу страниц.
 
 ---
 

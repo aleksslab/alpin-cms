@@ -528,7 +528,12 @@ function handleSaveSettings(): array {
         'assets_combine' => isset($_POST['assets_combine']) && $_POST['assets_combine'] == '1',
         'minify_exceptions' => $minifyExceptions,
         
-        // БЛОК 11: Кеширование страниц
+        // БЛОК 11: Медиа
+        'media_lazy_enabled' => isset($_POST['media_lazy_enabled']) && $_POST['media_lazy_enabled'] == '1',
+        'media_webp_enabled' => isWebpSupported() && isset($_POST['media_webp_enabled']) && $_POST['media_webp_enabled'] == '1',
+        'media_quality'      => max(1, min(100, intval($_POST['media_quality'] ?? 82))),
+        
+        // БЛОК 12: Кеширование страниц
         'cache_enabled' => isset($_POST['cache_enabled']) && $_POST['cache_enabled'] == '1',
         'cache_ttl' => intval($_POST['cache_ttl'] ?? 86400),
         
@@ -804,6 +809,9 @@ function handleAjaxImageUpload(): void {
     }
     
     if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+        // WebP-конвертация (если включена)
+        maybeConvertToWebp($targetPath);
+        
         echo json_encode(['success' => true, 'url' => $relativeUrl]);
         exit;
     }
@@ -5251,6 +5259,450 @@ function handleClearAllHistory(): void {
         'message' => $deletedVersions > 0
             ? 'Удалено версий: ' . $deletedVersions . ' (страниц: ' . $deletedPages . ').'
             : 'История уже пуста.',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+/**
+ * МЕДИА
+ */
+
+/**
+ * Проверяет, доступна ли конвертация в WebP на этом сервере.
+ * Результат кешируется в памяти.
+ *
+ * @return bool
+ */
+function isWebpSupported(): bool {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+
+    if (extension_loaded('gd') && function_exists('imagewebp')) {
+        return $cache = true;
+    }
+    if (extension_loaded('imagick')) {
+        try {
+            $formats = Imagick::queryFormats('WEBP');
+            return $cache = !empty($formats);
+        } catch (Exception $e) {
+            return $cache = false;
+        }
+    }
+    return $cache = false;
+}
+
+/**
+ * Конвертирует изображение в WebP.
+ * Создаёт файл foo.webp рядом с оригиналом. Оригинал НЕ удаляется.
+ *
+ * Предполагается, что поддержка WebP уже проверена снаружи
+ * (isWebpSupported()).
+ *
+ * @param string $sourcePath Полный путь к исходному файлу
+ * @param int    $quality    Качество (1..100), по умолчанию 82
+ * @return string|null Путь к .webp или null при ошибке
+ */
+function convertToWebp(string $sourcePath, int $quality = 82): ?string {
+    if (!is_file($sourcePath)) {
+        return null;
+    }
+
+    $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
+
+    // Только jpg / jpeg / png
+    if (!in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+        return null;
+    }
+
+    $quality = max(1, min(100, $quality));
+
+    // Целевой путь: foo.jpg → foo.webp
+    $targetPath = preg_replace('#\.(jpe?g|png)$#i', '.webp', $sourcePath);
+
+    // Если .webp уже есть — не перезаписываем
+    if (is_file($targetPath)) {
+        return $targetPath;
+    }
+
+    try {
+        // GD (приоритет)
+        if (extension_loaded('gd') && function_exists('imagewebp')) {
+            $image = null;
+            if ($ext === 'png') {
+                $image = @imagecreatefrompng($sourcePath);
+            } else {
+                $image = @imagecreatefromjpeg($sourcePath);
+            }
+
+            if ($image === false) {
+                return null;
+            }
+
+            if ($ext === 'png') {
+                imagepalettetotruecolor($image);
+                imagealphablending($image, true);
+                imagesavealpha($image, true);
+            }
+
+            $ok = @imagewebp($image, $targetPath, $quality);
+            imagedestroy($image);
+
+            if (!$ok || !is_file($targetPath)) {
+                @unlink($targetPath);
+                return null;
+            }
+
+            return $targetPath;
+        }
+
+        // Imagick (fallback)
+        if (extension_loaded('imagick')) {
+            $im = new Imagick($sourcePath);
+            $im->setImageFormat('webp');
+            $im->setImageCompressionQuality($quality);
+            $im->writeImage($targetPath);
+            $im->clear();
+            $im->destroy();
+
+            if (!is_file($targetPath)) {
+                return null;
+            }
+
+            return $targetPath;
+        }
+
+    } catch (Exception $e) {
+        if (is_file($targetPath)) {
+            @unlink($targetPath);
+        }
+        return null;
+    }
+
+    return null;
+}
+
+/**
+ * Обёртка: читает настройки и вызывает convertToWebp, если включено.
+ * Возвращает путь к .webp или null.
+ *
+ * @param string $sourcePath
+ * @return string|null
+ */
+function maybeConvertToWebp(string $sourcePath): ?string {
+    $settings = getSettingsData();
+    if (empty($settings['media_webp_enabled'])) {
+        return null;
+    }
+
+    // Защита от рассинхрона: галочка включена в settings.json,
+    // но на этом сервере поддержки WebP нет (например, после переноса).
+    if (!isWebpSupported()) {
+        return null;
+    }
+
+    $quality = max(1, min(100, (int)($settings['media_quality'] ?? 82)));
+    return convertToWebp($sourcePath, $quality);
+}
+
+/**
+ * Считает, сколько jpg/png-файлов (в images/ и корне) не имеют парного .webp.
+ *
+ * @return int
+ */
+function countImagesWithoutWebp(): int {
+    $files = array_merge(
+        getImageFiles(APP_ROOT . DIRECTORY_SEPARATOR . 'images', true),
+        getImageFiles(APP_ROOT, false)
+    );
+
+    $seen = [];
+    $count = 0;
+
+    foreach ($files as $original) {
+        $real = realpath($original);
+        if ($real === false || isset($seen[$real])) continue;
+        $seen[$real] = true;
+
+        $webp = preg_replace('#\.(jpe?g|png)$#i', '.webp', $original);
+        if (!is_file($webp)) {
+            $count++;
+        }
+    }
+
+    return $count;
+}
+
+/**
+ * Конвертирует пачку существующих изображений (jpg/png без .webp).
+ * Используется AJAX-шагами.
+ *
+ * @param int $step     Номер шага (0-based)
+ * @param int $perStep  Сколько файлов за шаг (1..50)
+ * @return array ['processed' => int, 'converted' => int, 'total' => int, 'is_finished' => bool]
+ */
+function convertExistingImagesStep(int $step, int $perStep = 10): array {
+    $perStep = max(1, min(50, $perStep));
+    $step = max(0, $step);
+
+    // Собираем оригиналы (рекурсивно в images/, верхний уровень корня)
+    $allFiles = array_merge(
+        getImageFiles(APP_ROOT . DIRECTORY_SEPARATOR . 'images', true),
+        getImageFiles(APP_ROOT, false)
+    );
+
+    // Оставляем только те, у которых нет .webp
+    $seen = [];
+    $pending = [];
+
+    foreach ($allFiles as $file) {
+        $real = realpath($file);
+        if ($real === false || isset($seen[$real])) continue;
+        $seen[$real] = true;
+
+        $webp = preg_replace('#\.(jpe?g|png)$#i', '.webp', $file);
+        if (!is_file($webp)) {
+            $pending[] = $file;
+        }
+    }
+
+    $total = count($pending);
+    $offset = $step * $perStep;
+    $slice = array_slice($pending, $offset, $perStep);
+
+    $settings = getSettingsData();
+    $quality = max(1, min(100, (int)($settings['media_quality'] ?? 82)));
+
+    $converted = 0;
+    foreach ($slice as $file) {
+        if (convertToWebp($file, $quality) !== null) {
+            $converted++;
+        }
+    }
+
+    $processed = $offset + count($slice);
+    $isFinished = $processed >= $total;
+
+    return [
+        'processed'   => $processed,
+        'converted'   => $converted,
+        'total'       => $total,
+        'is_finished' => $isFinished,
+    ];
+}
+
+/**
+ * AJAX-обработчик: конвертация существующих изображений шагами.
+ *
+ * @return void
+ */
+function handleConvertExistingImagesStep(): void {
+    if (!isWebpSupported()) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false,
+            'error'   => 'WebP-конвертация не поддерживается на этом сервере.',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $step = intval($_POST['step'] ?? 0);
+    $perStep = intval($_POST['per_step'] ?? 10);
+
+    $result = convertExistingImagesStep($step, $perStep);
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success'     => true,
+        'processed'   => $result['processed'],
+        'converted'   => $result['converted'],
+        'total'       => $result['total'],
+        'is_finished' => $result['is_finished'],
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+/**
+ * Рекурсивно собирает файлы jpg/jpeg/png в директории.
+ *
+ * @param string $rootDir
+ * @param bool   $recursive
+ * @return array Абсолютные пути
+ */
+function getImageFiles(string $rootDir, bool $recursive = true): array {
+    if (!is_dir($rootDir)) {
+        return [];
+    }
+
+    if (!$recursive) {
+        $files = array_merge(
+            glob($rootDir . DIRECTORY_SEPARATOR . '*.jpg') ?: [],
+            glob($rootDir . DIRECTORY_SEPARATOR . '*.jpeg') ?: [],
+            glob($rootDir . DIRECTORY_SEPARATOR . '*.png') ?: []
+        );
+        return $files;
+    }
+
+    $files = [];
+    try {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($rootDir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file->isFile()) continue;
+            $ext = strtolower($file->getExtension());
+            if (in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+                $files[] = $file->getPathname();
+            }
+        }
+    } catch (Exception $e) {
+        return [];
+    }
+
+    return $files;
+}
+
+/**
+ * Собирает статистику по .webp-файлам в images/ и корне сайта.
+ *
+ * Считает только .webp, у которых есть "парный" оригинал (.jpg/.jpeg/.png).
+ * Это "наши" сгенерированные .webp. Просто .webp без оригинала — не считаются.
+ *
+ * @return array ['count' => int, 'size_bytes' => int]
+ */
+function getWebpStats(): array {
+    $stats = ['count' => 0, 'size_bytes' => 0];
+
+    // images/ — рекурсивно, корень — только верхний уровень
+    $files = array_merge(
+        getImageFiles(APP_ROOT . DIRECTORY_SEPARATOR . 'images', true),
+        getImageFiles(APP_ROOT, false)
+    );
+
+    $seen = [];
+
+    foreach ($files as $original) {
+        $webp = preg_replace('#\.(jpe?g|png)$#i', '.webp', $original);
+        if (!is_file($webp)) continue;
+
+        $real = realpath($webp);
+        if ($real === false || isset($seen[$real])) continue;
+        $seen[$real] = true;
+
+        $stats['count']++;
+        $size = @filesize($webp);
+        if ($size !== false) {
+            $stats['size_bytes'] += $size;
+        }
+    }
+
+    return $stats;
+}
+
+/**
+ * Удаляет все .webp-файлы, у которых есть "парный" оригинал.
+ * Оригиналы (jpg/png) НЕ удаляются.
+ *
+ * @return array ['deleted' => int, 'kept' => int, 'error' => string]
+ */
+function deleteAllWebp(): array {
+    $deleted = 0;
+    $kept = 0;
+    $errors = 0;
+
+    // Все .webp рекурсивно в images/ и верхний уровень корня
+    $webpFiles = [];
+
+    // images/ — рекурсивно
+    $imagesDir = APP_ROOT . DIRECTORY_SEPARATOR . 'images';
+    if (is_dir($imagesDir)) {
+        try {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($imagesDir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::LEAVES_ONLY
+            );
+            foreach ($iterator as $file) {
+                if ($file->isFile() && strtolower($file->getExtension()) === 'webp') {
+                    $webpFiles[] = $file->getPathname();
+                }
+            }
+        } catch (Exception $e) {
+            // ignore
+        }
+    }
+
+    // корень — только верхний уровень
+    $rootWebp = glob(APP_ROOT . DIRECTORY_SEPARATOR . '*.webp') ?: [];
+    $webpFiles = array_merge($webpFiles, $rootWebp);
+
+    $seen = [];
+
+    foreach ($webpFiles as $webp) {
+        $real = realpath($webp);
+        if ($real === false || isset($seen[$real])) continue;
+        $seen[$real] = true;
+
+        $base = substr($webp, 0, -5);
+
+        $hasOriginal = false;
+        foreach (['.jpg', '.jpeg', '.png'] as $ext) {
+            if (is_file($base . $ext)) {
+                $hasOriginal = true;
+                break;
+            }
+        }
+
+        if (!$hasOriginal) {
+            $kept++;
+            continue;
+        }
+
+        if (@unlink($webp)) {
+            $deleted++;
+        } else {
+            $errors++;
+        }
+    }
+
+    $error = '';
+    if ($errors > 0) {
+        $error = 'Не удалось удалить файлов: ' . $errors . '.';
+    }
+
+    return ['deleted' => $deleted, 'kept' => $kept, 'error' => $error];
+}
+
+/**
+ * AJAX-обработчик: удаление всех сгенерированных .webp.
+ * Вызывается из секции «Медиа» в настройках.
+ *
+ * @return void
+ */
+function handleDeleteAllWebp(): void {
+    $result = deleteAllWebp();
+
+    if ($result['deleted'] > 0) {
+        logAction('media_webp_delete', 'Удалено .webp: ' . $result['deleted'] . ' (оставлено без оригинала: ' . $result['kept'] . ')', 'INFO');
+    }
+
+    $message = 'Удалено .webp: ' . $result['deleted'] . '.';
+    if ($result['kept'] > 0) {
+        $message .= ' Оставлено (нет оригинала): ' . $result['kept'] . '.';
+    }
+    if (!empty($result['error'])) {
+        $message .= ' ' . $result['error'];
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => true,
+        'deleted' => $result['deleted'],
+        'kept'    => $result['kept'],
+        'error'   => $result['error'],
+        'message' => $message,
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }

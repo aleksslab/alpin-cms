@@ -2,6 +2,51 @@
 
 Все значимые изменения проекта.
 
+## [Release version 1.8.0] — 2026-10-22
+
+### Добавлено
+
+- **Медиа: Lazy loading изображений**:
+  - Хелпер `mediaLazyAttrs()` в `functions.php` — возвращает `loading="lazy" decoding="async" ` при `media_lazy_enabled`.
+  - Применён в модулях и шаблонах: `cards`, `text-media`, `portfolio`, `testimonials`, `before-after`, `brands-marquee`, футеры.
+  - **Не применяется** к hero, carousel, slider-advanced и логотипу в хедере (LCP / выше линии сгиба).
+  - По умолчанию **включено** (не создаёт файлов, безопасно).
+- **Медиа: WebP-конвертация при загрузке**:
+  - Хелперы `isWebpSupported()`, `convertToWebp()`, `maybeConvertToWebp()` в `admin_controller.php`.
+  - При загрузке через **медиа-модалку** и **проводник** создаётся `.webp` рядом с `.jpg`/`.png`. Оригинал сохраняется.
+  - Работает **рекурсивно**: подпапки `images/products/`, `images/blog/` и т. д. — тоже обрабатываются.
+  - Поддержка **GD** (приоритет) и **Imagick** (fallback). Прозрачность PNG сохраняется.
+  - Хелпер `mediaImageSrc()` в `functions.php` — подменяет `src` на `.webp`, если файл существует.
+  - Кеш `mediaImageSrc` — в памяти на время запроса.
+  - `gif`, `svg`, `ico`, `avif` — **не конвертируются** (анимация / вектор / уже оптимизированы).
+  - По умолчанию **выключено** (создаёт файлы — согласуем явно).
+- **Секция настроек «Медиа»** в Настройках сайта:
+  - Lazy loading — вкл/выкл.
+  - WebP-конвертация — вкл/выкл + качество (1–100, по умолчанию 82).
+  - Индикатор движка (GD / Imagick) или предупреждение «не поддерживается».
+  - Статистика `.webp` (файлов, объём).
+  - Кнопка **«Удалить все .webp»** — с проверкой «есть оригинал рядом» (нативные `.webp` без пары не трогаются).
+  - Кнопка **«Конвертировать N существующих»** — AJAX-шагами с прогресс-баром, для старых картинок без `.webp`.
+- **Защита от рассинхрона** «локалка → прод»: если в `settings.json` `media_webp_enabled: true`, а на сервере GD/Imagick нет — конвертация **тихо не срабатывает**, в настройках показывается **двойное предупреждение** (галочка disabled + «была включена, отключится при сохранении»).
+
+### Изменено
+
+- **Медиа-модалка** — исправлено **drag & drop** и **клик по плиткам**: раньше слушатели навешивались через `DOMContentLoaded`, но модалка подключается **после** его срабатывания. Теперь — делегирование на `document`, работает **всегда**.
+- **`handleSaveSettings`** — сохраняет `media_lazy_enabled`, `media_webp_enabled`, `media_quality`. Защита от POST-инъекции `media_webp_enabled` при отсутствии поддержки.
+
+### Исправлено
+
+- **Медиа-модалка** — не работали выбор изображения и drag & drop (см. «Изменено»).
+- **`formatPhone`** — пустое значение возвращает `''` (было `'+'`), короткий номер (`661199`) — без `+`.
+
+### Технические детали
+
+- **Новые функции в `functions.php`**: `mediaLazyAttrs()`, `mediaImageSrc()`.
+- **Новые функции в `admin_controller.php`**: `isWebpSupported()`, `convertToWebp()`, `maybeConvertToWebp()`, `getWebpStats()`, `deleteAllWebp()`, `handleDeleteAllWebp()`, `countImagesWithoutWebp()`, `convertExistingImagesStep()`, `handleConvertExistingImagesStep()`.
+- **Новые поля в `data/settings.json`**: `media_lazy_enabled` (bool), `media_webp_enabled` (bool), `media_quality` (int).
+- **Новый файл:** `config/modules/config_vars/media.php`.
+- **Обновлено:** `config/modules/config_vars.php` (`'media'` в `$sections`), `config/js/config_vars.js` (`deleteAllWebp`, `convertExistingImages`), `config/js/media_modal.js` (делегирование), `config/index.php` (приём POST).
+
 ## [Release version 1.7.0] — 2026-10-08
 
 ### Добавлено

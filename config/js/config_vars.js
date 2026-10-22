@@ -642,6 +642,106 @@
         });
     };
     
+    // ===== МЕДИА: УДАЛЕНИЕ ВСЕХ WEBP =====
+    window.deleteAllWebp = function() {
+        if (!confirm('Удалить все сгенерированные .webp-файлы?\n\nОригиналы (jpg, png) останутся. .webp без оригинала не тронем.')) {
+            return;
+        }
+
+        var token = document.querySelector('input[name="csrf_token"]');
+        if (!token) {
+            alert('Ошибка: CSRF-токен не найден');
+            return;
+        }
+
+        fetch('index.php?tab=config_vars', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'delete_all_webp=1&csrf_token=' + encodeURIComponent(token.value)
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                alert(data.message || 'Готово.'); 
+                setTimeout(function() { window.location.reload(); }, 500);
+            } else {
+                alert(data.error || 'Ошибка удаления.');
+            }
+        })
+        .catch(function() {
+            alert('Ошибка соединения');
+        });
+    };
+    
+    // ===== МЕДИА: КОНВЕРТАЦИЯ СУЩЕСТВУЮЩИХ =====
+    window.convertExistingImages = function() {
+        if (!confirm('Конвертировать все существующие jpg/png в .webp?\n\nОригиналы сохранятся, добавится .webp рядом. Процесс может занять несколько минут.')) {
+            return;
+        }
+
+        var token = document.querySelector('input[name="csrf_token"]');
+        if (!token) {
+            alert('Ошибка: CSRF-токен не найден');
+            return;
+        }
+
+        var progressZone = document.getElementById('webp-convert-progress');
+        var statusText   = document.getElementById('webp-convert-status');
+        var percentText  = document.getElementById('webp-convert-percent');
+        var progressBar  = document.getElementById('webp-convert-bar');
+        var btn          = document.querySelector('button[onclick="window.convertExistingImages()"]');
+
+        if (btn) btn.disabled = true;
+        if (progressZone) progressZone.classList.remove('hidden');
+        if (statusText) statusText.textContent = 'Сканирование...';
+        if (percentText) percentText.textContent = '0%';
+        if (progressBar) progressBar.style.width = '0%';
+
+        var step = 0;
+        var perStep = 10;
+
+        function tick() {
+            var formData = new FormData();
+            formData.append('convert_existing_images_step', '1');
+            formData.append('step', step);
+            formData.append('per_step', perStep);
+            formData.append('csrf_token', token.value);
+
+            fetch('index.php?tab=config_vars', { method: 'POST', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        if (statusText) statusText.textContent = 'Ошибка: ' + (data.error || 'неизвестная');
+                        if (btn) btn.disabled = false;
+                        return;
+                    }
+
+                    var total = data.total;
+                    var processed = data.processed;
+                    var percent = total > 0 ? Math.round((processed / total) * 100) : 100;
+
+                    if (percentText) percentText.textContent = percent + '%';
+                    if (progressBar) progressBar.style.width = percent + '%';
+                    if (statusText) statusText.textContent = 'Обработано ' + processed + ' / ' + total;
+
+                    if (data.is_finished) {
+                        if (statusText) statusText.textContent = 'Готово. Конвертировано: ' + total;
+                        setTimeout(function() { window.location.reload(); }, 800);
+                        return;
+                    }
+
+                    step++;
+                    setTimeout(tick, 100);
+                })
+                .catch(function() {
+                    if (statusText) statusText.textContent = 'Ошибка соединения';
+                    if (btn) btn.disabled = false;
+                });
+        }
+
+        tick();
+    };
+    
     // ===== КРОН: ЗАПРОС НОВОГО ТОКЕНА (без сохранения) =====
     window.regenerateCronToken = function() {
         if (!confirm('⚠️ Сгенерировать новый токен крона?\n\nОн вступит в силу только после нажатия «Сохранить настройки». После этого все настроенные крон-задачи (бэкап, автопубликация) сломаются — придётся заново настроить планировщики на хостинге.')) {

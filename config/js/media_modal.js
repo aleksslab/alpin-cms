@@ -149,41 +149,47 @@
     };
 
     // Делегирование кликов по плиткам медиа-модалки
-    document.addEventListener('DOMContentLoaded', function() {
-        const grid = document.getElementById('media-grid');
-        if (!grid) return;
-
-        grid.addEventListener('click', function(e) {
-            const item = e.target.closest('.js-media-item');
-            if (!item) return;
-            const url = item.getAttribute('data-url');
-            if (url) {
-                window.selectImageForTarget(url);
-            }
-        });
+    // Без DOMContentLoaded — модалка может подключаться после его срабатывания.
+    document.addEventListener('click', function(e) {
+        const item = e.target.closest('.js-media-item');
+        if (!item) return;
+        const url = item.getAttribute('data-url');
+        if (url) {
+            window.selectImageForTarget(url);
+        }
     });
 
-    // Drag & Drop
-    document.addEventListener('DOMContentLoaded', function() {
-        const dropZone = document.querySelector('.modal-upload-inline-bar');
-        if (!dropZone) return;
+    // Drag & Drop — делегирование на document (модалка может подключаться после DOMContentLoaded).
+    (function initDragAndDrop() {
+        var dragEvents = ['dragenter', 'dragover', 'dragleave', 'drop'];
 
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(eventName) {
-            dropZone.addEventListener(eventName, function(e) { e.preventDefault(); }, false);
-            document.body.addEventListener(eventName, function(e) { e.preventDefault(); }, false);
+        // Глобальный preventDefault, чтобы браузер не открывал файл при промахе мимо dropZone
+        document.addEventListener('dragover', function(e) { e.preventDefault(); }, false);
+        document.addEventListener('drop', function(e) { e.preventDefault(); }, false);
+
+        // Обработка наведения/ухода/бросания — только когда цель внутри .modal-upload-inline-bar
+        dragEvents.forEach(function(eventName) {
+            document.addEventListener(eventName, function(e) {
+                var dropZone = e.target.closest ? e.target.closest('.modal-upload-inline-bar') : null;
+                if (!dropZone) return;
+
+                e.preventDefault();
+
+                if (eventName === 'dragenter' || eventName === 'dragover') {
+                    dropZone.classList.add('drag-over');
+                } else {
+                    dropZone.classList.remove('drag-over');
+                }
+
+                if (eventName === 'drop') {
+                    var dt = e.dataTransfer;
+                    if (dt && dt.files && dt.files.length > 0) {
+                        uploadImageFromDevice(dt.files);
+                    }
+                }
+            }, false);
         });
-        ['dragenter', 'dragover'].forEach(function(eventName) {
-            dropZone.addEventListener(eventName, function() { dropZone.classList.add('drag-over'); }, false);
-        });
-        ['dragleave', 'drop'].forEach(function(eventName) {
-            dropZone.addEventListener(eventName, function() { dropZone.classList.remove('drag-over'); }, false);
-        });
-        dropZone.addEventListener('drop', function(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            if (files && files.length > 0) { uploadImageFromDevice(files); }
-        }, false);
-    });
+    })();
 
     // Выносим функции в глобальную область
     window.openMediaModal = openMediaModal;

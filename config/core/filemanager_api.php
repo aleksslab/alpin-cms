@@ -582,6 +582,9 @@ if ($action === 'upload') {
         $targetPath = $currentFullPath . DIRECTORY_SEPARATOR . $finalName;
 
         if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+            // WebP-конвертация (если включена)
+            maybeConvertToWebp($targetPath);
+            
             $successCount++;
         } else {
             logAction('file_upload', 'Ошибка загрузки в папку ' . $requestedDir, 'ERROR');

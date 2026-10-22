@@ -7,7 +7,7 @@
         <div class="flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-2">
                 <?php if (!empty($site_logo)): ?>
-                    <img src="<?php echo e($site_logo); ?>" alt="<?php echo e($siteNamePlain); ?>" class="h-8 w-auto">
+                    <img src="<?php echo e(mediaImageSrc($site_logo)); ?>" <?php echo mediaLazyAttrs(); ?>alt="<?php echo e($siteNamePlain); ?>" class="h-8 w-auto">
                 <?php else: ?>
                     <span class="text-xl font-black tracking-tight text-white"><?php echo $site_name; ?></span>
                 <?php endif; ?>

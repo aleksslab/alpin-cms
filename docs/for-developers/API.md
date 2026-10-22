@@ -712,6 +712,258 @@ POST-эндпоинт для создания временного preview.
 
 ---
 
+## 🖼 Медиа
+
+### Хелперы для фронта (`functions.php`)
+
+#### `mediaLazyAttrs(): string`
+
+Возвращает строку с атрибутами lazy-загрузки для `<img>`.
+
+```php
+// media_lazy_enabled = true:
+// → 'loading="lazy" decoding="async" '
+// media_lazy_enabled = false:
+// → ''
+```
+
+**Использование:**
+```php
+<img src="..." <?php echo mediaLazyAttrs(); ?>alt="...">
+```
+
+**Не применять** к hero, carousel, slider-advanced и логотипу в хедере (LCP).
+
+---
+
+#### `mediaImageSrc(string $url): string`
+
+Подменяет `src` на `.webp`, если такой файл **существует** рядом с оригиналом.
+
+```php
+mediaImageSrc('images/photo.jpg');   // 'images/photo.webp' (если есть)
+mediaImageSrc('images/photo.jpg');   // 'images/photo.jpg' (если .webp нет)
+mediaImageSrc('images/photo.webp');  // 'images/photo.webp' (не трогает)
+mediaImageSrc('images/logo.svg');    // 'images/logo.svg' (не трогает)
+mediaImageSrc('https://cdn.com/a.jpg'); // без изменений
+mediaImageSrc('data:image/png;base64,...'); // без изменений
+```
+
+**Пропускает:** `data:`, `http(s)://`, `//`, `.webp`, `.svg`, `.avif`, `.ico`.
+
+**Результат кешируется** в памяти на время запроса (`static $cache`).
+
+**Использование:**
+```php
+<img src="<?php echo e(mediaImageSrc($url)); ?>" <?php echo mediaLazyAttrs(); ?>alt="...">
+```
+
+---
+
+### Утилиты сканирования (`admin_controller.php`)
+
+#### `getImageFiles(string $rootDir, bool $recursive = true): array`
+
+Собирает абсолютные пути к `jpg`/`jpeg`/`png` в директории.
+
+```php
+$files = getImageFiles('/path/to/images', true);
+// ['/path/to/images/a.jpg', '/path/to/images/sub/b.png', ...]
+```
+
+**`$recursive = true`** — обход **всех подпапок** через `RecursiveIteratorIterator`.
+
+**`$recursive = false`** — только верхний уровень (используется для **корня сайта**, чтобы не лезть в `css/`, `js/`, `modules/`).
+
+**Используется в:** `getWebpStats()`, `deleteAllWebp()`, `countImagesWithoutWebp()`, `convertExistingImagesStep()`.
+
+**Правило проекта:** для `images/` — **рекурсивно** (там подпапки: `products/`, `blog/`, `team/`), для **корня** — **только верхний уровень**.
+
+---
+
+### WebP-конвертация (`admin_controller.php`)
+
+#### `isWebpSupported(): bool`
+
+Проверяет доступность WebP на сервере.
+
+```php
+isWebpSupported(); // true — есть GD с imagewebp или Imagick с WebP
+                   // false — нет ни того, ни другого
+```
+
+**Результат кешируется** (`static $cache = null`).
+
+**Используется в:**
+- `handleSaveSettings` — защита от POST-инъекции `media_webp_enabled`.
+- `handleConvertExistingImagesStep` — отказ, если нет поддержки.
+- `media.php` — UI: `disabled` + предупреждения.
+
+---
+
+#### `convertToWebp(string $sourcePath, int $quality = 82): ?string`
+
+Конвертирует одно изображение в `.webp`. Создаёт файл **рядом** с оригиналом. Оригинал **не удаляет**.
+
+```php
+$webp = convertToWebp('/path/to/photo.jpg', 82);
+// '/path/to/photo.webp' или null при ошибке
+```
+
+**Что конвертирует:** `jpg`, `jpeg`, `png` (прозрачность PNG сохраняется).
+
+**Что пропускает:** `gif`, `svg`, `ico`, `avif`, `webp` (уже).
+
+**Движки:** GD (приоритет) → Imagick (fallback).
+
+**При ошибке:** возвращает `null`, чистит частичный `.webp` (если создался). **Не бросает исключений.**
+
+**Не проверяет** `isWebpSupported()` — предполагает, что поддержка уже проверена снаружи.
+
+---
+
+#### `maybeConvertToWebp(string $sourcePath): ?string`
+
+Обёртка: читает настройки и вызывает `convertToWebp()`, если включено.
+
+```php
+maybeConvertToWebp('/path/to/photo.jpg');
+// → '/path/to/photo.webp' (если media_webp_enabled = true и поддержка есть)
+// → null в остальных случаях
+```
+
+**Проверяет:**
+1. `media_webp_enabled` в `settings.json`.
+2. `isWebpSupported()` — защита от рассинхрона «локалка → прод».
+3. Берёт `media_quality` из настроек.
+
+**Используется в:** `handleAjaxImageUpload`, `filemanager_api.php → action=upload`.
+
+---
+
+### Статистика и удаление
+
+#### `getWebpStats(): array`
+
+Собирает статистику по `.webp`-файлам.
+
+```php
+$stats = getWebpStats();
+// ['count' => 42, 'size_bytes' => 1258291]
+```
+
+**Обход:**
+- `images/` — **рекурсивно** (включая подпапки: `products/`, `blog/`, `team/`).
+- корень сайта — **только верхний уровень** (логотипы, OG-картинки).
+
+**Считает только те `.webp`, у которых есть парный** `jpg`/`jpeg`/`png`. Нативные `.webp` (без оригинала) — **не считаются**.
+
+---
+
+#### `deleteAllWebp(): array`
+
+Удаляет все `.webp`, у которых есть парный оригинал. Оригиналы **не трогает**.
+
+```php
+$result = deleteAllWebp();
+// ['deleted' => 42, 'kept' => 3, 'error' => '']
+// 'kept' — .webp без оригинала (не удалены)
+```
+
+**Обход:**
+- `images/` — **рекурсивно** (включая подпапки).
+- корень сайта — **только верхний уровень**.
+
+**Защита:** удаляет `.webp` **только если** рядом есть `foo.jpg`/`foo.jpeg`/`foo.png`. Нативные `.webp` (загруженные сами по себе) — **не трогает**, считает в `kept`.
+
+**Используется в:** `handleDeleteAllWebp`.
+
+---
+
+#### `handleDeleteAllWebp(): void`
+
+AJAX-обработчик удаления всех `.webp`. Вызывается из `config/index.php` при `$_POST['delete_all_webp']`.
+
+**Возвращает JSON:**
+```json
+{
+    "success": true,
+    "deleted": 42,
+    "kept": 3,
+    "error": "",
+    "message": "Удалено .webp: 42. Оставлено (нет оригинала): 3."
+}
+```
+
+**Логирует** в `logAction` при `deleted > 0`.
+
+---
+
+### Массовая конвертация существующих
+
+#### `countImagesWithoutWebp(): int`
+
+Считает, сколько `jpg`/`png` **не имеют** парного `.webp`.
+
+```php
+countImagesWithoutWebp(); // 156
+```
+
+**Обход:**
+- `images/` — **рекурсивно** (включая подпапки).
+- корень сайта — **только верхний уровень**.
+
+**Используется в:** `media.php` — чтобы показать «Без .webp: N» и кнопку «Конвертировать N существующих».
+
+---
+
+#### `convertExistingImagesStep(int $step, int $perStep = 10): array`
+
+Обрабатывает **одну пачку** существующих изображений без `.webp`.
+
+```php
+$result = convertExistingImagesStep(0, 10);
+// [
+//   'processed'   => 10,
+//   'converted'   => 9,   // 1 могла упасть
+//   'total'       => 156,
+//   'is_finished' => false
+// ]
+```
+
+**Обход:**
+- `images/` — **рекурсивно** (включая подпапки).
+- корень сайта — **только верхний уровень**.
+
+**`$step`** — номер шага (0-based). **`$perStep`** — сколько файлов за шаг (1–50).
+
+**Порядок шагов:** JS начинает с `$step = 0`, увеличивает на 1, пока `is_finished = false`.
+
+---
+
+#### `handleConvertExistingImagesStep(): void`
+
+AJAX-обработчик шага конвертации. Вызывается из `config/index.php` при `$_POST['convert_existing_images_step']`.
+
+**Вход (POST):**
+- `step` (int) — номер шага.
+- `per_step` (int, опционально) — размер пачки, по умолчанию 10.
+
+**Возвращает JSON:**
+```json
+{
+    "success": true,
+    "processed": 20,
+    "converted": 19,
+    "total": 156,
+    "is_finished": false
+}
+```
+
+**Если `isWebpSupported() = false`** — возвращает `{success: false, error: '...'}`.
+
+---
+
 ## 🕘 История изменений
 
 ### Настройки

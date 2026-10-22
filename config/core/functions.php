@@ -117,6 +117,76 @@ function getBaseUrl(): string {
 }
 
 /**
+ * Возвращает строку с атрибутами lazy-загрузки для <img>.
+ * Пустая строка, если lazy отключён в настройках.
+ *
+ * Использование:
+ *   <img src="..." <?php echo mediaLazyAttrs(); ?> alt="...">
+ *
+ * @return string 'loading="lazy" decoding="async" ' или ''
+ */
+function mediaLazyAttrs(): string {
+    $settings = getSettingsData();
+    if (empty($settings['media_lazy_enabled'])) {
+        return '';
+    }
+    return 'loading="lazy" decoding="async" ';
+}
+
+/**
+ * Подменяет расширение изображения на .webp, если такой файл существует.
+ * Работает только для локальных относительных путей.
+ *
+ * Пропускает:
+ * - абсолютные URL (http://, https://, //)
+ * - data: URI
+ * - уже .webp, .svg, .avif, .ico
+ * - файлы, для которых нет .webp-версии
+ *
+ * Результат кешируется в памяти на время запроса.
+ *
+ * @param string $url Исходный путь (например, 'images/photo.jpg')
+ * @return string Путь к .webp или исходный путь
+ */
+function mediaImageSrc(string $url): string {
+    static $cache = [];
+
+    $url = trim($url);
+    if ($url === '') {
+        return '';
+    }
+
+    if (array_key_exists($url, $cache)) {
+        return $cache[$url];
+    }
+
+    // Внешние URL и data: не трогаем
+    if (preg_match('#^(data:|https?:|//)#i', $url)) {
+        return $cache[$url] = $url;
+    }
+
+    // Уже оптимизированные форматы — не трогаем
+    if (preg_match('#\.(webp|svg|avif|ico)$#i', $url)) {
+        return $cache[$url] = $url;
+    }
+
+    // Только jpg / jpeg / png / gif
+    if (!preg_match('#\.(jpe?g|png|gif)$#i', $url)) {
+        return $cache[$url] = $url;
+    }
+
+    // Строим путь к .webp
+    $webpUrl = preg_replace('#\.(jpe?g|png|gif)$#i', '.webp', $url);
+    $absolutePath = APP_ROOT . DIRECTORY_SEPARATOR . ltrim(str_replace('/', DIRECTORY_SEPARATOR, $webpUrl), DIRECTORY_SEPARATOR);
+
+    if (is_file($absolutePath)) {
+        return $cache[$url] = $webpUrl;
+    }
+
+    return $cache[$url] = $url;
+}
+
+/**
  * Проверяет URL на безопасность (whitelist схем).
  * 
  * @param string $url URL для проверки

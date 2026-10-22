@@ -16,7 +16,7 @@ $hasContacts = !empty($phone) || !empty($email);
         <!-- Логотип -->
         <a href="/" class="flex items-center gap-3 group">
             <?php if (!empty($site_logo)): ?>
-                <img src="<?php echo e($site_logo); ?>" alt="<?php echo e($siteNamePlain); ?>" class="h-10 w-auto">
+                <img src="<?php echo e(mediaImageSrc($site_logo)); ?>" alt="<?php echo e($siteNamePlain); ?>" class="h-10 w-auto">
             <?php else: ?>
                 <span class="text-2xl font-black tracking-tight text-slate-800 pr-4"><?php echo $site_name; ?></span>
             <?php endif; ?>

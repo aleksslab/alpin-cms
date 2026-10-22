@@ -258,7 +258,10 @@ if ($isAuth) {
         elseif (isset($_POST['restore_page_version'])) { handleRestorePageVersion($_POST['page_id'] ?? '', intval($_POST['version_ts'] ?? 0)); exit; }
         elseif (isset($_POST['delete_history_version'])) { handleDeleteHistoryVersion($_POST['page_id'] ?? '', intval($_POST['version_ts'] ?? 0)); exit; }
         elseif (isset($_POST['clear_page_history'])) { handleClearPageHistory($_POST['page_id'] ?? ''); exit; }
-        elseif (isset($_POST['clear_all_history'])) { handleClearAllHistory(); exit; }
+        elseif (isset($_POST['clear_all_history'])) { handleClearAllHistory(); exit; }        
+        
+        elseif (isset($_POST['delete_all_webp'])) { handleDeleteAllWebp(); exit; }
+        elseif (isset($_POST['convert_existing_images_step'])) { handleConvertExistingImagesStep(); exit; }
         
         elseif (isset($_POST['regenerate_seo_files'])) {
             $result = generateSeoFiles();

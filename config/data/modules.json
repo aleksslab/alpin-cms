@@ -136,6 +136,7 @@
         "icon": "icon-split",
         "description": "Слайдер для сравнения двух изображений",
         "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.0",
         "author": "AlekSSLab"
     },
