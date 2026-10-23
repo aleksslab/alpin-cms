@@ -712,6 +712,81 @@ POST-эндпоинт для создания временного preview.
 
 ---
 
+## 🚧 Технические работы
+
+### `isMaintenanceEnabled(): bool`
+
+Проверяет, включён ли режим техработ.
+
+```php
+isMaintenanceEnabled(); // true, если maintenance_enabled = true
+```
+
+**НЕ проверяет автоснятие.** Автоснятие делает **`index.php`** (фронт): если `maintenance_until` истёк — снимает флаг и пишет `settings.json`.
+
+---
+
+### `getMaintenanceBypassToken(): string`
+
+Возвращает текущий bypass-токен. Если токена нет — **генерирует** и **сохраняет** в `settings.json`.
+
+```php
+$token = getMaintenanceBypassToken(); // 32 hex
+```
+
+**Аналог `getCronToken()`** — но **отдельный** токен, **не пересекается** с кроном.
+
+---
+
+### `regenerateMaintenanceToken(): string`
+
+Принудительно генерирует **новый** токен и **сохраняет** в `settings.json`.
+
+```php
+$newToken = regenerateMaintenanceToken();
+```
+
+**Внимание:** сломает все ранее выданные bypass-ссылки.
+
+**В UI** — вызывается через **AJAX `generate_maintenance_token`**, который **генерирует без сохранения** (запись — только при «Сохранить настройки», как `cron_token`).
+
+---
+
+### AJAX-эндпоинт `generate_maintenance_token`
+
+**URL:** `index.php?tab=config_vars&ajax=generate_maintenance_token` (GET).
+
+Генерирует **новый** токен **без сохранения**. Возвращает `{success: true, token: "..."}`.
+
+Запись в `settings.json` — **только при «Сохранить настройки»** (через hidden-поле `maintenance_bypass_token`).
+
+---
+
+### Шаблон `templates/maintenance.php`
+
+**Не функция**, а **шаблон**, подключается из `index.php` при `503`.
+
+**Переменные** (из `index.php`):
+- `$maintenanceMessage` — HTML/plain (уже через `sanitizeHtml`).
+- `$maintenanceUntil` — Unix timestamp или `null`.
+- `$maintenanceShowTimer` — bool (показывать таймер).
+- `$maintenanceSettings` — весь `settings.json`.
+
+**Поведение:**
+- Inline-CSS (без Tailwind).
+- Логотип + название.
+- Сообщение (как есть).
+- Таймер (если `$maintenanceShowTimer && $maintenanceUntil > now`).
+- Контакты (email/телефон).
+- Reload через 5 сек после истечения таймера.
+
+**Заголовки** (устанавливаются в `index.php` **до** `include`):
+- `HTTP/1.1 503 Service Unavailable`
+- `Retry-After: 3600`
+- `X-Robots-Tag: noindex, nofollow, noarchive`
+
+---
+
 ## 🖼 Медиа
 
 ### Хелперы для фронта (`functions.php`)

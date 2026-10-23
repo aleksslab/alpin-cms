@@ -222,6 +222,14 @@ if ($isAuth) {
         echo json_encode(['success' => true, 'token' => $newToken]);
         exit;
     }
+    
+    // --- ГЕНЕРАЦИЯ НОВОГО BYPASS-ТОКЕНА ДЛЯ ТЕХРАБОТ (AJAX, без сохранения) ---
+    if (isset($_GET['ajax']) && $_GET['ajax'] === 'generate_maintenance_token') {
+        header('Content-Type: application/json; charset=utf-8');
+        $newToken = bin2hex(random_bytes(16));
+        echo json_encode(['success' => true, 'token' => $newToken]);
+        exit;
+    }
 
     // Блок Б: Единый барьер для ВСЕХ POST-запросов в системе (и формы, и AJAX Проводника)
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {

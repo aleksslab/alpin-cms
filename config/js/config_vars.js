@@ -742,6 +742,68 @@
         tick();
     };
     
+    // ===== ТЕХРАБОТЫ: ПЕРЕГЕНЕРАЦИЯ ТОКЕНА (без сохранения) =====
+    window.regenerateMaintenanceToken = function() {
+        if (!confirm('⚠️ Сгенерировать новый bypass-токен?\n\nОн вступит в силу только после нажатия «Сохранить настройки». После этого все ранее выданные bypass-ссылки сломаются.')) {
+            return;
+        }
+
+        fetch('index.php?tab=config_vars&ajax=generate_maintenance_token', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success || !data.token) {
+                alert('Ошибка генерации токена');
+                return;
+            }
+
+            var newToken = data.token;
+            var baseUrl = window.location.protocol + '//' + window.location.host;
+            var bypassUrl = baseUrl + '/?bypass=' + newToken;
+
+            var display = document.getElementById('maintenance-token-display');
+            if (display) display.value = newToken;
+
+            var hidden = document.getElementById('maintenance-token-hidden');
+            if (hidden) hidden.value = newToken;
+
+            // Обновить/создать поле с bypass-ссылкой
+            var urlInput = document.getElementById('maintenance-bypass-url');
+            if (urlInput) {
+                urlInput.value = bypassUrl;
+            }
+
+            if (display) {
+                display.classList.add('ring-2', 'ring-amber-300');
+                setTimeout(function() { display.classList.remove('ring-2', 'ring-amber-300'); }, 2000);
+            }
+        })
+        .catch(function() {
+            alert('Ошибка соединения');
+        });
+    };
+
+    // ===== ТЕХРАБОТЫ: КОПИРОВАНИЕ BYPASS-ССЫЛКИ =====
+    window.copyMaintenanceBypassUrl = function(btn) {
+        var input = document.getElementById('maintenance-bypass-url');
+        if (!input) return;
+
+        input.select();
+        input.setSelectionRange(0, 99999);
+
+        try {
+            navigator.clipboard.writeText(input.value).then(function() {
+                var original = btn.innerHTML;
+                btn.innerHTML = '<span class="icon-check text-sm"></span> Скопировано';
+                setTimeout(function() { btn.innerHTML = original; }, 1500);
+            });
+        } catch (e) {
+            document.execCommand('copy');
+        }
+    };
+    
     // ===== КРОН: ЗАПРОС НОВОГО ТОКЕНА (без сохранения) =====
     window.regenerateCronToken = function() {
         if (!confirm('⚠️ Сгенерировать новый токен крона?\n\nОн вступит в силу только после нажатия «Сохранить настройки». После этого все настроенные крон-задачи (бэкап, автопубликация) сломаются — придётся заново настроить планировщики на хостинге.')) {

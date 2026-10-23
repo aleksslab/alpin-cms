@@ -512,28 +512,56 @@ function handleSaveSettings(): array {
         'seo_robots_enabled'   => isset($_POST['seo_robots_enabled']) && $_POST['seo_robots_enabled'] == '1',
         'seo_auto_regenerate'  => isset($_POST['seo_auto_regenerate']) && $_POST['seo_auto_regenerate'] == '1',
         
-        // История изменений
+        // БЛОК 8: История изменений
         'history_enabled' => isset($_POST['history_enabled']) && $_POST['history_enabled'] == '1',
         'history_limit'   => max(1, min(100, intval($_POST['history_limit'] ?? 20))),
         
-        // БЛОК 8: Социальные сети (массив)
+        // БЛОК 9: Технические работы
+        'maintenance_enabled' => isset($_POST['maintenance_enabled']) && $_POST['maintenance_enabled'] == '1',
+        'maintenance_message' => sanitizeHtml(trim($_POST['maintenance_message'] ?? '')),
+        'maintenance_show_timer' => isset($_POST['maintenance_show_timer']) && $_POST['maintenance_show_timer'] == '1',
+        'maintenance_bypass_token' => (function() {
+            $posted = trim($_POST['maintenance_bypass_token'] ?? '');
+            if (preg_match('/^[a-f0-9]{32}$/i', $posted)) {
+                return $posted;
+            }
+            $settings = getSettingsData();
+            $existing = (string)($settings['maintenance_bypass_token'] ?? '');
+            if ($existing !== '' && preg_match('/^[a-f0-9]{32}$/i', $existing)) {
+                return $existing;
+            }
+            // При включении техработ — генерируем автоматически
+            $enabled = isset($_POST['maintenance_enabled']) && $_POST['maintenance_enabled'] == '1';
+            if ($enabled) {
+                return bin2hex(random_bytes(16));
+            }
+            return '';
+        })(),
+        'maintenance_until' => (function() {
+            $raw = trim($_POST['maintenance_until'] ?? '');
+            if ($raw === '') return null;
+            $ts = strtotime($raw);
+            return ($ts === false) ? null : $ts;
+        })(),
+        
+        // БЛОК 10: Социальные сети (массив)
         'socials' => $socials,
         
-        // БЛОК 9: Произвольный код
+        // БЛОК 11: Произвольный код
         'custom_css' => trim($_POST['set_custom_css'] ?? ''),
         'custom_js'  => trim($_POST['set_custom_js'] ?? ''),
     
-        // БЛОК 10: Минификация
+        // БЛОК 12: Минификация
         'assets_minify' => isset($_POST['assets_minify']) && $_POST['assets_minify'] == '1',
         'assets_combine' => isset($_POST['assets_combine']) && $_POST['assets_combine'] == '1',
         'minify_exceptions' => $minifyExceptions,
         
-        // БЛОК 11: Медиа
+        // БЛОК 13: Медиа
         'media_lazy_enabled' => isset($_POST['media_lazy_enabled']) && $_POST['media_lazy_enabled'] == '1',
         'media_webp_enabled' => isWebpSupported() && isset($_POST['media_webp_enabled']) && $_POST['media_webp_enabled'] == '1',
         'media_quality'      => max(1, min(100, intval($_POST['media_quality'] ?? 82))),
         
-        // БЛОК 12: Кеширование страниц
+        // БЛОК 14: Кеширование страниц
         'cache_enabled' => isset($_POST['cache_enabled']) && $_POST['cache_enabled'] == '1',
         'cache_ttl' => intval($_POST['cache_ttl'] ?? 86400),
         
@@ -5705,5 +5733,50 @@ function handleDeleteAllWebp(): void {
         'message' => $message,
     ], JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+/**
+ * ТЕХНИЧЕСКИЕ РАБОТЫ
+ */
+
+/**
+ * Проверяет, включён ли режим техработ.
+ * НЕ проверяет автоснятие — это делает фронт (index.php).
+ *
+ * @return bool
+ */
+function isMaintenanceEnabled(): bool {
+    $settings = getSettingsData();
+    return !empty($settings['maintenance_enabled']);
+}
+
+/**
+ * Возвращает bypass-токен для техработ.
+ * Если токена нет — генерирует и сохраняет.
+ *
+ * @return string 32 hex-символа
+ */
+function getMaintenanceBypassToken(): string {
+    $settings = getSettingsData();
+    if (!empty($settings['maintenance_bypass_token'])
+        && preg_match('/^[a-f0-9]{32}$/i', $settings['maintenance_bypass_token'])
+    ) {
+        return (string)$settings['maintenance_bypass_token'];
+    }
+    return regenerateMaintenanceToken();
+}
+
+/**
+ * Перегенерирует bypass-токен и сохраняет в settings.json.
+ * Внимание: сломает все ранее выданные bypass-ссылки.
+ *
+ * @return string Новый токен
+ */
+function regenerateMaintenanceToken(): string {
+    $token = bin2hex(random_bytes(16));
+    $settings = getSettingsData();
+    $settings['maintenance_bypass_token'] = $token;
+    saveData('settings', $settings);
+    return $token;
 }
 

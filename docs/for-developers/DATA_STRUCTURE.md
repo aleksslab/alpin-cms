@@ -93,7 +93,13 @@
 
     "media_lazy_enabled": true,
     "media_webp_enabled": false,
-    "media_quality": 82
+    "media_quality": 82,
+
+    "maintenance_enabled": false,
+    "maintenance_message": "",
+    "maintenance_show_timer": true,
+    "maintenance_until": null,
+    "maintenance_bypass_token": ""
 }
 ```
 
@@ -215,6 +221,16 @@
 | `media_lazy_enabled` | bool | Добавлять `loading="lazy"` + `decoding="async"` к контентным изображениям. По умолчанию `true`. |
 | `media_webp_enabled` | bool | Конвертировать jpg/png в `.webp` при загрузке. Требует GD или Imagick. По умолчанию `false`. |
 | `media_quality` | int | Качество WebP, 1–100. По умолчанию 82. |
+
+**Технические работы:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `maintenance_enabled` | bool | Режим техработ включён. По умолчанию `false`. |
+| `maintenance_message` | string | Сообщение на заглушке. HTML разрешён (через `sanitizeHtml`). |
+| `maintenance_show_timer` | bool | Показывать таймер на заглушке (если задан `maintenance_until`). По умолчанию `true`. |
+| `maintenance_until` | int \| null | Unix timestamp автоснятия. `null` — без автоснятия. |
+| `maintenance_bypass_token` | string | 32 hex, для `?bypass=`. Генерируется при включении режима. |
 
 **Системные привязки:**
 

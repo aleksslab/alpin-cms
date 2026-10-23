@@ -2,6 +2,81 @@
 require_once 'config/core/functions.php';
 require_once 'config/config.php';
 
+// ===== РЕЖИМ ТЕХНИЧЕСКИХ РАБОТ =====
+// Проверка автоснятия: если maintenance_until истёк — выключаем автоматически.
+$maintenanceSettings = getSettingsData();
+if (!empty($maintenanceSettings['maintenance_enabled'])
+    && !empty($maintenanceSettings['maintenance_until'])
+    && time() > (int)$maintenanceSettings['maintenance_until']
+) {
+    // Автоснятие
+        $maintenanceSettings['maintenance_enabled'] = false;
+    $maintenanceSettings['maintenance_until'] = null;
+
+    // saveData() — в admin_controller.php, на фронте недоступна.
+    // Пишем через safeFileWrite напрямую.
+    $settingsPath = DATA_DIR . 'settings.json';
+    $settingsJson = json_encode($maintenanceSettings, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    safeFileWrite($settingsPath, $settingsJson);
+
+    // Сброс кеша в памяти — чтобы getSettingsData() вернула новое
+    if (function_exists('clearDataCache')) {
+        clearDataCache('settings');
+    }
+
+    // Перечитываем settings
+    $maintenanceSettings = getSettingsData(true);
+}
+
+if (!empty($maintenanceSettings['maintenance_enabled'])) {
+    $maintenanceToken = (string)($maintenanceSettings['maintenance_bypass_token'] ?? '');
+    $isAdmin = !empty($_SESSION['admin_auth']);
+
+    // 1. Bypass по токену (?bypass=xxx)
+    $bypassParam = trim($_GET['bypass'] ?? '');
+    if ($bypassParam !== '' && $maintenanceToken !== ''
+        && preg_match('/^[a-f0-9]{32}$/i', $bypassParam)
+        && hash_equals($maintenanceToken, $bypassParam)
+    ) {
+        // Устанавливаем cookie на 24 часа
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+
+        setcookie('maintenance_bypass', '1', [
+            'expires'  => time() + 86400, // 24 часа
+            'path'     => '/',
+            'secure'   => $isHttps,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+
+        // Редирект без ?bypass
+        header('Location: /', true, 302);
+        exit;
+    }
+
+    // 2. Проверка cookie
+    $hasBypassCookie = ($_COOKIE['maintenance_bypass'] ?? '') === '1';
+
+    // 3. Если не админ и нет cookie — отдаём 503
+    if (!$isAdmin && !$hasBypassCookie) {
+        header('HTTP/1.1 503 Service Unavailable');
+        header('Retry-After: 3600');
+        header('X-Robots-Tag: noindex, nofollow, noarchive');
+        header('Content-Type: text/html; charset=utf-8');
+
+        $maintenanceMessage = (string)($maintenanceSettings['maintenance_message'] ?? '');
+        $maintenanceUntil = !empty($maintenanceSettings['maintenance_until'])
+            ? (int)$maintenanceSettings['maintenance_until']
+            : null;
+        $maintenanceShowTimer = !empty($maintenanceSettings['maintenance_show_timer']);
+
+        include __DIR__ . '/templates/maintenance.php';
+        exit;
+    }
+}
+// ===== КОНЕЦ РЕЖИМА ТЕХРАБОТ =====
+
 // --- РОУТИНГ: Определяем запрошенную страницу ---
 
 // Получаем путь из URL (например, /about, /contacts)

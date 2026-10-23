@@ -2,6 +2,51 @@
 
 Все значимые изменения проекта.
 
+## [Release version 1.9.0] — 2026-10-23
+
+### Добавлено
+
+- **Режим технических работ**:
+  - Галочка «Включить режим технических работ» в настройках.
+  - Все посетители видят заглушку с HTTP **503** (`Retry-After`, `X-Robots-Tag: noindex`).
+  - Админ (при залогиненной сессии) — видит сайт как обычно.
+  - **Bypass-ссылка** `?bypass={token}` — устанавливает cookie на 24 часа, открывает сайт в обход заглушки. Для проверки сайта перед публикацией.
+  - **Автоснятие** — опционально, по дате (`maintenance_until`). На фронте при истечении срока режим выключается автоматически, без крона.
+  - **Таймер обратного отсчёта** — если задано автоснятие и включена галочка «Показывать таймер». Формат `Д:Ч:М:С`, JS-обновление.
+  - **HTML-сообщение** — через `sanitizeHtml` (можно `p`, `h1-h4`, `a`, `ul`, `img`). Опасные теги (`<script>`, `<iframe>`, `<form>`) — вырезаются.
+  - **Страница заглушки** — `templates/maintenance.php`: логотип, название, сообщение, таймер, контакты. Inline-CSS, адаптив, без внешних зависимостей.
+- **Секция «Технические работы»** в Настройках сайта (между «Кеширование» и «История изменений»):
+  - Галочка вкл/выкл.
+  - Textarea для сообщения.
+  - `datetime-local` для автоснятия.
+  - Галочка «Показывать таймер».
+  - Bypass-токен + «Перегенерировать» + готовая ссылка + «Копировать».
+- **Новые поля в `data/settings.json`**:
+  - `maintenance_enabled` (bool, по умолчанию `false`).
+  - `maintenance_message` (string, HTML разрешён через `sanitizeHtml`).
+  - `maintenance_show_timer` (bool, по умолчанию `true`).
+  - `maintenance_until` (int|null, Unix timestamp автоснятия).
+  - `maintenance_bypass_token` (string, 32 hex, генерируется при включении).
+
+### Исправлено
+
+- **WebP-подмена для `background-image`** — в модулях `hero` и `cards` картинка задавалась через CSS-фон, а не `<img>`. Теперь используется `mediaImageSrc()`.
+  - `modules/hero.php` — фон.
+  - `modules/cards.php` — картинка карточки.
+
+### Технические детали
+
+- **Новые функции в `admin_controller.php`**: `isMaintenanceEnabled()`, `getMaintenanceBypassToken()`, `regenerateMaintenanceToken()`.
+- **Новый файл:** `config/modules/config_vars/maintenance.php`.
+- **Новый шаблон:** `templates/maintenance.php`.
+- **Обновлено:** `config_vars.php` (`'maintenance'` в `$sections`), `config/index.php` (AJAX `generate_maintenance_token`), `config/js/config_vars.js` (`regenerateMaintenanceToken`, `copyMaintenanceBypassUrl`), `index.php` (проверка режима + bypass + автоснятие).
+- **Автоснятие на фронте** — без крона. При первом запросе после `maintenance_until`:
+  - `maintenance_enabled` → `false`,
+  - `maintenance_until` → `null`,
+  - запись через `safeFileWrite` (в `index.php` нет `saveData` из `admin_controller.php`),
+  - сброс кеша `clearDataCache('settings')`.
+- **Bypass-cookie**: `maintenance_bypass=1`, 24 часа, `httponly`, `SameSite=Lax`, `secure` если HTTPS.
+
 ## [Release version 1.8.0] — 2026-10-22
 
 ### Добавлено

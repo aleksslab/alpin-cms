@@ -144,6 +144,18 @@ $requestUri = $_SERVER['REQUEST_URI'];
 $slug = trim($requestUri, '/');
 ```
 
+#### Режим технических работ
+
+Перед роутингом — проверка `maintenance_enabled`:
+
+1. **Автоснятие:** если `maintenance_until` истёк — `maintenance_enabled = false`, `maintenance_until = null`. Запись через `safeFileWrite` + `clearDataCache('settings')` (в `index.php` нет `saveData` из `admin_controller.php`).
+2. **Bypass:** `?bypass={token}` → сравнение с `maintenance_bypass_token` (`hash_equals`) → cookie `maintenance_bypass=1` на 24 часа → 302 на `/`.
+3. **Cookie:** если `maintenance_bypass=1` — **пропускаем** 503.
+4. **Админ:** если `$_SESSION['admin_auth']` — **пропускаем** 503.
+5. **503:** `HTTP/1.1 503`, `Retry-After: 3600`, `X-Robots-Tag: noindex`. `include templates/maintenance.php`. `exit`.
+
+**Важно:** проверка **до** роутинга и **до** кеша. Иначе `loadPage` / кеш **сработают зря**.
+
 **`config.php`** загружает:
 - **DEBUG_SITE**/**DEBUG_ADMIN**.
 - **Сессии** (`session_start`).
@@ -611,6 +623,9 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `countImagesWithoutWebp()` | Сколько jpg/png без .webp |
 | `convertExistingImagesStep()` | Конвертация пачки (для AJAX-шагов) |
 | `handleConvertExistingImagesStep()` | AJAX-обработчик шага конвертации |
+| `isMaintenanceEnabled()` | Режим техработ включён |
+| `getMaintenanceBypassToken()` | Bypass-токен (генерация при отсутствии) |
+| `regenerateMaintenanceToken()` | Перегенерация bypass-токена |
 
 ### `filemanager_api.php` — API проводника
 
