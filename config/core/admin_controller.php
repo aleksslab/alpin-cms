@@ -476,19 +476,31 @@ function handleSaveSettings(): array {
         'theme' => [
             'primary_color' => trim($_POST['theme_primary_color'] ?? '#10B981'),
             'primary_dark' => trim($_POST['theme_primary_dark'] ?? '#059669'),
-            'bg_main' => trim($_POST['theme_bg_main'] ?? '#FFFFFF'),
-            'bg_card' => trim($_POST['theme_bg_card'] ?? '#FFFFFF'),
-            'bg_section' => trim($_POST['theme_bg_section'] ?? '#F8FAFC'),
-            'text_main' => trim($_POST['theme_text_main'] ?? '#334155'),
-            'text_muted' => trim($_POST['theme_text_muted'] ?? '#64748B'),
-            'border_color' => trim($_POST['theme_border_color'] ?? '#F1F5F9'),
+            'light' => [
+                'bg_main' => trim($_POST['theme_light_bg_main'] ?? '#FFFFFF'),
+                'bg_card' => trim($_POST['theme_light_bg_card'] ?? '#FFFFFF'),
+                'bg_section' => trim($_POST['theme_light_bg_section'] ?? '#F8FAFC'),
+                'text_main' => trim($_POST['theme_light_text_main'] ?? '#334155'),
+                'text_muted' => trim($_POST['theme_light_text_muted'] ?? '#64748B'),
+                'border_color' => trim($_POST['theme_light_border_color'] ?? '#F1F5F9'),
+            ],
+            'dark' => [
+                'bg_main' => trim($_POST['theme_dark_bg_main'] ?? '#0F172A'),
+                'bg_card' => trim($_POST['theme_dark_bg_card'] ?? '#1E293B'),
+                'bg_section' => trim($_POST['theme_dark_bg_section'] ?? '#1E293B'),
+                'text_main' => trim($_POST['theme_dark_text_main'] ?? '#F1F5F9'),
+                'text_muted' => trim($_POST['theme_dark_text_muted'] ?? '#94A3B8'),
+                'border_color' => trim($_POST['theme_dark_border_color'] ?? '#334155'),
+            ],
         ],
+        'theme_default' => in_array($_POST['theme_default'] ?? 'light', ['light', 'dark']) ? $_POST['theme_default'] : 'light',
         
         // БЛОК 4: Настройки хедера
         'header_variant' => $_POST['header_variant'] ?? 'default',
         'header_fixed' => isset($_POST['header_fixed']) && $_POST['header_fixed'] == '1',
         'burger_enabled' => isset($_POST['burger_enabled']) && $_POST['burger_enabled'] == '1',
         'burger_breakpoint' => trim($_POST['burger_breakpoint'] ?? 'md'),
+        'theme_toggle_enabled' => isset($_POST['theme_toggle_enabled']) && $_POST['theme_toggle_enabled'] == '1',
                 
         // БЛОК 5: Настройки футера
         'footer_variant' => $_POST['footer_variant'] ?? 'default',

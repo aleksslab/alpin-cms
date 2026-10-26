@@ -229,6 +229,24 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <?php
+    // FOUC-защита: ставим data-theme="dark" до рендера body.
+    // Приоритет: localStorage('site-theme') > theme_default из настроек.
+    $themeDefault = $settings['theme_default'] ?? 'light';
+    if (!in_array($themeDefault, ['light', 'dark'], true)) {
+        $themeDefault = 'light';
+    }
+    ?>
+    <script>
+    (function() {
+        var def = '<?php echo e($themeDefault); ?>';
+        var t = localStorage.getItem('site-theme') || def;
+        if (t === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    })();
+    </script>
     
     <!-- Основные SEO -->
     <title><?php echo e($pageTitle); ?></title>
@@ -269,31 +287,38 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
     <?php endif; ?>
     
     <link href="css/style.css" rel="stylesheet" type="text/css"/>
+    <link href="css/theme.css" rel="stylesheet" type="text/css"/>
+    <link href="css/theme-dark.css" rel="stylesheet" type="text/css"/>
     <link href="fonts/lucide.css" rel="stylesheet" type="text/css"/>
     <script src="https://cdn.tailwindcss.com"></script>
 
+    <?php
+        // Палитры из настроек. Fallback — если theme.light/theme.dark нет.
+        $themeLight = getThemePalette($settings, 'light');
+        $themeDark  = getThemePalette($settings, 'dark');
+    ?>
     <style>
         :root {
             --primary-color: <?php echo e($settings['theme']['primary_color'] ?? '#10B981'); ?>;
             --primary-dark: <?php echo e($settings['theme']['primary_dark'] ?? '#059669'); ?>;
-            --bg-main: <?php echo e($settings['theme']['bg_main'] ?? '#FFFFFF'); ?>;
-            --bg-card: <?php echo e($settings['theme']['bg_card'] ?? '#FFFFFF'); ?>;
-            --bg-section: <?php echo e($settings['theme']['bg_section'] ?? '#F8FAFC'); ?>;
-            --text-main: <?php echo e($settings['theme']['text_main'] ?? '#334155'); ?>;
-            --text-muted: <?php echo e($settings['theme']['text_muted'] ?? '#64748B'); ?>;
-            --border-color: <?php echo e($settings['theme']['border_color'] ?? '#F1F5F9'); ?>;
-        }        
-        body {
-            background-color: var(--bg-main);
-            color: var(--text-main);
+            --bg-main: <?php echo e($themeLight['bg_main']); ?>;
+            --bg-card: <?php echo e($themeLight['bg_card']); ?>;
+            --bg-section: <?php echo e($themeLight['bg_section']); ?>;
+            --text-main: <?php echo e($themeLight['text_main']); ?>;
+            --text-muted: <?php echo e($themeLight['text_muted']); ?>;
+            --border-color: <?php echo e($themeLight['border_color']); ?>;
         }
-        body::selection {
-            background-color: var(--primary-color);
-            color: #ffffff;
-        }
-        body *::selection {
-            background-color: var(--primary-color);
-            color: #ffffff;
+        [data-theme="dark"] {
+            --bg-main: <?php echo e($themeDark['bg_main']); ?>;
+            --bg-card: <?php echo e($themeDark['bg_card']); ?>;
+            --bg-section: <?php echo e($themeDark['bg_section']); ?>;
+            --text-main: <?php echo e($themeDark['text_main']); ?>;
+            --text-muted: <?php echo e($themeDark['text_muted']); ?>;
+            --border-color: <?php echo e($themeDark['border_color']); ?>;
+            
+            /* Служебные переменные для тёмной темы */
+            --bg-hover: #334155;
+            --bg-input: #0F172A;
         }
         <?php echo $customCss; ?>
     </style>    
@@ -366,6 +391,9 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
     <?php endif; ?>
     
     <script src="js/script.js" type="text/javascript"></script>
+    <?php if (!empty($settings['theme_toggle_enabled'])): ?>
+        <script src="js/theme.js" type="text/javascript"></script>
+    <?php endif; ?>
     <?php foreach ($assets['js'] as $jsUrl): ?>
         <script src="<?php echo $jsUrl; ?>"></script>
     <?php endforeach; ?>

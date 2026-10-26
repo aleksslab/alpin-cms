@@ -45,19 +45,29 @@ $hasContacts = !empty($phone) || !empty($email);
                 <?php endif; ?>
             </a>
 
-            <!-- Бургер справа -->
-            <?php if (isBurgerEnabled()): ?>
-                <div class="ml-auto <?php echo $breakpoint; ?>:hidden">
+            <!-- Переключатель темы и бургер (справа) -->
+            <div class="ml-auto flex items-center gap-2">
+                <?php if (!empty($settings['theme_toggle_enabled'])): ?>
+                <button type="button" id="js-theme-toggle"
+                        class="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-all cursor-pointer flex-shrink-0"
+                        title="Переключить тему" aria-pressed="false">
+                    <span id="js-theme-icon" class="icon-moon text-lg"></span>
+                </button>
+                <?php endif; ?>
+
+                <?php if (isBurgerEnabled()): ?>
+                <div class="<?php echo $breakpoint; ?>:hidden">
                     <button onclick="toggleMobileMenu()" class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer">
                         <span id="burger-icon" class="icon-menu text-xl"></span>
                     </button>
                 </div>
-            <?php endif; ?>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
     
     <!-- Меню под логотипом -->
-    <div class="hidden <?php echo $breakpoint; ?>:block border-t border-slate-100/50">
+    <div class="hidden <?php echo $breakpoint; ?>:block">
         <div class="container mx-auto px-6">
             <nav class="flex items-center justify-center gap-8 h-12">
                 <?php echo $mainMenuHTML; ?>

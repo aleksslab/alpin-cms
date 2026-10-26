@@ -346,6 +346,80 @@ function getTemplateData(): array {
 function getSettingsData(bool $refresh = false): array { return getData('settings', $refresh); }
 
 /**
+ * Возвращает палитру темы (светлую или тёмную) из настроек.
+ *
+ * Поддерживает две структуры settings.json:
+ *   1. Вложенная: theme.light.* / theme.dark.*
+ *   2. Плоская:  theme.bg_main, theme.bg_card, ...
+ *
+ * Для светлой темы при плоской структуре — читает плоские ключи.
+ * Для тёмной темы при плоской структуре — возвращает дефолты.
+ *
+ * Ключи палитры: bg_main, bg_card, bg_section, text_main, text_muted, border_color.
+ * primary_color / primary_dark сюда НЕ входят — они общие для обеих тем.
+ *
+ * @param array  $settings Настройки сайта (из getSettingsData())
+ * @param string $mode     'light' или 'dark'
+ * @return array Ассоциативный массив с 6 ключами палитры
+ */
+function getThemePalette(array $settings, string $mode = 'light'): array {
+    if (!in_array($mode, ['light', 'dark'], true)) {
+        $mode = 'light';
+    }
+
+    $theme = $settings['theme'] ?? [];
+    if (!is_array($theme)) {
+        $theme = [];
+    }
+
+    // Дефолты на случай отсутствия ключей
+    $defaults = [
+        'light' => [
+            'bg_main'      => '#FFFFFF',
+            'bg_card'      => '#FFFFFF',
+            'bg_section'   => '#F8FAFC',
+            'text_main'    => '#334155',
+            'text_muted'   => '#64748B',
+            'border_color' => '#F1F5F9',
+        ],
+        'dark' => [
+            'bg_main'      => '#0F172A',
+            'bg_card'      => '#1E293B',
+            'bg_section'   => '#1E293B',
+            'text_main'    => '#F1F5F9',
+            'text_muted'   => '#94A3B8',
+            'border_color' => '#334155',
+        ],
+    ];
+
+    // 1. Вложенная структура: theme.light / theme.dark
+    if (isset($theme[$mode]) && is_array($theme[$mode])) {
+        $palette = $theme[$mode];
+        // Дополняем недостающие ключи дефолтами
+        foreach ($defaults[$mode] as $key => $def) {
+            if (!isset($palette[$key]) || $palette[$key] === '') {
+                $palette[$key] = $def;
+            }
+        }
+        return $palette;
+    }
+
+    // 2. Плоская структура (только для светлой)
+    if ($mode === 'light') {
+        $palette = [];
+        foreach ($defaults['light'] as $key => $def) {
+            $palette[$key] = (isset($theme[$key]) && $theme[$key] !== '')
+                ? $theme[$key]
+                : $def;
+        }
+        return $palette;
+    }
+
+    // 3. Тёмная тема при плоской структуре — дефолты
+    return $defaults['dark'];
+}
+
+/**
  * Возвращает список всех страниц (для админки)
  * 
  * @return array Массив страниц с id, title, slug, status

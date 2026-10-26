@@ -36,13 +36,25 @@
     "theme": {
         "primary_color": "#10B981",
         "primary_dark": "#059669",
-        "bg_main": "#FFFFFF",
-        "bg_card": "#FFFFFF",
-        "bg_section": "#F8FAFC",
-        "text_main": "#334155",
-        "text_muted": "#64748B",
-        "border_color": "#F1F5F9"
+        "light": {
+            "bg_main": "#FFFFFF",
+            "bg_card": "#FFFFFF",
+            "bg_section": "#F8FAFC",
+            "text_main": "#334155",
+            "text_muted": "#64748B",
+            "border_color": "#F1F5F9"
+        },
+        "dark": {
+            "bg_main": "#0F172A",
+            "bg_card": "#1E293B",
+            "bg_section": "#1E293B",
+            "text_main": "#F1F5F9",
+            "text_muted": "#94A3B8",
+            "border_color": "#334155"
+        }
     },
+    "theme_default": "light",
+    "theme_toggle_enabled": true,
 
     "header_variant": "default",
     "header_fixed": true,
@@ -126,14 +138,14 @@
 
 | Поле | Тип | Значения |
 |------|-----|----------|
-| `theme.primary_color` | string | HEX, например `#10B981` |
-| `theme.primary_dark` | string | HEX, hover-цвет кнопок |
-| `theme.bg_main` | string | HEX, фон страницы |
-| `theme.bg_card` | string | HEX, фон карточек |
-| `theme.bg_section` | string | HEX, фон секций |
-| `theme.text_main` | string | HEX, основной текст |
-| `theme.text_muted` | string | HEX, второстепенный текст |
-| `theme.border_color` | string | HEX, границы |
+| `theme.primary_color` | string | HEX, общий для обеих тем |
+| `theme.primary_dark` | string | HEX, hover-цвет, общий для обеих тем |
+| `theme.light.*` | object | Палитра светлой темы (6 цветов) |
+| `theme.dark.*` | object | Палитра тёмной темы (6 цветов) |
+| `theme_default` | string | `light` / `dark` (тема по умолчанию) |
+| `theme_toggle_enabled` | bool | Показывать переключатель в хедере |
+
+**Палитра (`light` / `dark`):** `bg_main`, `bg_card`, `bg_section`, `text_main`, `text_muted`, `border_color`.
 
 **Хедер:**
 

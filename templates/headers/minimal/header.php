@@ -19,10 +19,20 @@ $hasContacts = !empty($phone) || !empty($email);
             <?php endif; ?>
         </a>
 
-        <!-- Бургер справа -->
-        <button onclick="toggleMobileMenu()" class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer">
-            <span id="burger-icon" class="icon-menu text-xl"></span>
-        </button>
+        <!-- Переключатель темы + бургер -->
+        <div class="flex items-center gap-2">
+            <?php if (!empty($settings['theme_toggle_enabled'])): ?>
+            <button type="button" id="js-theme-toggle"
+                    class="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-all cursor-pointer flex-shrink-0"
+                    title="Переключить тему" aria-pressed="false">
+                <span id="js-theme-icon" class="icon-moon text-lg"></span>
+            </button>
+            <?php endif; ?>
+
+            <button onclick="toggleMobileMenu()" class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer">
+                <span id="burger-icon" class="icon-menu text-xl"></span>
+            </button>
+        </div>
     </div>
 
     <!-- Мобильное меню -->

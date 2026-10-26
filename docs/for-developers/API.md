@@ -119,6 +119,27 @@ $pages = getData('pages');
 
 ---
 
+### `getThemePalette(array $settings, string $mode = 'light'): array`
+
+**Возвращает палитру темы** (светлую или тёмную) из настроек.
+
+```php
+$themeLight = getThemePalette($settingsData, 'light');
+// ['bg_main' => '#FFFFFF', 'bg_card' => '#FFFFFF', ...]
+
+$themeDark = getThemePalette($settingsData, 'dark');
+// ['bg_main' => '#0F172A', 'bg_card' => '#1E293B', ...]
+```
+
+**Поддерживает две структуры `settings.json`:**
+1. Вложенная: `theme.light.*` / `theme.dark.*`.
+2. Плоская: `theme.bg_main`, `theme.bg_card`, ... — fallback для светлой темы. Для тёмной — дефолты.
+
+**Ключи палитры:** `bg_main`, `bg_card`, `bg_section`, `text_main`, `text_muted`, `border_color`.  
+**`primary_color` / `primary_dark`** — сюда **не входят** (общие для обеих тем, берутся отдельно из `$settings['theme']`).
+
+---
+
 ### `getModulesData(): array`
 
 **Читает** `config/data/modules.json` (**список** **модулей**).

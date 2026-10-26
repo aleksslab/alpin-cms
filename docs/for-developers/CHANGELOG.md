@@ -1,6 +1,27 @@
-# Changelog
-
 Все значимые изменения проекта.
+
+## [Release version 1.10.0] — 2026-10-26
+
+### Добавлено
+
+- **Тёмная тема на фронте** — поддержка светлой и тёмной палитры:
+  - Две палитры в `settings.json`: `theme.light.*` и `theme.dark.*` (по 6 цветов). Общие брендовые цвета (`primary_color`, `primary_dark`).
+  - `theme_default` — тема по умолчанию (светлая/тёмная).
+  - `theme_toggle_enabled` — переключатель темы в хедере.
+  - Inline-скрипт в `<head>` — защита от FOUC (вспышки светлой темы).
+  - `js/theme.js` — переключатель (localStorage, `data-theme` на `<html>`).
+  - `css/theme.css` — базовые светлые стили.
+  - `css/theme-dark.css` — правила для тёмной темы (фоны, текст, границы, тени, ховеры, CSS-модулей).
+  - Настройки в админке: табы «Светлая / Тёмная» с независимыми палитрами.
+- **Хелпер `getThemePalette()`** в `functions.php` — чтение палитры с fallback для старого варианта `settings.json` (плоская структура `theme.bg_main`).
+
+### Технические детали
+
+- **Новые поля в `data/settings.json`**: `theme.light.*`, `theme.dark.*`, `theme_default`, `theme_toggle_enabled`.
+- **Новые файлы**: `css/theme.css`, `css/theme-dark.css`, `js/theme.js`.
+- **Новая функция в `functions.php`**: `getThemePalette()`.
+- **Обновлено**: `index.php` (inline-скрипт, переменные, подключение), `header.php` (все 4 варианта — кнопка), `colors.php` (админка — две палитры + табы), `header.php` (админка — `theme_toggle_enabled`), `handleSaveSettings` (вложенная `theme`, `theme_default`, `theme_toggle_enabled`).
+- **Fallback**: старый `settings.json` работает без миграции (светлая тема читает плоские ключи, тёмная — дефолты).
 
 ## [Release version 1.9.0] — 2026-10-23
 
