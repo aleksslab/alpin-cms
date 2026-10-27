@@ -572,8 +572,15 @@ function handleSaveSettings(): array {
         'media_lazy_enabled' => isset($_POST['media_lazy_enabled']) && $_POST['media_lazy_enabled'] == '1',
         'media_webp_enabled' => isWebpSupported() && isset($_POST['media_webp_enabled']) && $_POST['media_webp_enabled'] == '1',
         'media_quality'      => max(1, min(100, intval($_POST['media_quality'] ?? 82))),
+
+        // БЛОК 14: Хлебные крошки
+        'breadcrumbs_enabled'         => isset($_POST['breadcrumbs_enabled']) && $_POST['breadcrumbs_enabled'] == '1',
+        'breadcrumbs_show_on_home'    => isset($_POST['breadcrumbs_show_on_home']) && $_POST['breadcrumbs_show_on_home'] == '1',
+        'breadcrumbs_show_home_root'  => isset($_POST['breadcrumbs_show_home_root']) && $_POST['breadcrumbs_show_home_root'] == '1',
+        'breadcrumbs_home_label'      => trim($_POST['breadcrumbs_home_label'] ?? 'Главная'),
+        'breadcrumbs_separator'       => in_array($_POST['breadcrumbs_separator'] ?? '/', ['/', '>', '→', '•', '|']) ? $_POST['breadcrumbs_separator'] : '/',
         
-        // БЛОК 14: Кеширование страниц
+        // БЛОК 15: Кеширование страниц
         'cache_enabled' => isset($_POST['cache_enabled']) && $_POST['cache_enabled'] == '1',
         'cache_ttl' => intval($_POST['cache_ttl'] ?? 86400),
         

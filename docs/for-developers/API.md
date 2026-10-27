@@ -259,6 +259,26 @@ $result = getPagesListPaginated(1, 25);
 
 ## 🎨 Рендер
 
+### `renderBreadcrumbs(array $page): string`
+
+**Рендерит хлебные крошки** для текущей страницы.
+
+```php
+echo renderBreadcrumbs($page);
+```
+
+**Логика:**
+1. Проверяет `breadcrumbs_enabled` в настройках.
+2. Если текущая страница — главная, проверяет `breadcrumbs_show_on_home` (если выключено — возвращает пустую строку).
+3. Ищет страницу в `main_menu` (рекурсивно по `children`).
+4. Если находит — строит цепочку от корня. Если нет — `[Корень] → Заголовок страницы`.
+5. Учитывает настройки: показывать ли корень (`breadcrumbs_show_home_root`), текст корня (`breadcrumbs_home_label`), разделитель (`breadcrumbs_separator`).
+6. Возвращает HTML с микроразметкой Schema.org (`BreadcrumbList`).
+
+**Важно:** если цепочка пустая (например, на главной при выключенном корне) — возвращает пустую строку.
+
+---
+
 ### `render_module(string $moduleId, array $moduleData = [], array $settings = []): string`
 
 **Рендерит** **модуль** **на** **фронте**.

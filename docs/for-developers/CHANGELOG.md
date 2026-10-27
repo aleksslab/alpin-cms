@@ -1,5 +1,23 @@
 Все значимые изменения проекта.
 
+## [Release version 1.11.0] — 2026-10-27
+
+### Добавлено
+
+- **Хлебные крошки** — навигационная цепочка для страниц:
+  - Строятся автоматически на основе главного меню (`main_menu`).
+  - Если страница не найдена в меню — выводится «Корень → Заголовок».
+  - Микроразметка Schema.org (`BreadcrumbList`) для SEO.
+  - Настройки: включение, показ на главной, показ корня, текст корня, разделитель (`/`, `>`, `→`, `•`, `|`).
+  - Выводятся внутри зоны `main` (до первого ряда), чтобы не ломать hero-секции.
+  - Не имеют жёстких классов-обёрток — стилизуются через Custom CSS.
+
+### Технические детали
+
+- **Новая функция в `functions.php`**: `renderBreadcrumbs(array $page): string`.
+- **Новые поля в `data/settings.json`**: `breadcrumbs_enabled`, `breadcrumbs_show_on_home`, `breadcrumbs_show_home_root`, `breadcrumbs_home_label`, `breadcrumbs_separator`.
+- **Обновлено**: `config/modules/config_vars/visual.php` (секция настроек), `handleSaveSettings` (сохранение), `templates/base.php` (вывод), `css/theme.css` (базовые стили).
+
 ## [Release version 1.10.0] — 2026-10-26
 
 ### Добавлено

@@ -74,5 +74,8 @@ desktop.ini
 /modules/*.php 
 /js/*.js
 !/js/script.js
+!/js/theme.js
 /css/*.css
 !/css/style.css
+!/css/theme.css
+!/css/theme-dark.css

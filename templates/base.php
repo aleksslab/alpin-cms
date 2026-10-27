@@ -93,6 +93,11 @@ if (!empty($pageRows)) {
             echo '<div class="' . e($zoneClass) . '">';
         }
         
+        // Хлебные крошки (только в основной зоне)
+        if ($zoneName === 'main' && function_exists('renderBreadcrumbs')) {
+            echo renderBreadcrumbs($page);
+        }
+        
         foreach ($zoneRows as $row) {
             $rowId = $row['id'] ?? '';
             $rowClass = $row['settings']['class'] ?? '';

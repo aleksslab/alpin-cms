@@ -420,6 +420,39 @@ chmod 755 data/ config/data/ cache/
 - **Ctrl+F5**.
 - **Открой** **DevTools** → **Network** → **проверь** **404**.
 
+### Хлебные крошки выбиваются из дизайна
+
+**Причина:** крошки выводятся как системный элемент, и по умолчанию у них есть базовые отступы, которые могут не совпадать с отступами ваших секций (если вы используете нестандартные классы для рядов).
+
+**Решение:** добавьте кастомные стили в **Настройки сайта** → **Произвольный код** → **Custom CSS**.
+
+Пример для стандартной секции с `px-12 md:px-24` и контейнером `max-w-7xl`:
+
+```css
+.breadcrumbs-nav {
+    padding-left: 3rem;
+    padding-right: 3rem;
+    padding-top: 1.5rem;
+    padding-bottom: 0.5rem;
+}
+@media (min-width: 768px) {
+    .breadcrumbs-nav {
+        padding-left: 6rem;
+        padding-right: 6rem;
+    }
+}
+.breadcrumbs-nav ol {
+    max-width: 80rem;
+    margin: 0 auto;
+    width: 100%;
+}
+@media (min-width: 640px) {
+    .breadcrumbs-nav ol {
+        width: 75%;
+    }
+}
+```
+
 ---
 
 ## 🔐 Безопасность

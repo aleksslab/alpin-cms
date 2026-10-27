@@ -1446,3 +1446,129 @@ function getCombinedAssets($moduleIds, $settings, $pageId = 'home') {
         'js' => !empty($jsContent) ? [$jsUrl . '?v=' . time()] : []
     ];
 }
+
+/**
+ * Рендерит хлебные крошки для текущей страницы.
+ *
+ * Ищет страницу в главном меню (main_menu) по её slug.
+ * Если находит — строит цепочку от корня до текущей страницы.
+ * Если не находит — выводит только корень и заголовок текущей страницы.
+ *
+ * @param array $page Массив данных текущей страницы
+ * @return string HTML-код крошек (или пустая строка, если выключены)
+ */
+function renderBreadcrumbs(array $page): string {
+    $settings = getSettingsData();
+    
+    // 1. Проверка глобального включения
+    if (empty($settings['breadcrumbs_enabled'])) {
+        return '';
+    }
+
+    $homeId = getHomePageId();
+    $currentPageId = $page['id'] ?? '';
+    
+    // 2. Проверка на главную страницу (если крошки на главной выключены)
+    if ($currentPageId === $homeId && empty($settings['breadcrumbs_show_on_home'])) {
+        return '';
+    }
+
+    $homeLabel = $settings['breadcrumbs_home_label'] ?? 'Главная';
+    $separator = $settings['breadcrumbs_separator'] ?? '/';
+    $showRoot  = !empty($settings['breadcrumbs_show_home_root']);
+    
+    // 3. Подготовка пути
+    $path = []; // Массив: ['label' => '...', 'url' => '...']
+    $currentSlug = $page['slug'] ?? '';
+    $menuId = getMainMenuId();
+    
+    if ($menuId) {
+        $menuItems = getMenuItems($menuId);
+        $foundPath = null;
+        
+        // Рекурсивный поиск страницы в дереве меню
+        $findInMenu = function(array $items, array $currentPath) use (&$findInMenu, $currentSlug) {
+            foreach ($items as $item) {
+                $itemType = $item['type'] ?? 'page';
+                $itemPageId = ltrim($item['page_id'] ?? '', '/'); // Убираем слеш для сравнения
+                
+                if ($itemType === 'page') {
+                    // Если нашли совпадение по slug (или если slug пустой и это главная)
+                    if (($currentSlug === '' && $itemPageId === getHomePageId()) || ($currentSlug !== '' && $itemPageId === $currentSlug)) {
+                        return $currentPath; // Возвращаем накопленный путь (без текущего)
+                    }
+                }
+                
+                if (!empty($item['children'])) {
+                    $result = $findInMenu($item['children'], array_merge($currentPath, [[
+                        'label' => $item['label'] ?? '',
+                        'url'   => $item['url'] ?? ''
+                    ]]));
+                    if ($result !== null) {
+                        return $result;
+                    }
+                }
+            }
+            return null;
+        };
+        
+        $foundPath = $findInMenu($menuItems, []);
+        
+        if ($foundPath !== null) {
+            $path = $foundPath;
+        }
+    }
+
+    // 4. Формирование HTML
+    $html = '<nav aria-label="breadcrumb" class="breadcrumbs-nav text-sm text-slate-500 mb-4">';
+    $html .= '<ol class="flex flex-wrap items-center gap-2" itemscope itemtype="https://schema.org/BreadcrumbList">';
+    
+    $position = 1;
+
+    // Корень
+    if ($showRoot) {
+        $html .= '<li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">';
+        $html .= '<a href="/" itemprop="item" class="hover:text-[var(--primary-color)] transition-colors">';
+        $html .= '<span itemprop="name">' . e($homeLabel) . '</span></a>';
+        $html .= '<meta itemprop="position" content="' . $position++ . '" />';
+        $html .= '</li>';
+        
+        // Разделитель, если есть что-то после корня
+        if (!empty($path) || $currentSlug !== '') {
+            $html .= '<li class="text-slate-300 select-none" aria-hidden="true">' . e($separator) . '</li>';
+        }
+    }
+
+    // Промежуточные пункты из меню
+    foreach ($path as $index => $crumb) {
+        $html .= '<li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">';
+        if (!empty($crumb['url'])) {
+            $html .= '<a href="' . e(safeUrl($crumb['url'])) . '" itemprop="item" class="hover:text-[var(--primary-color)] transition-colors">';
+            $html .= '<span itemprop="name">' . e($crumb['label']) . '</span></a>';
+        } else {
+            $html .= '<span itemprop="name">' . e($crumb['label']) . '</span>';
+        }
+        $html .= '<meta itemprop="position" content="' . $position++ . '" />';
+        $html .= '</li>';
+        $html .= '<li class="text-slate-300 select-none" aria-hidden="true">' . e($separator) . '</li>';
+    }
+
+    // Текущая страница
+    if ($currentPageId !== $homeId || !empty($path)) {
+        $html .= '<li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem" class="text-slate-800 font-medium" aria-current="page">';
+        $html .= '<span itemprop="name">' . e($page['title'] ?? 'Страница') . '</span>';
+        $html .= '<meta itemprop="position" content="' . $position . '" />';
+        $html .= '</li>';
+    }
+
+    $html .= '</ol>';
+    $html .= '</nav>';    
+
+    // Если цепочка пустая (например, главная без корня) — не выводим ничего
+    if (!$showRoot && empty($path) && $currentPageId === $homeId) {
+        return '';
+    }
+
+    return $html;
+}
+

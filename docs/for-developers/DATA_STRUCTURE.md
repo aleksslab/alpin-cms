@@ -107,6 +107,12 @@
     "media_webp_enabled": false,
     "media_quality": 82,
 
+    "breadcrumbs_enabled": false,
+    "breadcrumbs_show_on_home": false,
+    "breadcrumbs_show_home_root": true,
+    "breadcrumbs_home_label": "Главная",
+    "breadcrumbs_separator": "/",
+
     "maintenance_enabled": false,
     "maintenance_message": "",
     "maintenance_show_timer": true,
@@ -233,6 +239,16 @@
 | `media_lazy_enabled` | bool | Добавлять `loading="lazy"` + `decoding="async"` к контентным изображениям. По умолчанию `true`. |
 | `media_webp_enabled` | bool | Конвертировать jpg/png в `.webp` при загрузке. Требует GD или Imagick. По умолчанию `false`. |
 | `media_quality` | int | Качество WebP, 1–100. По умолчанию 82. |
+
+**Хлебные крошки:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `breadcrumbs_enabled` | bool | Показывать крошки на сайте. По умолчанию `false`. |
+| `breadcrumbs_show_on_home` | bool | Показывать крошки на главной странице. По умолчанию `false`. |
+| `breadcrumbs_show_home_root` | bool | Выводить «Главная» в начале цепочки. По умолчанию `true`. |
+| `breadcrumbs_home_label` | string | Текст для главной страницы. По умолчанию `"Главная"`. |
+| `breadcrumbs_separator` | string | Разделитель между пунктами (`/`, `>`, `→`, `•`, `|`). По умолчанию `"/"`. |
 
 **Технические работы:**
 
