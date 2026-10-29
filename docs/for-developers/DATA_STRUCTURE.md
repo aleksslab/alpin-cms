@@ -91,7 +91,10 @@
     "minify_exceptions": {},
 
     "cache_enabled": false,
-    "cache_ttl": 86400,
+    "cache_ttl": 86400,,
+    
+    "config_sections_order": [],
+    "config_sections_hidden": [],
 
     "home_page_id": "home",
     "main_menu": "header_main"
@@ -225,6 +228,13 @@
 |------|-----|----------|
 | `cache_enabled` | bool | Кеширование HTML-страниц |
 | `cache_ttl` | int | TTL кеша в секундах. `0` — бессрочно до изменения страницы. |
+
+**Настройки вывода секций:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| config_sections_order | array | Порядок секций в настройках |
+| config_sections_hidden | array | Скрытые секции |
 
 **История изменений:**
 

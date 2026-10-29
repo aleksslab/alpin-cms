@@ -529,6 +529,14 @@ function handleSaveSettings(): array {
         'cache_enabled' => isset($_POST['cache_enabled']) && $_POST['cache_enabled'] == '1',
         'cache_ttl' => intval($_POST['cache_ttl'] ?? 86400),
         
+        // БЛОК 12: Кеширование страниц
+        'cache_enabled' => isset($_POST['cache_enabled']) && $_POST['cache_enabled'] == '1',
+        'cache_ttl' => intval($_POST['cache_ttl'] ?? 86400),
+
+        // БЛОК 13: Порядок и видимость секций
+        'config_sections_order' => json_decode($_POST['config_sections_order_json'] ?? '[]', true) ?: [],
+        'config_sections_hidden' => json_decode($_POST['config_sections_hidden_json'] ?? '[]', true) ?: [],
+        
         // === СОХРАНЯЕМ ПОЛЯ, КОТОРЫЕ НЕ В ФОРМЕ ===
         'home_page_id' => getHomePageId(),
         'main_menu'    => getMainMenuId(),

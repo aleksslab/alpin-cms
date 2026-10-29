@@ -194,6 +194,61 @@ add_filter('save_settings_data', function($newSettings) {
 
 ---
 
+## 🧩 Добавление своей секции в «Настройки сайта»
+
+Если плагину нужна собственная секция в общих настройках (а не отдельная вкладка), он может зарегистрировать её через `register_plugin_section()`. Ядро автоматически добавит её в общий аккордеон, отсортирует и покажет в модалке «Настроить разделы».
+
+### 1. Регистрация в `plugin.php`
+
+```php
+register_plugin_section('my-plugin', 'Мой плагин', function() {
+    // Вывод HTML секции
+    include __DIR__ . '/admin-section.php';
+});
+```
+
+**Аргументы:**
+- `$id` — уникальный ID секции (совпадает с ID плагина).
+- `$title` — заголовок в аккордеоне.
+- `$callback` — функция, которая выводит HTML.
+
+### 2. Файл `admin-section.php`
+
+Создай в папке плагина файл `admin-section.php` и выведи в нём поля. Форма должна отправляться на `index.php?tab=config_vars` с `save_settings=1`.
+
+```php
+<?php
+if (!defined('APP_ROOT') || empty($_SESSION['admin_auth'])) {
+    die('Доступ запрещен');
+}
+$settings = getSettingsData();
+$token = $_SESSION['csrf_token'];
+?>
+
+<div class="border border-slate-200 rounded-2xl overflow-hidden">
+    <div class="section-header bg-slate-50 px-4 py-3 border-b border-slate-100 flex items-center justify-between cursor-pointer hover:bg-slate-100/50 transition-colors" onclick="window.toggleSection(this)">
+        <div class="flex items-center gap-3">
+            <span class="section-arrow icon-chevron-right text-xs text-slate-400"></span>
+            <span class="text-sm font-bold text-slate-700">Мой плагин</span>
+        </div>
+    </div>
+    <div class="section-content p-6 bg-slate-50 hidden">
+        <input type="hidden" name="csrf_token" value="<?php echo $token; ?>">
+        
+        <!-- Твои поля -->
+        <input type="text" name="my_plugin_setting" value="<?php echo e($settings['my_plugin_setting'] ?? ''); ?>">
+    </div>
+</div>
+```
+
+### 3. Сохранение настроек
+
+Добавь в `plugin.php` фильтр `save_settings_data` (как описано выше в разделе «Сохранение настроек»). Поля из `admin-section.php` будут автоматически переданы в `$_POST`.
+
+**Важно:** Пользователь может **перемещать** секцию (вверх/вниз) и **скрывать** её через кнопку «Настроить разделы» в шапке «Настроек сайта». Порядок и видимость сохраняются в `settings.json` (`config_sections_order`, `config_sections_hidden`).
+
+---
+
 ## 🖥 `admin-page.php` — страница в админке
 
 Если у плагина есть `admin_tab` в манифесте, ядро будет искать этот файл.

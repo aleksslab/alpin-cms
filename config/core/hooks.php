@@ -158,3 +158,36 @@ function add_admin_tab(string $id, string $title, string $icon = 'icon-puzzle', 
         'visible' => true
     ];
 }
+
+/**
+ * Регистрирует секцию настроек от плагина.
+ *
+ * @param string   $id       Уникальный ID секции (латиница, цифры, дефис)
+ * @param string   $title    Заголовок секции
+ * @param callable $callback Функция, которая выведет HTML секции
+ * @return void
+ */
+function register_plugin_section(string $id, string $title, callable $callback): void {
+    if (!preg_match('/^[a-z0-9\-_]+$/i', $id)) {
+        return;
+    }
+    
+    if (!isset($GLOBALS['cms_plugin_sections'])) {
+        $GLOBALS['cms_plugin_sections'] = [];
+    }
+    
+    $GLOBALS['cms_plugin_sections'][$id] = [
+        'id' => $id,
+        'title' => $title,
+        'callback' => $callback
+    ];
+}
+
+/**
+ * Возвращает все зарегистрированные секции плагинов.
+ *
+ * @return array
+ */
+function get_plugin_sections(): array {
+    return $GLOBALS['cms_plugin_sections'] ?? [];
+}

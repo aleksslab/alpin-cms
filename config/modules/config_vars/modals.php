@@ -48,3 +48,31 @@
         </div>
     </div>
 </div>
+
+<!-- Модалка настройки разделов -->
+<div id="sections-settings-modal" class="modal-backdrop-fixed">
+    <div class="modal-content-card" style="max-width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
+        
+        <!-- Шапка -->
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 flex-shrink-0">
+            <div>
+                <h3 class="text-base font-bold text-slate-800">Настройка разделов</h3>
+                <p class="text-xs text-slate-400 mt-1">Перемещайте разделы и скрывайте ненужные.</p>
+            </div>
+            <button type="button" onclick="closeSectionsModal()" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-400 rounded-lg hover:text-slate-600 transition-all cursor-pointer">
+                <span class="icon-x text-xl"></span>
+            </button>
+        </div>
+        
+        <!-- Список -->
+        <div class="p-4 overflow-y-auto flex-1" id="sections-list-container">
+            <!-- Список будет сгенерирован через JS -->
+        </div>
+        
+        <!-- Кнопки -->
+        <div class="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2 flex-shrink-0">
+            <button type="button" onclick="closeSectionsModal()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition cursor-pointer">Отмена</button>
+            <button type="button" onclick="saveSectionsSettings()" class="px-6 py-2 bg-[var(--primary-color)] text-white font-bold rounded-xl hover:bg-[var(--primary-dark)] transition shadow-lg shadow-[var(--primary-color)]/20">Применить</button>
+        </div>
+    </div>
+</div>
