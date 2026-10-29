@@ -20,8 +20,8 @@
         },
         "test-tab": {
             "type": "plugin",
-            "name": "Тестовая вкладка",
-            "description": "Проверка admin_tab в манифесте",
+            "name": "Тестовый плагин",
+            "description": "Пример для разработки собственных расширений.",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_test-tab.zip"
         },
