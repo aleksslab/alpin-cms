@@ -1,0 +1,19 @@
+# Защита кеша от прямого доступа
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order Deny,Allow
+    Deny from all
+</IfModule>
+
+# Разрешаем объединённые CSS/JS (подключаются с фронта)
+<FilesMatch "\.(css|js)$">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Allow from all
+    </IfModule>
+</FilesMatch>

@@ -1,0 +1,1737 @@
+# API функций AlPin CMS
+
+## 🛠 Утилиты
+
+### `e(?string $str): string`
+
+**HTML-escape** для безопасного вывода.
+
+```php
+echo e($page['title']);  // &lt;script&gt; → &amp;lt;script&amp;gt;
+```
+
+**Использует** `htmlspecialchars` с `ENT_QUOTES | UTF-8`.
+
+---
+
+### `escapeJsString(?string $str): string`
+
+**JS-escape** для безопасной вставки в строку внутри HTML-атрибута.
+
+```php
+<button onclick="deleteModule('<?php echo escapeJsString($id); ?>')">
+```
+
+**Заменяет:** `\`, `'`, `"`, `\n`, `\r`, `<`, `>`, `&`.
+
+---
+
+### `safeUrl(string $url): string`
+
+**Whitelist схем URL.** Возвращает `#` при опасной схеме.
+
+```php
+$url = safeUrl('javascript:alert(1)');  // '#'
+$url = safeUrl('/about');               // '/about'
+$url = safeUrl('https://google.com');   // 'https://google.com'
+```
+
+**Разрешает:** `/path`, `#anchor`, `http(s)://`, `mailto:`, `tel:`.  
+**Запрещает:** `javascript:`, `data:`, `vbscript:`.
+
+---
+
+### `validateHtml(string $html): ?string`
+
+**Проверка HTML** на опасные конструкции.  
+Возвращает **текст ошибки** или `null`.
+
+```php
+$error = validateHtml('<script>alert(1)</script>');
+// 'Обнаружено недопустимое содержимое: тег <script>'
+```
+
+**Проверяет** **после** `html_entity_decode` (**защита** **от** **обфускации**):
+- `<script>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<meta>`, `<link>`
+- `on*="..."` (**события**)
+- `javascript:`, `vbscript:`, `data:text/html`
+- `expression(...)`
+- `\x..`, `\u....`
+
+---
+
+### `sanitizeHtml(string $html): string`
+
+**Очистка HTML** — **whitelist** **тегов**.
+
+```php
+$clean = sanitizeHtml('<p>OK</p><script>bad</script>');
+// '<p>OK</p>'
+```
+
+**Разрешает:** `b, i, u, strong, em, span, ul, ol, li, p, br, a, h1-h4`.  
+**Убирает** **опасные** **атрибуты** (`on*`, `style`, `srcdoc`, `formaction`).
+
+---
+
+### `formatPhone(string $phone): string`
+
+**Форматирует** **номер** **в** **читаемый** **вид**.
+
+```php
+echo formatPhone('79001234567');  // +7 (900) 123-45-67
+echo formatPhone('+7 900 123 45 67');  // +7 (900) 123-45-67
+```
+
+---
+
+### `safeFileWrite(string $path, string $content, bool $append = false): bool`
+
+**Атомарная** **запись** **с** **блокировкой** (`flock`).
+
+```php
+safeFileWrite($path, $json, false);  // перезапись
+safeFileWrite($logFile, $line, true);  // append
+```
+
+**Защита** **от** **race** **condition**.
+
+---
+
+## 📖 Чтение данных
+
+### `getData(string $fileName, bool $refresh = false): array`
+
+**Читает** JSON **из** `data/{fileName}.json` **с** **кешем** **в** **памяти**.
+
+```php
+$settings = getData('settings');
+$pages = getData('pages');
+```
+
+**Кеш** — **`$GLOBALS['DATA_CACHE']`** (**сброс** **при** `$refresh = true`).
+
+---
+
+### `getSettingsData(bool $refresh = false): array`
+
+**Обёртка** `getData('settings')`.
+
+---
+
+### `getThemePalette(array $settings, string $mode = 'light'): array`
+
+**Возвращает палитру темы** (светлую или тёмную) из настроек.
+
+```php
+$themeLight = getThemePalette($settingsData, 'light');
+// ['bg_main' => '#FFFFFF', 'bg_card' => '#FFFFFF', ...]
+
+$themeDark = getThemePalette($settingsData, 'dark');
+// ['bg_main' => '#0F172A', 'bg_card' => '#1E293B', ...]
+```
+
+**Поддерживает две структуры `settings.json`:**
+1. Вложенная: `theme.light.*` / `theme.dark.*`.
+2. Плоская: `theme.bg_main`, `theme.bg_card`, ... — fallback для светлой темы. Для тёмной — дефолты.
+
+**Ключи палитры:** `bg_main`, `bg_card`, `bg_section`, `text_main`, `text_muted`, `border_color`.  
+**`primary_color` / `primary_dark`** — сюда **не входят** (общие для обеих тем, берутся отдельно из `$settings['theme']`).
+
+---
+
+### `getModulesData(): array`
+
+**Читает** `config/data/modules.json` (**список** **модулей**).
+
+---
+
+### `getTemplateData(): array`
+
+**Читает** `config/data/templates.json`.
+
+---
+
+### `loadModule(string $id): ?array`
+
+**Загружает** **описание** **модуля** **из** `config/data/modules.json`.
+
+---
+
+## 📄 Загрузка контента
+
+### `loadPage(string $slug): ?array`
+
+**Загружает** **страницу** **по** **slug**.
+
+```php
+$page = loadPage('about');
+```
+
+**Валидация** **slug** (**regex**, **без** `..`).  
+**Проверка** `status === 'published'`.  
+**Проверка** `unpublish_at`: если задан и уже наступил — возвращает `null` (подстраховка от задержки cron).
+
+---
+
+### `loadPageById(string $id): ?array`
+
+**Загружает** **страницу** **по** **ID** (**без** **проверки** **статуса**).
+
+---
+
+### `loadTemplate(string $id): ?array`
+
+**Загружает** **шаблон** **из** `templates.json`.
+
+---
+
+### `getTemplateZones(string $templateId): array`
+
+**Зоны** **шаблона** (**main**, **sidebar-left**, **sidebar-right**, **hero**).
+
+---
+
+### `getPagesList(): array`
+
+**Все** **страницы** (**для** **меню**, **селектов**).
+
+---
+
+### `getPagesListPaginated(int $page, int $perPage): array`
+
+**С** **пагинацией**.
+
+```php
+$result = getPagesListPaginated(1, 25);
+// ['pages' => [...], 'total' => 100, 'page' => 1, 'totalPages' => 4]
+```
+
+---
+
+### `getMenusList(): array`
+
+**Все** **меню** **из** `data/menus/*.json`.
+
+---
+
+### `loadMenu(string $id): ?array`
+
+**Загружает** **меню** **по** **ID**.
+
+---
+
+### `getMenuItems(string $menuId): array`
+
+**Пункты** **меню**.
+
+---
+
+### `getMainMenuId(): ?string`
+
+**ID** **главного** **меню**.
+
+---
+
+### `getHomePageId(): string`
+
+**ID** **главной** **страницы**.
+
+---
+
+### `getUsedModules(array $page): array`
+
+**Уникальные** **ID** **модулей** **на** **странице**.
+
+---
+
+### `isModuleInstalled(string $id): bool`
+
+**Установлен** **ли** **модуль** (**распакован**).
+
+---
+
+### `findModuleUsage(string $id): array`
+
+**Где** **используется** **модуль** (**список** **страниц**).
+
+---
+
+## 🎨 Рендер
+
+## 🪝 Хуки и Плагины
+
+### `add_action(string $hook, callable $callback, int $priority = 10): void`
+
+**Добавляет обработчик события (действия).**
+
+```php
+add_action('index_start', function() {
+    // Код, который выполнится в начале index.php
+});
+```
+
+---
+
+### `do_action(string $hook, ...$args): void`
+
+**Выполняет событие (действие).** Все обработчики вызываются по очереди.
+
+```php
+do_action('admin_init');
+```
+
+---
+
+### `add_filter(string $hook, callable $callback, int $priority = 10): void`
+
+**Добавляет фильтр (модификатор данных).**
+
+```php
+add_filter('page_title', function($title, $page) {
+    return $title . ' | Мой плагин';
+});
+```
+
+---
+
+### `apply_filters(string $hook, $value, ...$args)`
+
+**Применяет фильтры к значению.**
+
+```php
+$title = apply_filters('page_title', $pageTitle, $page);
+```
+
+---
+
+### `add_route(string $pattern, callable $callback): void`
+
+**Регистрирует кастомный маршрут.** Вызывается в `router.php` (если страница не найдена).
+
+```php
+add_route('/callback', function() {
+    echo 'Callback page';
+    exit;
+});
+```
+
+---
+
+### `dispatch_custom_route(string $slug): bool`
+
+**Ищет кастомный маршрут и выполняет его.** Возвращает `true`, если маршрут найден.
+
+```php
+if (dispatch_custom_route($slug)) {
+    exit;
+}
+```
+
+---
+
+### `add_admin_tab(string $id, string $title, string $icon = 'icon-puzzle', string $group = 'system'): void`
+
+**Добавляет вкладку в сайдбар админки.** Обычно вызывается автоматически из `plugin.json` при загрузке плагина.
+
+```php
+add_admin_tab('updates', 'Обновления', 'icon-refresh-cw', 'system');
+```
+
+---
+
+### `getPluginsData(): array`
+
+**Возвращает список плагинов и их статусов из `config/data/plugins.json`.**
+
+---
+
+### `syncPluginsData(): array`
+
+**Синхронизирует папку плагинов с `plugins.json`.** Читает `plugin.json` и обновляет метаданные (включая `admin_tab`).
+
+---
+
+### `loadActivePlugins(): void`
+
+**Подключает файлы `plugin.php` для всех активных плагинов.** Вызывается в `index.php` и `config/index.php`.
+
+---
+
+### `isPluginActive(string $id): bool`
+
+**Проверяет, активен ли конкретный плагин.**
+
+---
+
+### `save_plugin_settings(array &$newSettings, string $triggerField, array $defaults = [], array $fields = []): void`
+
+**Безопасно сохраняет настройки плагина.** Если форма плагина не отправлялась (поле `$triggerField` отсутствует в POST), сохраняет старые значения из `settings.json`, предотвращая их затирание.
+
+---
+
+### `renderBreadcrumbs(array $page): string`
+
+**Рендерит хлебные крошки** для текущей страницы.
+
+```php
+echo renderBreadcrumbs($page);
+```
+
+**Логика:**
+1. Проверяет `breadcrumbs_enabled` в настройках.
+2. Если текущая страница — главная, проверяет `breadcrumbs_show_on_home` (если выключено — возвращает пустую строку).
+3. Ищет страницу в `main_menu` (рекурсивно по `children`).
+4. Если находит — строит цепочку от корня. Если нет — `[Корень] → Заголовок страницы`.
+5. Учитывает настройки: показывать ли корень (`breadcrumbs_show_home_root`), текст корня (`breadcrumbs_home_label`), разделитель (`breadcrumbs_separator`).
+6. Возвращает HTML с микроразметкой Schema.org (`BreadcrumbList`).
+
+**Важно:** если цепочка пустая (например, на главной при выключенном корне) — возвращает пустую строку.
+
+---
+
+### `render_module(string $moduleId, array $moduleData = [], array $settings = []): string`
+
+**Рендерит** **модуль** **на** **фронте**.
+
+```php
+echo render_module('hero', ['title' => 'Hello']);
+```
+
+**`include`** **файла** `modules/{moduleId}.php` **с** **буферизацией**.
+
+---
+
+### `renderMainMenu(array $items): string`
+
+**HTML** **главного** **меню** (**desktop**).
+
+**Использует** `safeUrl()` **и** `e()`.
+
+---
+
+### `renderMobileMenu(array $items): string`
+
+**HTML** **мобильного** **меню** (**бургер**).
+
+---
+
+### `getModuleAssets(array $moduleIds, ?array $settings, string $pageId): array`
+
+**URLs** **CSS**/**JS** **модулей** (**или** **объединённых**).
+
+```php
+$assets = getModuleAssets(['hero', 'faq'], $settings, 'home');
+// ['css' => [...], 'js' => [...]]
+```
+
+---
+
+### `getCombinedAssets(array $moduleIds, array $settings, string $pageId): array`
+
+**Объединённые** **CSS**/**JS** **в** `/cache/assets/{pageId}.{css,js}`.
+
+---
+
+## 💾 Запись данных
+
+### `saveData(string $fileName, array $data): bool`
+
+**Сохраняет** JSON **в** `data/{fileName}.json`.
+
+---
+
+### `savePageData(string $id, array $data): bool`
+
+**Сохраняет** **страницу**.
+
+---
+
+### `saveMenu(string $id, array $data): bool`
+
+**Сохраняет** **меню**.
+
+---
+
+### `saveModulesData(array $data): bool`
+
+**Сохраняет** `config/data/modules.json`.
+
+---
+
+### `handleSaveSettings(): array`
+
+**Сохраняет** **настройки** **сайта**.
+
+```php
+$res = handleSaveSettings();
+// ['success' => '...', 'error' => '']
+```
+
+**Валидация** `name`/`slogan`/`footer_copyright` (**санитайзер**).  
+**Валидация** `email`.  
+**Обновление** **кеша** **при** **изменении** **ассетов**.
+
+---
+
+### `handleSavePage(): array`
+
+**Сохраняет** **страницу** (**создание**/**редактирование**).
+
+**Валидация** `title`, `slug`, `template`, `status` (4 значения: `draft` / `scheduled` / `published` / `archived`).  
+**Валидация дат:**
+- `scheduled` требует `publish_at` в будущем.
+- `unpublish_at` (если задан) — в будущем и позже `publish_at`.
+- Даты в прошлом → ошибка.
+
+**Очистка дат по статусу:**
+- `draft` / `archived` → обе даты обнуляются.
+- `published` → `publish_at` обнуляется, `unpublish_at` сохраняется.
+
+**Сохранение** `rows`/`columns`/`modules`.  
+**Сброс кеша** страницы через `clearPageCacheById($id)`.
+
+---
+
+### `handleDeletePage(): void`
+
+**Удаляет** **страницу**. **Редирект** **на** **список**.
+
+---
+
+### `handleClonePage(): void`
+
+**Клонирует** **страницу** **в** `{id}-copy`.
+
+---
+
+### `handleSetHomePage(): void`
+
+**Назначает** **главную** **страницу**.
+
+---
+
+### `handleSaveMenu(): array`
+
+**Сохраняет** **меню**.
+
+---
+
+### `handleDeleteMenu(): void`
+
+**Удаляет** **меню**.
+
+---
+
+### `handleSetMainMenu(): void`
+
+**Назначает** **главное** **меню**.
+
+---
+
+### `handleModuleAction(): array`
+
+**Управление** **модулями**:
+- `module_action=upload` — загрузка ZIP.
+- `module_action=delete` — удаление.
+
+**Валидация** `manifest.id`.  
+**`detectZipSlip`** **перед** **распаковкой**.
+
+---
+
+### `unpackModule(string $moduleId): array`
+
+**Распаковывает** **модуль** **из** **ZIP**.
+
+**Валидация** `$moduleId`.  
+**`detectZipSlip`**.
+
+---
+
+### `removeModuleFiles(string $moduleId): array`
+
+**Удаляет** **файлы** **модуля**.
+
+---
+
+### `handleSaveSecurity(): array`
+
+**Сохраняет** **настройки** **безопасности**.
+
+**Валидация** `From:` (**Host** **Header** **Injection**).
+
+---
+
+### `handleSaveBackupSettings(): array`
+
+**Сохраняет** **настройки** **бэкапов**.
+
+---
+
+### `handleInitBackupProcess(): array`
+
+**Инициализация** **бэкапа** (**сбор** **файлов**, **разбивка** **на** **пачки**).
+
+---
+
+### `handleProcessBackupStep(): array`
+
+**Пошаговая** **архивация** (**50** **файлов** **на** **шаг**).
+
+---
+
+### `handleRestoreBackup(): array`
+
+**Восстановление** **из** **бэкапа**.
+
+**`detectZipSlip`** **перед** **распаковкой**.
+
+---
+
+### `handleDownloadBackup(): void`
+
+**Отдаёт** **ZIP** **через** `readfile`.
+
+---
+
+### `handleCronBackupAction(string $token): void`
+
+**Крон** **бэкапа** (**токен** **из** `$_GET['token']`).  
+**Сравнение с** `getCronToken()` — общий токен для бэкапов и публикации, хранится в `data/settings.json`.
+
+---
+
+### `clearPageCache(): void`
+
+**Очистка** **кеша** **страниц** + **объединённых** **ассетов**.
+
+---
+
+### `clearPageCacheById(string $id): void`
+
+**Очистка кеша одной страницы** (HTML + объединённые ассеты).
+
+Отличие от `clearPageCache()`: чистит **только** страницу с указанным ID, а не весь кеш. Используется при сохранении одной страницы или при её публикации/архивации — чтобы не сбрасывать кеш всего сайта.
+
+```php
+clearPageCacheById('about');
+// Удаляет cache/pages/about.html
+// Удаляет cache/assets/about.css, cache/assets/about.js
+```
+
+**Особенность:** для главной страницы (getHomePageId()) ключ кеша — home, а не реальный ID. Учитывается автоматически.
+
+**Используется в:**
+
+handleSavePage() — при сохранении страницы.
+
+handleCronPublishAction() — при автопубликации / архивации.
+
+---
+
+## 🗑 Корзина
+
+### `trashPage(string $id): array`
+
+**Перемещает страницу в корзину.** Логин для `_trash.deleted_by` берётся из `$_SESSION['admin_login']`.
+
+```php
+$result = trashPage('about');
+// ['success' => true, 'error' => '']
+```
+
+**Валидация:** тип `page`, ID по regex `[a-z0-9\-_]+`.
+
+---
+
+### `trashMenu(string $id): array`
+
+**Перемещает меню в корзину.** Аналогично `trashPage`, но для `data/menus/`.
+
+```php
+$result = trashMenu('footer_help');
+```
+
+---
+
+### `trashEntity(string $type, string $id, string $sourceDir): array`
+
+**Общая функция перемещения сущности в корзину.** Используется `trashPage()` и `trashMenu()`. Напрямую обычно не вызывается.
+
+**Что делает:**
+1. Валидирует тип и ID.
+2. Читает исходный JSON.
+3. Добавляет `_trash` с метаданными.
+4. Записывает в `data/trash/{type}_{id}_{timestamp}.json`.
+5. Удаляет оригинал.
+6. **Откат:** если не удалось удалить оригинал — удаляет файл из корзины.
+
+---
+
+### `getTrashList(?string $type = null): array`
+
+**Возвращает список файлов в корзине с метаданными.** Отсортировано по `deleted_at` (свежие сверху).
+
+```php
+$list = getTrashList('page');
+// [
+//   ['file' => 'page_home_1735689600.json', 'type' => 'page', 'original_id' => 'home', 'title' => 'Главная', 'deleted_at' => 1735689600, 'deleted_by' => 'admin', 'size_bytes' => 4096],
+//   ...
+// ]
+```
+
+**Фильтр `$type`:** `'page'` / `'menu'` / `null` (все).
+
+---
+
+### `getTrashCount(?string $type = null): int`
+
+**Возвращает количество файлов в корзине.**
+
+```php
+$total = getTrashCount();          // все
+$pages = getTrashCount('page');    // только страницы
+$menus = getTrashCount('menu');    // только меню
+```
+
+Для фильтра по типу использует `glob("{$type}_*.json")` — быстро.
+
+---
+
+### `restoreFromTrash(string $trashFileName): array`
+
+**Восстанавливает сущность из корзины.**
+
+```php
+$result = restoreFromTrash('page_about_1735689600.json');
+// ['success' => true, 'message' => 'Страница восстановлена как "about-restored" (оригинальный ID был занят).', 'error' => '', 'new_id' => 'about-restored']
+```
+
+**Разрешение конфликта ID:**
+1. Если `original_id` свободен — восстанавливает под ним.
+2. Иначе — `{original_id}-restored`, `{original_id}-restored-2`, ... до 100 попыток.
+
+**Для страниц** slug **всегда пересчитывается** в `{new_id}` — чтобы URL не конфликтовал.
+
+---
+
+### `deleteFromTrash(array $fileNames): array`
+
+**Окончательно удаляет указанные файлы из корзины.**
+
+```php
+$result = deleteFromTrash(['page_home_1735689600.json', 'menu_x_1735689601.json']);
+// ['success' => true, 'deleted' => 2, 'error' => '']
+```
+
+**Валидация имён файлов:** regex `^[a-z]+_[a-z0-9\-_]+_\d+\.json$`.
+
+---
+
+### `clearTrash(): array`
+
+**Полностью очищает корзину.**
+
+```php
+$result = clearTrash();
+// ['success' => true, 'deleted' => 5, 'error' => '']
+```
+
+---
+
+### `handleTrashAction(): void`
+
+**Обработчик POST-действий корзины.** Вызывается из `config/index.php` при `$_POST['trash_action']`.
+
+**Действия:**
+- `restore` — восстановить выбранные.
+- `delete_selected` — удалить выбранные.
+- `clear_all` — очистить всё.
+
+**Дополнительные поля формы:** `trash_context` (`page` / `menu`), `trash_return_url`, `trash_files[]`.
+
+**Редирект** — всегда, в конце. `flash` — success / warning / error.
+
+---
+
+### `ensureTrashDir(): bool`
+
+**Гарантирует существование `data/trash/` + `.htaccess` защиту.** Вызывается из `trashEntity()`.
+
+```php
+if (!ensureTrashDir()) {
+    return ['success' => false, 'error' => 'Папка корзины недоступна для записи.'];
+}
+```
+
+---
+
+## 👁 Предпросмотр
+
+### Временный preview (из конструктора)
+
+#### `createPreview(array $pageData, string $sessionId, string $pageId, ?string $existingPreviewId, string $createdBy): array`
+
+Создаёт/перезаписывает preview-файл.
+
+```php
+$result = createPreview($pageData, session_id(), 'about', null, 'admin');
+// ['success' => true, 'preview_id' => 'a1b2...', 'error' => '']
+```
+
+Перезапись — если `$existingPreviewId` задан и совпадает `session_id + page_id`.
+
+#### `loadPreviewById(string $previewId): ?array`
+
+Читает preview-файл, **убирает** служебный блок `_preview`.
+
+```php
+$page = loadPreviewById('a1b2c3...');
+```
+
+**Живёт в `functions.php`** — нужна и фронту.
+
+#### `cleanupAllPreviews(): int`
+
+Удаляет **все** preview-файлы. Используется при логине.
+
+#### `cleanupSessionPreviews(string $sessionId): int`
+
+Удаляет previews конкретной сессии.
+
+#### `cleanupSessionPagePreviews(string $sessionId, string $pageId): int`
+
+Удаляет previews сессии **для** конкретной страницы.
+
+#### `ensurePreviewDir(): bool`
+
+Создаёт `data/preview/` + `.htaccess`.
+
+#### `getPreviewUrl(string $previewId, string $slug = ''): string`
+
+Формирует URL вида `/{slug}?preview={id}` или `/?preview={id}`.
+
+---
+
+### Постоянный preview-токен (для согласования)
+
+#### `getPagePreviewToken(string $pageId): string`
+
+Читает `preview_token` из JSON страницы. Пустая строка, если не задан.
+
+#### AJAX-эндпоинт `generate_preview_token`
+
+**URL:** `index.php?tab=pages&ajax=generate_preview_token` (GET).
+
+Генерирует **новый** preview-токен **без сохранения** в JSON. Возвращает `{success: true, token: "..."}`.
+
+Запись токена в `data/pages/{id}.json` — **только при сохранении страницы** (через hidden-поле `preview_token` в форме). Удаление — снятие поля при сохранении.
+
+#### `getPagePreviewUrl(string $pageId, string $token): string`
+
+Формирует **полный** URL: `{protocol}://{host}/{slug}?preview={token}`.
+
+#### `loadPageByPreviewToken(string $token): ?array`
+
+Ищет страницу по `preview_token`. Возвращает в **любом** статусе. **Живёт в `functions.php`.**
+
+---
+
+### Эндпоинт `config/preview.php`
+
+POST-эндпоинт для создания временного preview.
+
+**Вход (POST):**
+- `csrf_token` — обязательно.
+- `page_id` — ID страницы (пусто для новой).
+- `title`, `slug`, `template`.
+- `show_header`, `show_footer`.
+- `meta_description`, `meta_keywords`.
+- `rows_json` — JSON конструктора.
+- `existing_preview_id` — опционально (перезапись).
+
+**Выход (JSON):**
+```json
+{
+    "success": true,
+    "preview_id": "a1b2c3...",
+    "url": "/about?preview=a1b2c3..."
+}
+```
+
+**Требует авторизации и CSRF.**
+
+---
+
+## 🚧 Технические работы
+
+### `isMaintenanceEnabled(): bool`
+
+Проверяет, включён ли режим техработ.
+
+```php
+isMaintenanceEnabled(); // true, если maintenance_enabled = true
+```
+
+**НЕ проверяет автоснятие.** Автоснятие делает **`index.php`** (фронт): если `maintenance_until` истёк — снимает флаг и пишет `settings.json`.
+
+---
+
+### `getMaintenanceBypassToken(): string`
+
+Возвращает текущий bypass-токен. Если токена нет — **генерирует** и **сохраняет** в `settings.json`.
+
+```php
+$token = getMaintenanceBypassToken(); // 32 hex
+```
+
+**Аналог `getCronToken()`** — но **отдельный** токен, **не пересекается** с кроном.
+
+---
+
+### `regenerateMaintenanceToken(): string`
+
+Принудительно генерирует **новый** токен и **сохраняет** в `settings.json`.
+
+```php
+$newToken = regenerateMaintenanceToken();
+```
+
+**Внимание:** сломает все ранее выданные bypass-ссылки.
+
+**В UI** — вызывается через **AJAX `generate_maintenance_token`**, который **генерирует без сохранения** (запись — только при «Сохранить настройки», как `cron_token`).
+
+---
+
+### AJAX-эндпоинт `generate_maintenance_token`
+
+**URL:** `index.php?tab=config_vars&ajax=generate_maintenance_token` (GET).
+
+Генерирует **новый** токен **без сохранения**. Возвращает `{success: true, token: "..."}`.
+
+Запись в `settings.json` — **только при «Сохранить настройки»** (через hidden-поле `maintenance_bypass_token`).
+
+---
+
+### Шаблон `templates/maintenance.php`
+
+**Не функция**, а **шаблон**, подключается из `index.php` при `503`.
+
+**Переменные** (из `index.php`):
+- `$maintenanceMessage` — HTML/plain (уже через `sanitizeHtml`).
+- `$maintenanceUntil` — Unix timestamp или `null`.
+- `$maintenanceShowTimer` — bool (показывать таймер).
+- `$maintenanceSettings` — весь `settings.json`.
+
+**Поведение:**
+- Inline-CSS (без Tailwind).
+- Логотип + название.
+- Сообщение (как есть).
+- Таймер (если `$maintenanceShowTimer && $maintenanceUntil > now`).
+- Контакты (email/телефон).
+- Reload через 5 сек после истечения таймера.
+
+**Заголовки** (устанавливаются в `index.php` **до** `include`):
+- `HTTP/1.1 503 Service Unavailable`
+- `Retry-After: 3600`
+- `X-Robots-Tag: noindex, nofollow, noarchive`
+
+---
+
+## 🖼 Медиа
+
+### Хелперы для фронта (`functions.php`)
+
+#### `mediaLazyAttrs(): string`
+
+Возвращает строку с атрибутами lazy-загрузки для `<img>`.
+
+```php
+// media_lazy_enabled = true:
+// → 'loading="lazy" decoding="async" '
+// media_lazy_enabled = false:
+// → ''
+```
+
+**Использование:**
+```php
+<img src="..." <?php echo mediaLazyAttrs(); ?>alt="...">
+```
+
+**Не применять** к hero, carousel, slider-advanced и логотипу в хедере (LCP).
+
+---
+
+#### `mediaImageSrc(string $url): string`
+
+Подменяет `src` на `.webp`, если такой файл **существует** рядом с оригиналом.
+
+```php
+mediaImageSrc('images/photo.jpg');   // 'images/photo.webp' (если есть)
+mediaImageSrc('images/photo.jpg');   // 'images/photo.jpg' (если .webp нет)
+mediaImageSrc('images/photo.webp');  // 'images/photo.webp' (не трогает)
+mediaImageSrc('images/logo.svg');    // 'images/logo.svg' (не трогает)
+mediaImageSrc('https://cdn.com/a.jpg'); // без изменений
+mediaImageSrc('data:image/png;base64,...'); // без изменений
+```
+
+**Пропускает:** `data:`, `http(s)://`, `//`, `.webp`, `.svg`, `.avif`, `.ico`.
+
+**Результат кешируется** в памяти на время запроса (`static $cache`).
+
+**Использование:**
+```php
+<img src="<?php echo e(mediaImageSrc($url)); ?>" <?php echo mediaLazyAttrs(); ?>alt="...">
+```
+
+---
+
+### Утилиты сканирования (`admin_controller.php`)
+
+#### `getImageFiles(string $rootDir, bool $recursive = true): array`
+
+Собирает абсолютные пути к `jpg`/`jpeg`/`png` в директории.
+
+```php
+$files = getImageFiles('/path/to/images', true);
+// ['/path/to/images/a.jpg', '/path/to/images/sub/b.png', ...]
+```
+
+**`$recursive = true`** — обход **всех подпапок** через `RecursiveIteratorIterator`.
+
+**`$recursive = false`** — только верхний уровень (используется для **корня сайта**, чтобы не лезть в `css/`, `js/`, `modules/`).
+
+**Используется в:** `getWebpStats()`, `deleteAllWebp()`, `countImagesWithoutWebp()`, `convertExistingImagesStep()`.
+
+**Правило проекта:** для `images/` — **рекурсивно** (там подпапки: `products/`, `blog/`, `team/`), для **корня** — **только верхний уровень**.
+
+---
+
+### WebP-конвертация (`admin_controller.php`)
+
+#### `isWebpSupported(): bool`
+
+Проверяет доступность WebP на сервере.
+
+```php
+isWebpSupported(); // true — есть GD с imagewebp или Imagick с WebP
+                   // false — нет ни того, ни другого
+```
+
+**Результат кешируется** (`static $cache = null`).
+
+**Используется в:**
+- `handleSaveSettings` — защита от POST-инъекции `media_webp_enabled`.
+- `handleConvertExistingImagesStep` — отказ, если нет поддержки.
+- `media.php` — UI: `disabled` + предупреждения.
+
+---
+
+#### `convertToWebp(string $sourcePath, int $quality = 82): ?string`
+
+Конвертирует одно изображение в `.webp`. Создаёт файл **рядом** с оригиналом. Оригинал **не удаляет**.
+
+```php
+$webp = convertToWebp('/path/to/photo.jpg', 82);
+// '/path/to/photo.webp' или null при ошибке
+```
+
+**Что конвертирует:** `jpg`, `jpeg`, `png` (прозрачность PNG сохраняется).
+
+**Что пропускает:** `gif`, `svg`, `ico`, `avif`, `webp` (уже).
+
+**Движки:** GD (приоритет) → Imagick (fallback).
+
+**При ошибке:** возвращает `null`, чистит частичный `.webp` (если создался). **Не бросает исключений.**
+
+**Не проверяет** `isWebpSupported()` — предполагает, что поддержка уже проверена снаружи.
+
+---
+
+#### `maybeConvertToWebp(string $sourcePath): ?string`
+
+Обёртка: читает настройки и вызывает `convertToWebp()`, если включено.
+
+```php
+maybeConvertToWebp('/path/to/photo.jpg');
+// → '/path/to/photo.webp' (если media_webp_enabled = true и поддержка есть)
+// → null в остальных случаях
+```
+
+**Проверяет:**
+1. `media_webp_enabled` в `settings.json`.
+2. `isWebpSupported()` — защита от рассинхрона «локалка → прод».
+3. Берёт `media_quality` из настроек.
+
+**Используется в:** `handleAjaxImageUpload`, `filemanager_api.php → action=upload`.
+
+---
+
+### Статистика и удаление
+
+#### `getWebpStats(): array`
+
+Собирает статистику по `.webp`-файлам.
+
+```php
+$stats = getWebpStats();
+// ['count' => 42, 'size_bytes' => 1258291]
+```
+
+**Обход:**
+- `images/` — **рекурсивно** (включая подпапки: `products/`, `blog/`, `team/`).
+- корень сайта — **только верхний уровень** (логотипы, OG-картинки).
+
+**Считает только те `.webp`, у которых есть парный** `jpg`/`jpeg`/`png`. Нативные `.webp` (без оригинала) — **не считаются**.
+
+---
+
+#### `deleteAllWebp(): array`
+
+Удаляет все `.webp`, у которых есть парный оригинал. Оригиналы **не трогает**.
+
+```php
+$result = deleteAllWebp();
+// ['deleted' => 42, 'kept' => 3, 'error' => '']
+// 'kept' — .webp без оригинала (не удалены)
+```
+
+**Обход:**
+- `images/` — **рекурсивно** (включая подпапки).
+- корень сайта — **только верхний уровень**.
+
+**Защита:** удаляет `.webp` **только если** рядом есть `foo.jpg`/`foo.jpeg`/`foo.png`. Нативные `.webp` (загруженные сами по себе) — **не трогает**, считает в `kept`.
+
+**Используется в:** `handleDeleteAllWebp`.
+
+---
+
+#### `handleDeleteAllWebp(): void`
+
+AJAX-обработчик удаления всех `.webp`. Вызывается из `config/index.php` при `$_POST['delete_all_webp']`.
+
+**Возвращает JSON:**
+```json
+{
+    "success": true,
+    "deleted": 42,
+    "kept": 3,
+    "error": "",
+    "message": "Удалено .webp: 42. Оставлено (нет оригинала): 3."
+}
+```
+
+**Логирует** в `logAction` при `deleted > 0`.
+
+---
+
+### Массовая конвертация существующих
+
+#### `countImagesWithoutWebp(): int`
+
+Считает, сколько `jpg`/`png` **не имеют** парного `.webp`.
+
+```php
+countImagesWithoutWebp(); // 156
+```
+
+**Обход:**
+- `images/` — **рекурсивно** (включая подпапки).
+- корень сайта — **только верхний уровень**.
+
+**Используется в:** `media.php` — чтобы показать «Без .webp: N» и кнопку «Конвертировать N существующих».
+
+---
+
+#### `convertExistingImagesStep(int $step, int $perStep = 10): array`
+
+Обрабатывает **одну пачку** существующих изображений без `.webp`.
+
+```php
+$result = convertExistingImagesStep(0, 10);
+// [
+//   'processed'   => 10,
+//   'converted'   => 9,   // 1 могла упасть
+//   'total'       => 156,
+//   'is_finished' => false
+// ]
+```
+
+**Обход:**
+- `images/` — **рекурсивно** (включая подпапки).
+- корень сайта — **только верхний уровень**.
+
+**`$step`** — номер шага (0-based). **`$perStep`** — сколько файлов за шаг (1–50).
+
+**Порядок шагов:** JS начинает с `$step = 0`, увеличивает на 1, пока `is_finished = false`.
+
+---
+
+#### `handleConvertExistingImagesStep(): void`
+
+AJAX-обработчик шага конвертации. Вызывается из `config/index.php` при `$_POST['convert_existing_images_step']`.
+
+**Вход (POST):**
+- `step` (int) — номер шага.
+- `per_step` (int, опционально) — размер пачки, по умолчанию 10.
+
+**Возвращает JSON:**
+```json
+{
+    "success": true,
+    "processed": 20,
+    "converted": 19,
+    "total": 156,
+    "is_finished": false
+}
+```
+
+**Если `isWebpSupported() = false`** — возвращает `{success: false, error: '...'}`.
+
+---
+
+## 🕘 История изменений
+
+### Настройки
+
+#### `isHistoryEnabled(): bool`
+
+Проверяет галочку `history_enabled` в `settings.json`.
+
+```php
+if (!isHistoryEnabled()) {
+    return false;
+}
+```
+
+---
+
+#### `getHistoryLimit(): int`
+
+Максимум хранимых версий на страницу. Читает `history_limit`, ограничивает диапазоном **1..100**, по умолчанию **20**.
+
+```php
+$limit = getHistoryLimit(); // 20
+```
+
+---
+
+#### `getHistoryDir(string $historyKey): string`
+
+Путь к папке истории конкретной страницы. **Не создаёт** папку — только формирует путь.
+
+```php
+$dir = getHistoryDir('22c915d03008950d');
+// /.../data/history/22c915d03008950d/
+```
+
+Валидация: `historyKey` — 16 hex-символов. Иначе — пустая строка.
+
+---
+
+#### `ensureHistoryDir(string $historyKey): bool`
+
+Создаёт `data/history/` + `.htaccess` (`Require all denied`) + вложенную папку страницы. Возвращает `true`, если папка доступна для записи.
+
+---
+
+#### `getOrCreateHistoryKey(array &$page): string`
+
+Возвращает `history_key` страницы. Если ключа нет — генерирует, **пишет в JSON страницы** и возвращает. **Модифицирует `$page` по ссылке**.
+
+Используется как fallback для страниц, созданных **до** фичи.
+
+```php
+$key = getOrCreateHistoryKey($page); // 16 hex
+```
+
+---
+
+### Запись снапшотов
+
+#### `savePageSnapshot(array $oldPage, array $newPage, string $savedBy = 'system'): bool`
+
+Сохраняет снапшот страницы. Вызывается **перед** перезаписью файла.
+
+**Дедупликация — снапшот НЕ пишется, если:**
+1. История отключена.
+2. `$oldPage` = `$newPage` (пользователь ничего не менял).
+3. Такое же состояние уже есть в **последнем** снапшоте.
+
+```php
+savePageSnapshot($oldPageForHistory, $pageData, $_SESSION['admin_login'] ?? 'system');
+```
+
+**Что делает:**
+1. Проверка `isHistoryEnabled()`.
+2. Сравнение `$oldPage` и `$newPage` по контентным полям (`extractHistoryContent`).
+3. Проверка дедупликации с последним снапшотом.
+4. Запись `data/history/{key}/{timestamp}.json` со служебным блоком `_history`.
+5. Ротация — удаление старых при превышении `getHistoryLimit()`.
+
+---
+
+#### `rotatePageHistory(string $historyKey, int $limit): int`
+
+Удаляет самые старые снапшоты, оставляя не больше `$limit`. Возвращает число удалённых файлов.
+
+---
+
+#### `getHistoryContentFields(): array`
+
+Список **контентных** полей — единый источник правды для снапшота, сравнения и отката.
+
+```php
+// ['title', 'template', 'meta', 'show_header', 'show_footer', 'rows']
+```
+
+**Не входят:** `status`, `publish_at`, `unpublish_at`, `slug`, `slug_history`, `preview_token`, `id`, `history_key`.
+
+---
+
+#### `extractHistoryContent(array $page): array`
+
+Возвращает из страницы **только контентные поля** (список выше). Отсутствующие ключи → `null`.
+
+---
+
+#### `normalizeHistoryContent(array $content): array`
+
+Нормализует контент для стабильного сравнения:
+- Вырезает служебное поле `_jsId` в `rows[].columns[].modules[]`.
+- Рекурсивно сортирует ключи через `ksort` (`normalizeHistorySort`).
+
+Используется для `md5(json_encode(...))` перед сравнением.
+
+---
+
+#### `normalizeHistorySort($value)`
+
+Рекурсивный `ksort`. Служебная функция для `normalizeHistoryContent`. Напрямую не вызывается.
+
+---
+
+### Чтение
+
+#### `getPageHistory(string $historyKey): array`
+
+Возвращает список версий страницы (свежие сверху).
+
+```php
+$list = getPageHistory('22c915d03008950d');
+// [
+//   ['timestamp' => 1735689700, 'snapshot_at' => 1735689700, 'saved_by' => 'admin', 'size_bytes' => 5752, 'page_id' => 'about'],
+//   ...
+// ]
+```
+
+Метаданные — из блока `_history` каждого файла. Битые / пустые файлы игнорируются.
+
+---
+
+#### `getHistorySnapshot(string $historyKey, int $timestamp): ?array`
+
+Читает конкретный снапшот. Возвращает данные **без** служебного блока `_history`.
+
+---
+
+### Удаление версий
+
+#### `deleteHistoryVersion(string $historyKey, int $timestamp): array`
+
+Удаляет одну версию.
+
+```php
+$result = deleteHistoryVersion('22c915d03008950d', 1735689700);
+// ['success' => true, 'error' => '']
+```
+
+---
+
+#### `clearPageHistory(string $historyKey): int`
+
+Удаляет все версии страницы + папку. Возвращает число удалённых файлов.
+
+---
+
+#### `getHistoryStats(): array`
+
+Статистика всей истории сайта. Для секции настроек.
+
+```php
+$stats = getHistoryStats();
+// ['pages' => 5, 'versions' => 87, 'size_bytes' => 342000]
+```
+
+---
+
+### Откат
+
+#### `restorePageFromHistory(string $pageId, int $timestamp): array`
+
+Восстанавливает страницу из снапшота.
+
+```php
+$result = restorePageFromHistory('about', 1735689700);
+// ['success' => true, 'error' => '', 'message' => 'Страница восстановлена к версии от 05.10.2026 14:32.']
+```
+
+**Порядок работы:**
+1. Загрузка текущей страницы.
+2. Получение `history_key`.
+3. Чтение снапшота.
+4. **Снапшот текущего состояния** — чтобы откат был обратимым.
+5. Применение контентных полей из снапшота (`getHistoryContentFields`).
+6. Служебные поля (`id`, `slug`, `history_key`, `preview_token`) — **из текущей** страницы.
+7. `savePageData`, `clearPageCacheById`, `maybeRegenerateSeoFiles`.
+
+---
+
+#### `handleRestorePageVersion(string $pageId, int $timestamp): void`
+
+POST-обработчик отката. Вызывается из `config/index.php`. Делает flash + log + redirect в `edit.php`.
+
+---
+
+#### `handleDeleteHistoryVersion(string $pageId, int $timestamp): void`
+
+POST-обработчик удаления одной версии.
+
+---
+
+#### `handleClearPageHistory(string $pageId): void`
+
+POST-обработчик очистки всей истории одной страницы.
+
+---
+
+#### `handleClearAllHistory(): void`
+
+AJAX-обработчик очистки **всей** истории сайта. Вызывается из секции настроек. Возвращает JSON с количеством удалённых версий и страниц.
+
+```json
+{
+    "success": true,
+    "deleted_pages": 5,
+    "deleted_versions": 87,
+    "message": "Удалено версий: 87 (страниц: 5)."
+}
+```
+
+---
+
+## 🔍 SEO
+
+### `generateSitemap(): array`
+
+Генерирует `sitemap.xml` в корне сайта.
+
+```php
+$result = generateSitemap();
+// ['success' => true, 'count' => 25, 'error' => '']
+```
+
+Включает только `published`-страницы без истёкшего `unpublish_at`. Главная — `priority 1.0`, остальные — `0.8`.
+
+---
+
+### `generateRobots(): array`
+
+Генерирует `robots.txt` в корне.
+
+```php
+$result = generateRobots();
+// ['success' => true, 'error' => '']
+```
+
+Содержит `Disallow` для `/config/`, `/data/`, `/cache/`, `/*?preview=` + `Sitemap:`.
+
+---
+
+### `generateSeoFiles(): array`
+
+Генерирует оба файла (с учётом галочек `seo_sitemap_enabled` / `seo_robots_enabled`).
+
+```php
+$result = generateSeoFiles();
+// ['sitemap' => ['success' => true, 'skipped' => false, 'error' => ''],
+//  'robots'  => ['success' => true, 'skipped' => false, 'error' => '']]
+```
+
+При выключенной галочке — **удаляет** соответствующий файл.
+
+Обновляет `last_seo_regenerate` в `settings.json`.
+
+---
+
+### `maybeRegenerateSeoFiles(): void`
+
+Обёртка: проверяет `seo_auto_regenerate` и вызывает `generateSeoFiles()`, если включено.
+
+Вызывается из `handleSavePage`, `handleDeletePage`, `restoreFromTrash`, `handleClonePage`, `handleSetHomePage`.
+
+---
+
+### `findPageBySlugHistory(string $slug): ?array`
+
+Ищет страницу по slug в `slug_history` других страниц.
+
+**Живёт в `functions.php`.**
+
+```php
+$page = findPageBySlugHistory('about');  // находит страницу с актуальным slug 'o-kompanii', если в её истории есть 'about'
+```
+
+**Возвращает страницу в любом статусе** — проверка статуса на уровне вызывающего (`loadPage`).
+
+---
+
+### `applyPageDefaults(array $page): array`
+
+Заполняет пропущенные поля страницы значениями по умолчанию. **Живёт в `functions.php`.**
+
+---
+
+### `getBaseUrl(): string`
+
+Возвращает `{protocol}://{host}` без слэша на конце. **Живёт в `functions.php`.**
+
+```php
+$baseUrl = getBaseUrl();  // 'https://alpincms.ru'
+```
+
+---
+
+### Крон `config/cron/seo.php`
+
+URL: `/config/cron/seo.php?token=xxx`.
+
+Токен — **общий** (`getCronToken()`).
+
+Отдаёт plain-text: `Status: OK, sitemap: ok, robots: skip` — где `ok` (сгенерирован), `skip` (галочка выключена), `error` (ошибка генерации).
+
+---
+
+## ⏰ Cron-публикация
+
+### `handleCronPublishAction(string $token): void`
+
+**Логика крона публикации страниц.** Вызывается из `config/cron/publish.php`.
+
+**Что делает:**
+
+1. Проверяет `token` через `getCronToken()`.
+2. Проходит по всем файлам `data/pages/*.json`.
+3. Применяет переходы:
+   - `scheduled` + `publish_at <= now` → `published`, `publish_at = null`.
+   - Если при этом `unpublish_at` уже в прошлом — сразу `archived` (без промежуточного `published`).
+   - `published` + `unpublish_at <= now` → `archived`, `unpublish_at = null`.
+4. Сбрасывает кеш затронутых страниц через `clearPageCacheById()`.
+5. Логирует переходы (`page_publish`, `page_archive`).
+6. Отдаёт plain-text: `Status: OK, published: N, archived: M`.
+
+**Не использует** `handleSavePage()` — для крона простая прямая запись через `savePageData()` (без POST-валидации).
+
+---
+
+### `getLastCronPublishTime(): int`
+
+**Время последнего запуска виртуального крона публикации** (Unix timestamp).  
+`0` — если ни разу не запускался.
+
+```php
+$last = getLastCronPublishTime();
+setLastCronPublishTime(int $timestamp): void
+```
+**Сохраняет время последнего запуска** виртуального крона публикации в data/settings.json.
+
+---
+
+### `setLastCronPublishTime(int $timestamp): void`
+**Сохраняет время последнего запуска** виртуального крона публикации в data/settings.json.
+
+```php
+setLastCronPublishTime(time());
+```
+**Используется в** config/index.php перед асинхронным вызовом крона — ограничивает частоту (не чаще 1 раза в 5 минут).
+
+--- 
+
+### `getCronToken(): string`
+**Возвращает общий токен** для cron/backup.php и cron/publish.php.
+Если в settings.json токена нет — генерирует bin2hex(random_bytes(16)) и сохраняет.
+
+```php
+$token = getCronToken();
+```
+---
+
+### `regenerateCronToken(): string`
+**Принудительно генерирует новый токен** и сохраняет в settings.json.
+**Внимание:** сломает все настроенные крон-задачи (бэкап + публикация).
+
+```php
+$newToken = regenerateCronToken();
+```
+**Вызывается** из формы «Интеграция с планировщиком» в Настройках сайта (через AJAX-эндпоинт `generate_cron_token` + сохранение формы).
+
+---
+
+## 🔐 Безопасность
+
+### `verifyAdminCredentials(string $login, string $password): bool`
+
+**Проверка** **логина**/**пароля** (**с** **`hash_equals`** **и** **`password_verify`**).
+
+```php
+if (verifyAdminCredentials($login, $password)) { ... }
+```
+
+---
+
+### `checkIpBlockStatus(string $userIp, array $bfData): bool`
+
+**Проверка** **бана** **IP**.
+
+---
+
+### `handleSuccessfulLogin(string $userIp, array $bfData): void`
+
+**Успешный** **вход** (**regenerate** **session**, **очистка** **attempts**).
+
+---
+
+### `handleFailedLogin(string $userIp, array $bfData): void`
+
+**Неудачная** **попытка** (**инкремент** **счётчика**, **бан**).
+
+---
+
+### `handleLiveHashGeneration(string $newPassword): string`
+
+**Генерация** **хеша** **пароля** (**только** **до** **первой** **настройки**).
+
+---
+
+### `checkAdminSessionTimeout(array $bfData): void`
+
+**Idle timeout** — **уничтожение** **сессии** **при** **неактивности**.
+
+---
+
+## 📁 Файловый менеджер
+
+### `fmSafePath(string $path): ?string`
+
+**Валидация** **относительного** **пути** (**whitelist** **символов**).
+
+---
+
+### `fmSafeAbsolute(string $relativePath): ?string`
+
+**`realpath`** + **проверка** **префикса** `FM_SITE_ROOT`.
+
+---
+
+### `fmIsBlacklisted(string $relativePath): bool`
+
+**Запрещённые** **пути:** `config/data`, `config/backups`, `config/core`, `data/logs`.
+
+---
+
+### `fmIsAllowedExtension(string $fileName): bool`
+
+**Whitelist** **расширений**.
+
+---
+
+### `fmIsSensitiveFile(string $fileName): bool`
+
+**Чувствительные** **файлы:** `.pepper`, `credentials.json`, `login_attempts.json`, `backup_config.json`.
+
+---
+
+## 📝 Логирование
+
+### `logAction(string $action, string $message, string $level = 'INFO', ?string $user = null): void`
+
+**Запись** **в** `data/logs/admin.log`.
+
+```php
+logAction('page_save', 'Страница сохранена', 'INFO');
+logAction('auth_failed', 'Неудачная попытка', 'WARNING');
+```
+
+**Уровни:** `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+
+---
+
+### `rotateLog(string $logDir): void`
+
+**Ротация** **лога** **при** **превышении** **размера**.
+
+---
+
+### `parseLogLine(string $line): ?array`
+
+**Парсинг** **строки** **лога**.
+
+---
+
+### `getLogActions(): array`
+
+**Список** **всех** **возможных** **действий** **для** **логирования**.
+
+---
+
+## 🌐 Меню
+
+### `isBurgerEnabled(): bool`
+
+**Включён** **ли** **бургер**.
+
+---
+
+### `getBurgerBreakpoint(): string`
+
+**Брейкпоинт** **бургера** (`sm`, `md`, `lg`, `xl`).
+
+---
+
+### `getPlainText(): string`
+
+**Название** **сайта** **без** **HTML-тегов**.
+
+---
+
+## 🏷 Статусы страниц
+
+### `getPageStatusBadge(array $page): array`
+
+**Возвращает** метку, CSS-классы и иконку для бейджа статуса страницы.
+
+```php
+$badge = getPageStatusBadge($page);
+// ['label' => 'Опубликована', 'class' => 'text-emerald-800 bg-emerald-50', 'icon' => 'icon-circle-check']
+```
+
+**Логика:**
+
+| Условие | Label | Класс |
+|---------|-------|-------|
+| `draft` | Черновик | amber |
+| `scheduled` | Запланирована | blue |
+| `published` + `unpublish_at` в будущем | Снятие запланировано | orange |
+| `published` (без `unpublish_at` или оно в прошлом) | Опубликована | emerald |
+| `archived` | Снята с публикации | slate |
+
+**Используется** в `pages.php` — и в десктопной таблице, и в мобильных карточках.
+
+---
+
+## 📞 Поддержка
+
+- **Архитектура:** [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Модули:** [MODULES.md](MODULES.md)
+- **Безопасность:** [SECURITY.md](SECURITY.md)

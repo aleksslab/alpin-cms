@@ -1,0 +1,13 @@
+# ==========================================================================
+# Исключение из архивов GitHub (Source code zip / tar.gz)
+# Файлы, которые есть в репозитории, но не нужны пользователю в релизе.
+# ==========================================================================
+
+# Служебные файлы Git и IDE
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/.github export-ignore
+
+# Файлы каталога
+/catalog.json export-ignore
+/catalog/ export-ignore

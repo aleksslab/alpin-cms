@@ -1,0 +1,63 @@
+{
+    "templates": [
+        {
+            "id": "full-width",
+            "name": "Полная ширина",
+            "description": "Одна колонка на всю ширину экрана",
+            "zones": {
+                "header": { "global": true, "class": "" },
+                "hero": { "class": "w-full" },
+                "main": { "class": "w-full" },
+                "footer": { "global": true, "class": "" }
+            }
+        },
+        {
+            "id": "sidebar-left",
+            "name": "Сайдбар слева",
+            "description": "Основной контент + левая колонка",
+            "zones": {
+                "header": { "global": true, "class": "" },
+                "hero": { "class": "w-full" },
+                "sidebar-left": { "class": "w-1/4" },
+                "main": { "class": "w-3/4" },
+                "footer": { "global": true, "class": "" }
+            }
+        },
+        {
+            "id": "sidebar-right",
+            "name": "Сайдбар справа",
+            "description": "Основной контент + правая колонка",
+            "zones": {
+                "header": { "global": true, "class": "" },
+                "hero": { "class": "w-full" },
+                "main": { "class": "w-3/4" },
+                "sidebar-right": { "class": "w-1/4" },
+                "footer": { "global": true, "class": "" }
+            }
+        },
+        {
+            "id": "sidebar-both",
+            "name": "Сайдбары с обеих сторон",
+            "description": "Левая колонка + основной контент + правая колонка",
+            "zones": {
+                "header": { "global": true, "class": "" },
+                "hero": { "class": "w-full" },
+                "sidebar-left": { "class": "w-1/5" },
+                "main": { "class": "w-3/5" },
+                "sidebar-right": { "class": "w-1/5" },
+                "footer": { "global": true, "class": "" }
+            }
+        },
+        {
+            "id": "boxed",
+            "name": "Коробочный",
+            "description": "Контент в центре с отступами",
+            "zones": {
+                "header": { "global": true, "class": "" },
+                "hero": { "class": "w-full" },
+                "main": { "class": "container mx-auto px-6 max-w-7xl" },
+                "footer": { "global": true, "class": "" }
+            }
+        }
+    ]
+}

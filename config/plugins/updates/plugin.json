@@ -1,0 +1,12 @@
+{
+    "id": "updates",
+    "name": "Обновления",
+    "description": "Проверка новых версий ядра, модулей и плагинов",
+    "version": "1.0.0",
+    "author": "AlekSSLab",
+    "admin_tab": {
+        "title": "Обновления",
+        "icon": "icon-refresh-cw",
+        "group": "system"
+    }
+}

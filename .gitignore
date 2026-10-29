@@ -1,0 +1,83 @@
+# === Пользовательские данные (НЕ в репозиторий) ===
+/data/settings.json
+/data/pages/*.json
+/data/menus/*.json
+/data/logs/*.log
+/data/logs/archive/
+/data/trash/*.json
+/data/preview/*.json
+/data/history/*
+/data/updates_cache.json
+
+# === Системные данные ===
+!.gitkeep
+!.htaccess
+/config/data/*.json
+/config/data/.pepper
+!/config/data/modules.json
+!/config/data/templates.json
+
+# === Бэкапы ===
+/config/backups/*.zip
+
+# === Кеш ===
+/cache/pages/*.html
+/cache/assets/*.css
+/cache/assets/*.js
+
+# === Загруженные картинки ===
+/images/*
+
+# === IDE ===
+.vscode/
+.idea/
+.netbeans/
+.osp/
+nbproject/
+nbproject/private/
+*.sublime-*
+
+# === OS ===
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# === Логи ===
+*.log
+
+# === Временные и служебные файлы ===
+/config/css/old_config.css
+/fonts/youtube.svg
+*.tmp
+*.bak
+*.bat
+*.swp
+*~
+*_.php
+*_.js
+*.docx
+/favicon_iсo.zip
+/favicon-512.png
+/catalog-builder.php
+
+# === Распакованные модули ===
+# Админка
+/config/modules/*/
+!/config/modules/archives/
+/config/modules/archives/*/
+!/config/modules/config\_vars/
+!/config/modules/menu/
+!/config/modules/pages/
+!/config/modules/previews/
+/config/modules/previews/*
+/config/plugins/*/
+
+# Сайт
+/modules/*.php 
+/js/*.js
+!/js/script.js
+!/js/theme.js
+/css/*.css
+!/css/style.css
+!/css/theme.css
+!/css/theme-dark.css

@@ -1,0 +1,920 @@
+# Структуры JSON
+
+## 📂 Обзор
+
+**Все данные** — **в** **JSON-файлах**.
+
+| Файл | Что хранит |
+|------|-----------|
+| `data/settings.json` | Настройки сайта |
+| `data/pages/{id}.json` | Страницы |
+| `data/menus/{id}.json` | Меню |
+| `data/logs/admin.log` | Логи (**не** JSON) |
+| `data/trash/*.json` | Корзина (удалённые страницы и меню) |
+| `data/preview/{preview_id}.json` | Временные preview (из конструктора) |
+| `data/history/{history_key}/*.json` | История изменений страниц (снапшоты) |
+| `config/data/credentials.json` | Логин/хеш |
+| `config/data/modules.json` | Список модулей |
+| `config/data/plugins.json` | Список плагинов |
+| `config/data/templates.json` | Список шаблонов |
+| `config/data/backup_config.json` | Настройки бэкапов |
+| `config/data/login_attempts.json` | Логин-попытки, баны IP |
+
+---
+
+## 📄 `data/settings.json`
+
+```json
+{
+    "name": "AlPin<span class=\"text-[var(--primary-color)]\">CMS</span>",
+    "slogan": "Профессиональная CMS",
+    "phone": "+79001234567",
+    "email": "info@example.com",
+    "address": "г. Москва, ул. Ленина, д. 1",
+    "logo": "images/logo.png",
+    "favicon": "images/favicon.png",
+
+    "theme": {
+        "primary_color": "#10B981",
+        "primary_dark": "#059669",
+        "light": {
+            "bg_main": "#FFFFFF",
+            "bg_card": "#FFFFFF",
+            "bg_section": "#F8FAFC",
+            "text_main": "#334155",
+            "text_muted": "#64748B",
+            "border_color": "#F1F5F9"
+        },
+        "dark": {
+            "bg_main": "#0F172A",
+            "bg_card": "#1E293B",
+            "bg_section": "#1E293B",
+            "text_main": "#F1F5F9",
+            "text_muted": "#94A3B8",
+            "border_color": "#334155"
+        }
+    },
+    "theme_default": "light",
+    "theme_toggle_enabled": true,
+
+    "header_variant": "default",
+    "header_fixed": true,
+    "burger_enabled": true,
+    "burger_breakpoint": "md",
+
+    "footer_variant": "default",
+    "footer_copyright": "Все права защищены.",
+
+    "meta_title": "",
+    "meta_description": "",
+    "meta_keywords": "",
+
+    "og_title": "",
+    "og_description": "",
+    "og_image": "",
+    "og_url": "",
+
+    "twitter_title": "",
+    "twitter_description": "",
+    "twitter_image": "",
+
+    "socials": [
+        { "id": "vk", "url": "https://vk.com/..." },
+        { "id": "telegram", "url": "https://t.me/..." }
+    ],
+
+    "custom_css": "",
+    "custom_js": "",
+
+    "assets_minify": false,
+    "assets_combine": false,
+    "minify_exceptions": {},
+
+    "cache_enabled": false,
+    "cache_ttl": 86400,
+
+    "home_page_id": "home",
+    "main_menu": "header_main"
+    "cron_token": "a1b2c3d4e5f6...",
+    "last_cron_publish": 1735689600,
+    "seo_sitemap_enabled": true,
+    "seo_robots_enabled": true,
+    "seo_auto_regenerate": false,
+    "last_seo_regenerate": 0,
+    "history_enabled": false,
+    "history_limit": 20,
+
+    "media_lazy_enabled": true,
+    "media_webp_enabled": false,
+    "media_quality": 82,
+
+    "breadcrumbs_enabled": false,
+    "breadcrumbs_show_on_home": false,
+    "breadcrumbs_show_home_root": true,
+    "breadcrumbs_home_label": "Главная",
+    "breadcrumbs_separator": "/",
+
+    "maintenance_enabled": false,
+    "maintenance_message": "",
+    "maintenance_show_timer": true,
+    "maintenance_until": null,
+    "maintenance_bypass_token": ""
+}
+```
+
+### Поля
+
+**Контактная информация:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `name` | string | Название сайта. HTML разрешён (валидация + `sanitizeHtml`). |
+| `slogan` | string | Слоган. HTML разрешён. |
+| `phone` | string | Телефон. Только `0-9+`. Формат при выводе — `formatPhone()`. |
+| `email` | string | Email. Валидация `FILTER_VALIDATE_EMAIL`. |
+| `address` | string | Адрес. HTML вырезается при выводе. |
+
+**Визуальные элементы:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `logo` | string | Путь к логотипу, относительно корня: `images/logo.png`. |
+| `favicon` | string | Путь к favicon: `images/favicon.png`. |
+
+**Цветовая схема (`theme`):**
+
+| Поле | Тип | Значения |
+|------|-----|----------|
+| `theme.primary_color` | string | HEX, общий для обеих тем |
+| `theme.primary_dark` | string | HEX, hover-цвет, общий для обеих тем |
+| `theme.light.*` | object | Палитра светлой темы (6 цветов) |
+| `theme.dark.*` | object | Палитра тёмной темы (6 цветов) |
+| `theme_default` | string | `light` / `dark` (тема по умолчанию) |
+| `theme_toggle_enabled` | bool | Показывать переключатель в хедере |
+
+**Палитра (`light` / `dark`):** `bg_main`, `bg_card`, `bg_section`, `text_main`, `text_muted`, `border_color`.
+
+**Хедер:**
+
+| Поле | Тип | Значения |
+|------|-----|----------|
+| `header_variant` | string | `default` / `centered` / `minimal` / `with-cta` |
+| `header_fixed` | bool | Фиксация хедера при скролле |
+| `burger_enabled` | bool | Мобильное бургер-меню |
+| `burger_breakpoint` | string | `sm` / `md` / `lg` / `xl` |
+
+**Футер:**
+
+| Поле | Тип | Значения |
+|------|-----|----------|
+| `footer_variant` | string | `default` / `minimal` / `dark` / `light` |
+| `footer_copyright` | string | HTML разрешён. Если пусто — выводится `© {YEAR} {name}. Все права защищены.` |
+
+**SEO:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `meta_title` | string | Глобальный meta title. Если пусто — берётся из страницы. |
+| `meta_description` | string | Глобальный meta description. |
+| `meta_keywords` | string | Ключевые слова через запятую. |
+| **SEO: технический** | | |
+| `seo_sitemap_enabled` | bool | Генерировать sitemap.xml |
+| `seo_robots_enabled` | bool | Генерировать robots.txt |
+| `seo_auto_regenerate` | bool | Автообновлять при изменении страниц |
+| `last_seo_regenerate` | int | Unix timestamp последней генерации |
+
+**Open Graph:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `og_title` | string | Если пусто — `meta_title` |
+| `og_description` | string | Если пусто — `meta_description` |
+| `og_image` | string | Путь: `images/og-image.jpg`. Рекомендуется 1200×630. |
+| `og_url` | string | Канонический URL. Если пусто — генерируется из `HTTP_HOST`. |
+
+**Twitter Card:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `twitter_title` | string | Если пусто — `og_title` |
+| `twitter_description` | string | Если пусто — `og_description` |
+| `twitter_image` | string | Если пусто — `og_image` |
+
+**Социальные сети (`socials`):**
+
+Массив объектов `{ "id": "vk", "url": "https://..." }`. ID — из `getSocialNetworks()` (13 сетей). Пустые URL не сохраняются.
+
+**Произвольный код:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `custom_css` | string | Вставляется в `<style>` в `<head>` сайта. **Санитайзер не применяется.** |
+| `custom_js` | string | Вставляется в `<script>` перед `</body>`. **Санитайзер не применяется.** |
+
+**Ассеты:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `assets_minify` | bool | Минификация CSS/JS модулей |
+| `assets_combine` | bool | Объединение всех CSS/JS страницы в один файл |
+| `minify_exceptions` | object | Карта `{ "module_id": { "css": bool, "js": bool } }`. Исключения из минификации по модулям. |
+
+**Кеширование:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `cache_enabled` | bool | Кеширование HTML-страниц |
+| `cache_ttl` | int | TTL кеша в секундах. `0` — бессрочно до изменения страницы. |
+
+**История изменений:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `history_enabled` | bool | Хранить историю изменений страниц. По умолчанию `false`. |
+| `history_limit` | int | Максимум хранимых версий одной страницы. Диапазон 1–100, по умолчанию 20. |
+
+**Медиа:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `media_lazy_enabled` | bool | Добавлять `loading="lazy"` + `decoding="async"` к контентным изображениям. По умолчанию `true`. |
+| `media_webp_enabled` | bool | Конвертировать jpg/png в `.webp` при загрузке. Требует GD или Imagick. По умолчанию `false`. |
+| `media_quality` | int | Качество WebP, 1–100. По умолчанию 82. |
+
+**Хлебные крошки:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `breadcrumbs_enabled` | bool | Показывать крошки на сайте. По умолчанию `false`. |
+| `breadcrumbs_show_on_home` | bool | Показывать крошки на главной странице. По умолчанию `false`. |
+| `breadcrumbs_show_home_root` | bool | Выводить «Главная» в начале цепочки. По умолчанию `true`. |
+| `breadcrumbs_home_label` | string | Текст для главной страницы. По умолчанию `"Главная"`. |
+| `breadcrumbs_separator` | string | Разделитель между пунктами (`/`, `>`, `→`, `•`, `|`). По умолчанию `"/"`. |
+
+**Технические работы:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `maintenance_enabled` | bool | Режим техработ включён. По умолчанию `false`. |
+| `maintenance_message` | string | Сообщение на заглушке. HTML разрешён (через `sanitizeHtml`). |
+| `maintenance_show_timer` | bool | Показывать таймер на заглушке (если задан `maintenance_until`). По умолчанию `true`. |
+| `maintenance_until` | int \| null | Unix timestamp автоснятия. `null` — без автоснятия. |
+| `maintenance_bypass_token` | string | 32 hex, для `?bypass=`. Генерируется при включении режима. |
+
+**Системные привязки:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `home_page_id` | string | ID главной страницы. По умолчанию `home`. |
+| `main_menu` | string | ID главного меню. Если не задано — хедер без меню. |
+
+### Служебные поля
+
+Эти поля **не редактируются вручную** через админку — управляются кодом:
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `cron_token` | string | Общий токен для `config/cron/backup.php` и `config/cron/publish.php`. Генерируется автоматически (`bin2hex(random_bytes(16))`) при первом обращении к `getCronToken()`, если отсутствует. Перегенерация — в секции «Интеграция с планировщиком» в Настройках сайта. **Один токен для обеих крон-задач.** |
+| `last_cron_publish` | int | Unix timestamp последнего запуска виртуального крона публикации. Ограничивает частоту — не чаще **1 раза в 5 минут** при заходе админа в админку (`getLastCronPublishTime()` / `setLastCronPublishTime()`). |
+
+**Важно:** оба поля **сохраняются** при сохранении настроек сайта через `handleSaveSettings()`. Не теряются при перезаписи `settings.json`.
+
+---
+
+## 📄 `data/pages/{id}.json`
+
+```json
+{
+    "id": "about",
+    "title": "О компании",
+    "slug": "about",
+    "template": "full-width",
+    "status": "published",
+    "publish_at": null,
+    "unpublish_at": null,
+    "preview_token": null,
+    "slug_history": [],
+    "history_key": "22c915d03008950d",
+    "created": "2025-01-15 12:00:00",
+    "updated": "2025-01-15 14:30:00",
+    "meta": {
+        "description": "Описание страницы",
+        "keywords": "ключевые, слова"
+    },
+    "show_header": true,
+    "show_footer": true,
+    "rows": [
+        {
+            "id": "row_1",
+            "zone": "main",
+            "settings": { "class": "container mx-auto" },
+            "columns": [
+                {
+                    "id": "col_1",
+                    "width_class": "w-full",
+                    "settings": { "class": "" },
+                    "modules": [
+                        {
+                            "id": "mod_1",
+                            "type": "hero",
+                            "data": {
+                                "title": "Заголовок",
+                                "subtitle": "Подзаголовок",
+                                "button_text": "Узнать больше",
+                                "button_link": "/contacts"
+                            },
+                            "settings": { "class": "bg-slate-50" },
+                            "global": false
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
+```
+
+**Поля:**
+
+| Поле | Тип | Обязательное |
+|------|-----|--------------|
+| `id` | string | ✅ |
+| `title` | string | ✅ |
+| `slug` | string | ✅ |
+| `template` | string | ✅ |
+| `status` | `draft` / `scheduled` / `published` / `archived` | ✅ |
+| `publish_at` | int (Unix timestamp) \| null | Для `scheduled` — обязательно |
+| `unpublish_at` | int (Unix timestamp) \| null | Опционально для `scheduled` / `published` |
+| `preview_token` | string (32 hex) \| null | Постоянный preview-токен для согласования |
+| `slug_history` | array | История старых slug'ов (для 301-редиректов) |
+| `history_key` | string (16 hex) \| null | Ключ истории. Генерируется при создании страницы. |
+| `created` | `Y-m-d H:i:s` | Опционально |
+| `updated` | `Y-m-d H:i:s` | Опционально |
+| `meta` | object | Опционально |
+| `show_header` | bool | Опционально |
+| `show_footer` | bool | Опционально |
+| `rows` | array | Опционально |
+
+**Поле `preview_token`:** создаётся/удаляется **только по кнопке** в `edit.php`. При сохранении страницы **не трогается**. Открывает страницу в любом статусе по URL `/{slug}?preview={token}`.
+
+**Поле `slug_history`:** массив старых slug'ов. Заполняется автоматически при переименовании страницы. Используется для 301-редиректов: старый URL → актуальный. Если поле пустое — не создаётся. Лимит — 50 записей (старые удаляются).
+
+**Поле `history_key`:** 16 hex-символов. Генерируется при **создании** страницы. **Не меняется** при переименовании slug. Клонирование создаёт **новый** ключ (история не наследуется). Восстановление из корзины **сохраняет** ключ. Используется как имя папки в `data/history/`.
+
+### Статусы страниц
+
+| Статус | Видна на фронте | `publish_at` | `unpublish_at` |
+|--------|-----------------|--------------|----------------|
+| `draft` | Нет | Всегда `null` | Всегда `null` |
+| `scheduled` | Станет видна в `publish_at` | Обязателен, в будущем | Опционально, > `publish_at` |
+| `published` | Да (до `unpublish_at`, если задан) | Всегда `null` | Опционально, в будущем |
+| `archived` | Нет | Всегда `null` | Всегда `null` |
+
+**Переходы статусов:**
+
+- **Вручную** — через форму редактирования страницы (4 radio).
+- **Автоматически** — через `cron/publish.php`:
+  - `scheduled` → `published`, когда `publish_at <= now`.
+  - `published` → `archived`, когда `unpublish_at <= now`.
+
+**Очистка дат при сохранении:**
+
+- `draft` / `archived` → `publish_at` и `unpublish_at` обнуляются.
+- `published` → `publish_at` обнуляется, `unpublish_at` сохраняется.
+- `scheduled` → обе даты актуальны.
+
+**Подстраховка на фронте:**
+
+`loadPage()` в `functions.php` отдаёт страницу только если:
+- `status === 'published'`, и
+- `unpublish_at` не задан или ещё не наступил.
+
+Это защита на случай, если cron не сработал (отключён, упал) — страница всё равно не будет видна после истечения `unpublish_at`.
+
+**Удаление:** при удалении страницы файл **не удаляется физически**, а перемещается в `data/trash/page_{id}_{timestamp}.json` (см. раздел «`data/trash/`»). Восстановление — через модалку «Корзина» в админке.
+
+---
+
+## 📄 `data/menus/{id}.json`
+
+```json
+{
+    "id": "header_main",
+    "name": "Главное меню",
+    "items": [
+        {
+            "id": "item_1",
+            "type": "page",
+            "label": "Главная",
+            "page_id": "/",
+            "order": 0
+        },
+        {
+            "id": "item_2",
+            "type": "dropdown",
+            "label": "Услуги",
+            "order": 1,
+            "children": [
+                {
+                    "type": "page",
+                    "label": "Разработка",
+                    "page_id": "/services/dev"
+                }
+            ]
+        },
+        {
+            "id": "item_3",
+            "type": "custom",
+            "label": "Внешняя ссылка",
+            "url": "https://example.com",
+            "order": 2
+        },
+        {
+            "id": "item_4",
+            "type": "divider",
+            "order": 3
+        }
+    ]
+}
+```
+
+**Типы** **пунктов:**
+
+| Тип | Поля |
+|-----|------|
+| `page` | `label`, `page_id` |
+| `section` | `label`, `url` (**якорь** `#section`) |
+| `custom` | `label`, `url` |
+| `dropdown` | `label`, `children[]` |
+| `divider` | — |
+
+**Удаление:** аналогично страницам — файл перемещается в `data/trash/menu_{id}_{timestamp}.json`. **Главное меню** нельзя удалить (защита в `handleDeleteMenu`), в корзину не попадает.
+
+---
+
+## 📄 `data/trash/{type}_{id}_{timestamp}.json`
+
+Корзина удалённых сущностей. Один файл — одна удалённая страница или меню.
+
+**Структура имени файла:**
+
+- `{type}` — `page` или `menu`.
+- `{id}` — оригинальный ID сущности.
+- `{timestamp}` — Unix timestamp момента удаления.
+
+**Примеры:**
+- `page_home_1735689600.json`
+- `menu_footer_help_1735689601.json`
+
+**Структура JSON:**
+
+Содержимое — **то же, что у оригинала** (`data/pages/{id}.json` или `data/menus/{id}.json`) **+ поле `_trash`**:
+
+```json
+{
+    "id": "about",
+    "title": "О компании",
+    "slug": "about",
+    "rows": [ ... ],
+
+    "_trash": {
+        "type": "page",
+        "original_id": "about",
+        "deleted_at": 1735689600,
+        "deleted_by": "admin",
+        "size_bytes": 4096
+    }
+}
+```
+
+**Поля `_trash`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `type` | string | `page` или `menu` |
+| `original_id` | string | Исходный ID сущности |
+| `deleted_at` | int | Unix timestamp удаления |
+| `deleted_by` | string | Логин админа, удалившего сущность |
+| `size_bytes` | int | Размер оригинала в байтах (для UI) |
+
+**Что происходит при восстановлении:**
+
+1. Файл читается из `data/trash/`.
+2. Убирается поле `_trash`.
+3. `id` (и `slug` для страниц) заменяется на `{original_id}`, если он **свободен**, иначе — на `{original_id}-restored`, `{original_id}-restored-2`, ...
+4. Файл записывается в `data/pages/` или `data/menus/`.
+5. Файл из корзины удаляется.
+
+**Очистка корзины — только вручную:**
+
+- Кнопка **«Удалить выбранные»** в модалке.
+- Кнопка **«Очистить корзину»**.
+- Автоочистки по TTL — **нет**.
+
+---
+
+## 📄 `data/preview/{preview_id}.json`
+
+Временные preview-файлы из конструктора. Создаются кнопкой «Предпросмотр», живут до срабатывания одного из триггеров очистки.
+
+**Структура имени:** `{preview_id}.json`, где `preview_id` = 32 hex-символа.
+
+**Структура JSON:**
+
+Содержимое — **то же, что у страницы** + служебный блок `_preview`:
+
+```json
+{
+    "id": "about",
+    "title": "О компании",
+    "slug": "about",
+    "template": "full-width",
+    "status": "published",
+    "publish_at": null,
+    "unpublish_at": null,
+    "meta": { ... },
+    "show_header": true,
+    "show_footer": true,
+    "rows": [ ... ],
+
+    "_preview": {
+        "preview_id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+        "session_id": "abc123...",
+        "page_id": "about",
+        "created_at": 1735689600,
+        "created_by": "admin"
+    }
+}
+```
+
+**Поля `_preview`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `preview_id` | string | 32 hex |
+| `session_id` | string | ID сессии админа, создавшего preview |
+| `page_id` | string | ID страницы (или `''` для новой) |
+| `created_at` | int | Unix timestamp |
+| `created_by` | string | Логин админа |
+
+**Жизненный цикл:**
+
+- **Создаётся** — POST из `constructor.js`.
+- **Перезаписывается** — повторное нажатие «Предпросмотр» для той же `session + page`.
+- **Удаляется**:
+  1. При успешном логине — **всё**.
+  2. При заходе на `edit.php?id=X` — previews **текущей сессии** для `X`.
+  3. При сохранении `X` — previews **текущей сессии** для `X` (+ `''` при create).
+
+**Никакой автоочистки по TTL нет.**
+
+---
+
+## 📄 `sitemap.xml` и `robots.txt` (корень)
+
+Генерируются функциями `generateSitemap()` и `generateRobots()`.
+
+**Управление:** Настройки сайта → SEO → «Технический SEO».
+
+**Триггеры генерации:**
+1. Вручную — кнопка «Пересобрать».
+2. При сохранении настроек SEO (если галочки менялись).
+3. При сохранении/удалении/восстановлении/клонировании страницы — если `seo_auto_regenerate = true`.
+4. Крон — `config/cron/seo.php?token=xxx`.
+
+**Если галочка выключена** — соответствующий файл **удаляется** (если был).
+
+**Не путать с динамической отдачей:** никаких `.htaccess`-правил для sitemap/robots. Файлы — физические.
+
+---
+
+## 📄 Сгенерированные `.webp`
+
+**Где лежат:** рядом с оригиналом. `images/photo.jpg` → `images/photo.webp`. В подпапках — тоже (`images/products/photo.jpg` → `images/products/photo.webp`).
+
+**Когда создаются:**
+- При загрузке через **медиа-модалку** или **проводник**, если `media_webp_enabled = true`.
+- При ручной конвертации существующих (кнопка в Настройках → Медиа).
+
+**Что конвертируется:** только `jpg`, `jpeg`, `png`.
+
+**Что не конвертируется:** `gif` (анимация), `svg`, `ico`, `avif`.
+
+**Что НЕ удаляется:** оригинал (`photo.jpg`) — **всегда** остаётся.
+
+**Как используется на фронте:** через `mediaImageSrc($url)` — если `.webp` есть, подменяет `src`. Оригинал — fallback.
+
+**Настройки:** `media_webp_enabled`, `media_quality`.
+
+**Требования:** `GD` с поддержкой WebP (приоритет) или `Imagick` с WebP (fallback). Если ни одного — конвертация **тихо не срабатывает**, оригинал загружается как есть.
+
+**Удаление:** кнопка «Удалить все .webp» в настройках. Удаляет только те `.webp`, у которых **есть парный** `jpg`/`png`. Нативные `.webp` (загруженные сами по себе) — **не трогаются**.
+
+**`.htaccess`:** **не нужен** — `.webp` лежат рядом с оригиналами в `images/`, доступны по прямым URL.
+
+---
+
+## 📄 `config/data/credentials.json`
+
+```json
+{
+    "login": "admin",
+    "password_hash": "$2y$10$abcdefghijklmnopqrstuv"
+}
+```
+
+**`password_hash`** — **`password_hash(hash_hmac('sha256', $password, $login . $pepper))`**.
+
+---
+
+## 📄 `config/data/modules.json`
+
+```json
+{
+    "hero": {
+        "name": "Hero",
+        "icon": "icon-image",
+        "description": "Обложка с фоном",
+        "has_settings": true,
+        "auto_unpack": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    },
+    "faq": {
+        "name": "FAQ",
+        "icon": "icon-help-circle",
+        "description": "Вопрос-ответ",
+        "has_settings": true,
+        "auto_unpack": true,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    }
+}
+```
+
+---
+
+## 📄 `config/data/templates.json`
+
+```json
+{
+    "templates": [
+        {
+            "id": "full-width",
+            "name": "Полная ширина",
+            "zones": {
+                "main": { "class": "container mx-auto px-6" }
+            }
+        },
+        {
+            "id": "sidebar-left",
+            "name": "С сайдбаром слева",
+            "zones": {
+                "sidebar-left": { "class": "w-full lg:w-1/4" },
+                "main": { "class": "w-full lg:w-3/4" }
+            }
+        },
+        {
+            "id": "boxed",
+            "name": "Боксовый",
+            "zones": {
+                "main": { "class": "container max-w-6xl mx-auto" }
+            }
+        }
+    ]
+}
+```
+
+---
+
+## 📄 `config/data/plugins.json`
+
+Список плагинов и их статусов. Синхронизируется с папкой `config/plugins/` при заходе в админку (функция `syncPluginsData()`).
+
+```json
+{
+    "plugin_id": {
+        "id": "plugin_id",
+        "name": "Название плагина",
+        "description": "Описание",
+        "version": "1.0.0",
+        "author": "Автор",
+        "active": true,
+        "admin_tab": {
+            "title": "Название вкладки",
+            "icon": "icon-puzzle",
+            "group": "system"
+        }
+    }
+}
+```
+
+**Поля:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `id` | string | Уникальный ID (совпадает с именем папки). Берется из `plugin.json`. |
+| `name` | string | Название плагина |
+| `description` | string | Описание |
+| `version` | string | Версия (SemVer) |
+| `author` | string | Автор |
+| `active` | bool | Включен ли плагин |
+| `admin_tab` | object | (Опционально) Данные для автоматического создания вкладки в админке |
+
+**`admin_tab`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `title` | string | Заголовок в меню |
+| `icon` | string | Класс иконки Lucide |
+| `group` | string | Группа (`modules` или `system`) |
+
+**Важно:** при клике на вкладку ядро ищет файл `config/plugins/{id}/admin-page.php`. ID берется из корневого поля `id` манифеста. Если файл не найден — вы увидите заглушку «Визуальные настройки отсутствуют».
+
+---
+
+## 📄 `config/data/backup_config.json`
+
+```json
+{
+    "backup_type": "full",
+    "targets": [],
+    "storage_path": "config/backups/",
+    "encrypt_archive": false,
+    "archive_password": "",
+    "cron_enabled": false,
+    "cron_virtual": false,
+    "cron_period": 24,
+    "last_backup_time": 1705321200
+}
+```
+
+**Что было убрано из этого файла в v1.3.0:** поле `cron_token` **удалено** из `config/data/backup_config.json` и перенесено в `settings.json`, потому что теперь это **общий** токен для бэкапов и публикации страниц.
+
+---
+
+## 📄 `config/data/login_attempts.json`
+
+```json
+{
+    "settings": {
+        "max_attempts": 5,
+        "lockout_time": 15,
+        "permanent_trigger_count": 3,
+        "permanent_trigger_period": 24,
+        "session_timeout": 20
+    },
+    "attempts": {
+        "192.168.1.100": {
+            "count": 3,
+            "last_time": 1705321200,
+            "bans_count": 1,
+            "bans_history": [1705320000],
+            "permanent": false
+        }
+    }
+}
+```
+
+---
+
+## 📄 `data/history/{history_key}/{timestamp}.json`
+
+История изменений страницы. Один файл = один снапшот.
+
+**Структура имени:** `{history_key}/{timestamp}.json`, где:
+- `history_key` — 16 hex-символов (ключ истории страницы).
+- `timestamp` — Unix timestamp момента сохранения.
+
+**Структура JSON:**
+
+Содержимое — **полный JSON страницы** + служебный блок `_history`:
+
+```json
+{
+    "id": "about",
+    "title": "О компании",
+    "slug": "about",
+    "template": "full-width",
+    "status": "published",
+    "publish_at": null,
+    "unpublish_at": null,
+    "meta": { ... },
+    "show_header": true,
+    "show_footer": true,
+    "rows": [ ... ],
+    "slug_history": [ ... ],
+    "history_key": "22c915d03008950d",
+    "preview_token": null,
+
+    "_history": {
+        "page_id": "about",
+        "snapshot_at": 1735689600,
+        "saved_by": "admin",
+        "size_bytes": 5752
+    }
+}
+```
+
+**Поля `_history`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `page_id` | string | ID страницы |
+| `snapshot_at` | int | Unix timestamp |
+| `saved_by` | string | Логин админа |
+| `size_bytes` | int | Размер снапшота в байтах |
+
+**Что восстанавливается при откате:**
+
+- `title`
+- `template`
+- `meta`
+- `show_header`
+- `show_footer`
+- `rows`
+
+**Что НЕ восстанавливается:**
+
+- `status`, `publish_at`, `unpublish_at` — жизненный цикл.
+- `slug`, `slug_history` — адрес и его история.
+- `preview_token` — ссылка для согласования.
+- `id`, `history_key` — служебные.
+
+**Дедупликация:** снапшот не пишется, если:
+1. Пользователь ничего не менял (контент новый = старый).
+2. Такое же состояние уже есть в **последнем** снапшоте.
+
+**Лимит версий:** при превышении `history_limit` удаляются самые старые версии.
+
+**Ротация:** по имени файла (timestamp, возрастание).
+
+**Чистка:** при окончательном удалении страницы из корзины — история удаляется.
+
+**Автоочистки по TTL нет.**
+
+---
+
+## 🔄 Соглашения
+
+### Кодировка
+
+**Все** **файлы** — **UTF-8**, **без** **BOM**.
+
+### Форматирование
+
+**Запись** — **с** `JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT`.
+
+```php
+$jsonString = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+```
+
+**Чтение** — `json_decode($json, true)` (**ассоциативный** **массив**).
+
+### Безопасность
+
+- **Никаких** **executable** **данных** (**eval**, **PHP-код**) — **только** **данные**.
+- **Пользовательский** **HTML** — **санитизируется** **при** **сохранении** (`sanitizeHtml`).
+- **Строки** — **экранируются** `e()` **при** **выводе**.
+
+### Кеш в памяти
+
+**`getData($fileName)`** **кеширует** **в** `$GLOBALS['DATA_CACHE']` **на** **время** **запроса**.
+
+**`clearDataCache($fileName)`** — **сброс** **кеша** **при** **записи**.
+
+---
+
+## 🎯 Примеры операций
+
+### Чтение
+
+```php
+$settings = getSettingsData();
+$page = loadPage('about');
+$menuItems = getMenuItems('header_main');
+```
+
+### Запись
+
+```php
+saveData('settings', $newSettings);
+savePageData('about', $pageData);
+saveMenu('header_main', $menuData);
+```
+
+### Обновление части
+
+```php
+$settings = getSettingsData();
+$settings['cache_enabled'] = true;
+saveData('settings', $settings);
+```
+
+---
+
+## 📞 Поддержка
+
+- **Архитектура:** [ARCHITECTURE.md](ARCHITECTURE.md)
+- **API:** [API.md](API.md)
+- **Модули:** [MODULES.md](MODULES.md)
