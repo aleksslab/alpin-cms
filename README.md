@@ -153,8 +153,6 @@
 │   │   └── history_modal.php     
 │   │
 │   ├── plugins/                  # Плагины (системные расширения)
-│   │   ├── maintenance/
-│   │   └── updates/
 │   │
 │   ├── modules/                  # Модули админки
 │   │   ├── pages/
@@ -164,11 +162,11 @@
 │   │   ├── plugins.php           # Управление плагинами
 │   │   ├── security.php
 │   │   ├── backups.php
-│   │   ├── filemanager.php
-│   │   └── logs.php
+│   │   └── filemanager.php
 │   │
 │   ├── css/config.css            
-│   ├── js/                       
+│   ├── js/                           
+│   ├── logs/                  
 │   └── data/                     
 │       ├── credentials.json      
 │       ├── modules.json          
@@ -177,7 +175,6 @@
 │       └── .pepper               
 │
 ├── data/                         # ПОЛЬЗОВАТЕЛЬСКИЕ ДАННЫЕ
-│   ├── logs/                     # Логи
 │   ├── menus/*.json              # Меню
 │   ├── pages/*.json              # Страницы
 │   ├── preview/                  # Временные preview из конструктора

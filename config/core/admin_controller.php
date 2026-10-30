@@ -2905,13 +2905,42 @@ function handleDeleteMenu(): void {
  */
 function logAction(string $action, string $message, string $level = 'INFO', ?string $user = null): void {
     $settings = getLogSettings();
-    $logDir = $settings['storage_path'] ?? DATA_DIR . 'logs/';
-    
-    // Нормализуем путь
-    if (strpos($logDir, DATA_DIR) !== 0 && strpos($logDir, APP_ROOT) !== 0) {
-        $logDir = DATA_DIR . 'logs/';
+
+    // Проверка 1: логирование выключено — не пишем
+    if (empty($settings['log_enabled'])) {
+        return;
     }
-    
+
+    // Проверка 2: действие отключено в настройках — не пишем
+    $allowedActions = $settings['log_actions'] ?? [];
+    if (empty($allowedActions[$action])) {
+        return;
+    }
+
+    // Проверка 3: путь к логам (пустая строка → fallback на CMS_LOGS_DIR)
+    $logDir = trim($settings['storage_path'] ?? '') ?: CMS_LOGS_DIR;
+
+    // Нормализуем слэши для кросс-платформенного сравнения
+    $normalizedLogDir    = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $logDir);
+    $normalizedConfigDir = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, CONFIG_DIR);
+    $normalizedDataDir   = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, DATA_DIR);
+
+    // Абсолютный путь (Linux/Mac: /... | Windows: C:\... или C:/...)
+    $isAbsolute = preg_match('#^(/|[a-zA-Z]:[\\\\/])#', $logDir) === 1;
+
+    // Внутри сайта (config/ или data/) — регистронезависимо (Windows)
+    $isInsideSite = stripos($normalizedLogDir, $normalizedConfigDir) === 0
+                 || stripos($normalizedLogDir, $normalizedDataDir) === 0;
+
+    // Разрешены: абсолютные пути и пути внутри config/ или data/
+    // Всё остальное (относительные пути вне сайта) — fallback на дефолт
+    if (!$isAbsolute && !$isInsideSite) {
+        $logDir = CMS_LOGS_DIR;
+    }
+
+    // Нормализуем trailing separator
+    $logDir = rtrim($logDir, '/\\') . DIRECTORY_SEPARATOR;
+
     if (!is_dir($logDir)) {
         @mkdir($logDir, 0755, true);
     }
@@ -2976,54 +3005,6 @@ function rotateLog(string $logDir): void {
 }
 
 /**
- * Возвращает список всех возможных действий для логирования
- *
- * @return array Массив действий с метками
- */
-function getLogActions(): array {
-    return [
-        // Страницы
-        'page_save' => 'Сохранение страницы',
-        'page_delete' => 'Удаление страницы',
-        'page_clone' => 'Клонирование страницы',
-        'page_set_home' => 'Назначение главной страницы',
-        
-        // Меню
-        'menu_save' => 'Сохранение меню',
-        'menu_delete' => 'Удаление меню',
-        'menu_set_main' => 'Назначение главного меню',
-        
-        // Настройки
-        'settings_save' => 'Сохранение настроек сайта',
-        'security_save' => 'Сохранение настроек безопасности',
-        
-        // Бэкапы
-        'backup_create' => 'Создание бэкапа',
-        'backup_restore' => 'Восстановление из бэкапа',
-        'backup_delete' => 'Удаление бэкапа',
-        
-        // Файлы
-        'file_upload' => 'Загрузка файлов',
-        'file_delete' => 'Удаление файлов',
-        'file_edit' => 'Редактирование файлов',
-        'file_rename' => 'Переименование файлов',
-        'file_chmod' => 'Изменение прав доступа',
-        'file_create_dir' => 'Создание папки',
-        'file_create_file' => 'Создание файла',
-        
-        // Модули
-        'module_install' => 'Установка модуля',
-        'module_delete' => 'Удаление модуля',
-        'module_update' => 'Обновление модуля',
-        
-        // Авторизация
-        'auth_login' => 'Вход в админку',
-        'auth_logout' => 'Выход из админки',
-        'auth_failed' => 'Неудачная попытка входа',
-    ];
-}
-
-/**
  * Получить настройки логирования
  */
 function getLogSettings(): array {
@@ -3031,7 +3012,7 @@ function getLogSettings(): array {
     $defaults = [
         'log_enabled' => true,
         'log_levels' => ['INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-        'storage_path' => DATA_DIR . 'logs/',
+        'storage_path' => CMS_LOGS_DIR,
         'max_size' => 5 * 1024 * 1024, // 5 MB
         'keep_count' => 10,
         'log_actions' => [
@@ -3054,97 +3035,6 @@ function getLogSettings(): array {
     ];
     
     return array_merge($defaults, $settings['log_settings'] ?? []);
-}
-
-/**
- * Парсит строку лога в массив
- *
- * @param string $line Строка лога
- * @return array|null Массив с данными или null
- */
-function parseLogLine(string $line): ?array {
-    $pattern = '/\[([^\]]+)\]\s+\[([^\]]+)\]\s+\[([^\]]+)\]\s+\[([^\]]+)\]\s+([^:]+):\s+(.+)/';
-    
-    if (preg_match($pattern, trim($line), $matches)) {
-        return [
-            'timestamp' => $matches[1],
-            'level' => $matches[2],
-            'user' => $matches[3],
-            'ip' => $matches[4],
-            'action' => $matches[5],
-            'message' => $matches[6]
-        ];
-    }
-    
-    return null;
-}
-
-function handleSaveLogSettings(): array {
-    $settings = getData('settings');
-    
-    $settings['log_settings'] = [
-        'log_enabled' => isset($_POST['log_enabled']),
-        'storage_path' => trim($_POST['storage_path'] ?? DATA_DIR . 'logs/'),
-        'max_size' => intval($_POST['max_size'] ?? 5) * 1024 * 1024,
-        'keep_count' => intval($_POST['keep_count'] ?? 10),
-        'log_actions' => $_POST['log_actions'] ?? []
-    ];
-    
-    if (saveData('settings', $settings)) {
-        setFlash('Настройки логирования сохранены', 'success', 3);
-    } else {
-        setFlash('Ошибка сохранения настроек', 'error', 5);
-    }
-    
-    header('Location: index.php?tab=logs');
-    exit;
-}
-
-/**
- * Обработка AJAX-запроса на получение логов
- */
-function handleGetLogs(): void {
-    header('Content-Type: application/json; charset=utf-8');
-    
-    $settings = getLogSettings();
-    $logDir = $settings['storage_path'] ?? DATA_DIR . 'logs/';
-    $logFile = $logDir . 'admin.log';
-    
-    $filterLevel = $_GET['level'] ?? '';
-    $filterAction = $_GET['action'] ?? '';
-    $search = $_GET['search'] ?? '';
-    $page = intval($_GET['page'] ?? 1);
-    $perPage = intval($_GET['per_page'] ?? 50);
-    
-    $logs = [];
-    if (file_exists($logFile)) {
-        $lines = file($logFile);
-        $lines = array_reverse($lines);
-        
-        foreach ($lines as $line) {
-            $parsed = parseLogLine($line);
-            if (!$parsed) continue;
-            
-            if ($filterLevel && $parsed['level'] !== $filterLevel) continue;
-            if ($filterAction && strpos($parsed['action'], $filterAction) === false) continue;
-            if ($search && stripos($line, $search) === false) continue;
-            
-            $logs[] = $parsed;
-        }
-    }
-    
-    $total = count($logs);
-    $totalPages = ceil($total / $perPage);
-    $offset = ($page - 1) * $perPage;
-    $logs = array_slice($logs, $offset, $perPage);
-    
-    echo json_encode([
-        'logs' => $logs,
-        'total' => $total,
-        'page' => $page,
-        'totalPages' => $totalPages
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
 }
 
 /**
@@ -5342,12 +5232,17 @@ function handlePluginUpload(): array {
     require_once __DIR__ . '/plugins.php';
     $result = installPluginFromZip($tempFile, $id);
     if ($result['success']) {
-        do_action('plugin_after_update', $id, $newVersion);
-        $msg = isset($plugins[$id]) ? 'Плагин "' . e($id) . '" успешно обновлен до версии ' . e($newVersion) . '!' : $result['message'];
+        if (isset($plugins[$id])) {
+            do_action('plugin_after_update', $id, $newVersion);
+            logAction('plugin_update', 'Плагин "' . $id . '" обновлён до версии ' . $newVersion, 'INFO');
+            $msg = 'Плагин "' . e($id) . '" успешно обновлен до версии ' . e($newVersion) . '!';
+        } else {
+            do_action('plugin_after_install', $id);
+            logAction('plugin_install', 'Установлен плагин "' . $id . '" (версия ' . $newVersion . ')', 'INFO');
+            $msg = $result['message'];
+        }
         return ['success' => $msg, 'error' => ''];
     }
-    
-    return ['success' => '', 'error' => $result['message']];
 }
 
 /**
@@ -5418,12 +5313,14 @@ function handlePluginAction(): array {
         }
         
         // Удаляем из JSON
+        // Имя плагина — ДО unset
+        $pluginName = $plugins[$pluginId]['name'] ?? $pluginId;
+
         unset($plugins[$pluginId]);
         savePluginsData($plugins);
-        
-        // Хук ПОСЛЕ удаления
         do_action('plugin_after_delete', $pluginId);
-        
+        logAction('plugin_delete', 'Удалён плагин "' . $pluginId . '"' . ($pluginName !== $pluginId ? ' (' . $pluginName . ')' : ''), 'INFO');
+
         // Чистим кеш
         $cacheFile = DATA_DIR . 'updates_cache.json';
         if (file_exists($cacheFile)) {
@@ -5432,7 +5329,7 @@ function handlePluginAction(): array {
             safeFileWrite($cacheFile, json_encode($cache, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         }
         
-        return ['success' => 'Плагин "' . e($plugins[$pluginId]['name'] ?? $pluginId) . '" успешно удален.', 'error' => ''];
+        return ['success' => 'Плагин "' . e($pluginName) . '" успешно удален.', 'error' => ''];
     }
     
     // --- ПЕРЕКЛЮЧЕНИЕ СТАТУСА ---
@@ -5456,9 +5353,12 @@ function handlePluginAction(): array {
         
         // Хук ПОСЛЕ переключения
         do_action('plugin_after_toggle', $pluginId, $active);
-        
+
+        $pluginName = $plugins[$pluginId]['name'] ?? $pluginId;
+        logAction('plugin_toggle', 'Плагин "' . $pluginId . '" ' . ($active ? 'включён' : 'выключен') . ($pluginName !== $pluginId ? ' (' . $pluginName . ')' : ''), 'INFO');
+
         return [
-            'success' => 'Плагин "' . e($plugins[$pluginId]['name'] ?? $pluginId) . '" ' . ($active ? 'включен' : 'выключен') . '.',
+            'success' => 'Плагин "' . e($pluginName) . '" ' . ($active ? 'включен' : 'выключен') . '.',
             'error' => ''
         ];
     }

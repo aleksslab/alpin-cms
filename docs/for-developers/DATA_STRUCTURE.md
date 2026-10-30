@@ -9,7 +9,6 @@
 | `data/settings.json` | Настройки сайта |
 | `data/pages/{id}.json` | Страницы |
 | `data/menus/{id}.json` | Меню |
-| `data/logs/admin.log` | Логи (**не** JSON) |
 | `data/trash/*.json` | Корзина (удалённые страницы и меню) |
 | `data/preview/{preview_id}.json` | Временные preview (из конструктора) |
 | `data/history/{history_key}/*.json` | История изменений страниц (снапшоты) |
@@ -19,6 +18,7 @@
 | `config/data/templates.json` | Список шаблонов |
 | `config/data/backup_config.json` | Настройки бэкапов |
 | `config/data/login_attempts.json` | Логин-попытки, баны IP |
+| `config/logs/admin.log` | Логи (**не** JSON) |
 
 ---
 

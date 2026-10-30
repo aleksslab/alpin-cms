@@ -29,6 +29,9 @@
   - Иконка-уведомление в хедере админки при наличии обновлений.
   - Настройки: период проверки, URL каталога, выбор проверяемых сущностей.
   - Автоматическая проверка раз в N дней (виртуальный крон).
+- **Плагин «Логи системы»**: вынесен из ядра (UI, фильтры, настройки ротации, AJAX `get_logs`). Логика записи (`logAction`, `rotateLog`, `getLogSettings`) остаётся в ядре.
+- **Логирование операций с плагинами**: `plugin_install`, `plugin_update`, `plugin_delete`, `plugin_toggle`.
+- **Фикс `plugin_after_install`**: теперь вызывается при установке нового плагина.
 
 ### Изменено
 
@@ -41,11 +44,19 @@
   - Добавлен хук `admin_init` для инициализации плагинов.
 - **`handleSaveSettings`**: добавлена поддержка AJAX-ответов (для плагинов) и `return_url` (возврат на нужную вкладку после сохранения).
 - **Унифицированы флеш-сообщения**: теперь можно передавать источник (`Настройки сайта` / `Настройки плагина`) через скрытое поле `settings_source`.
+- **Логи переехали**: `data/logs/` → `config/logs/`. Дефолт — `CMS_LOGS_DIR` (константа в `config.php`).
+
+### Исправлено
+
+- **`logAction`**: уважает `log_enabled` (раньше галочка в UI не работала).
+- **`logAction`**: уважает `log_actions` (раньше снятые чекбоксы не влияли).
+- **`logAction`**: fallback на `CMS_LOGS_DIR` при небезопасном `storage_path`.
+- **Удаление плагина**: имя берётся до `unset` (раньше сообщение теряло название).
 
 ### Технические детали
 
-- **Новые файлы**: `config/core/hooks.php`, `plugins.php`, `router.php`, `virtual_crons.php`, `admin_actions.php`, `admin_ajax.php`, `admin_menu.php`, `config/plugins/maintenance/*`, `config/plugins/updates/*`.
-- **Новые константы**: `CONFIG_DIR`, `PLUGINS_DIR`, `UPDATES_DEFAULT_CATALOG_URL`.
+- **Новые файлы**: `config/core/hooks.php`, `plugins.php`, `router.php`, `virtual_crons.php`, `admin_actions.php`, `admin_ajax.php`, `admin_menu.php`, `config/plugins/*`
+- **Новые константы**: `CONFIG_DIR`, `PLUGINS_DIR`, `CMS_LOGS_DIR`, `UPDATES_DEFAULT_CATALOG_URL`.
 - **Новые поля в `settings.json`**: `updates_period`, `updates_check_core`, `updates_check_modules`, `updates_check_plugins`, `updates_catalog_url`.
 
 ## [Release version 1.11.0] — 2026-10-27

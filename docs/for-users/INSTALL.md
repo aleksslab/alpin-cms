@@ -13,6 +13,7 @@
 - **Права на запись** для папок:
   - `data/`
   - `config/data/`
+  - `config/logs/`
   - `cache/`
 - **~50 МБ** свободного места на диске
 
@@ -69,7 +70,7 @@
 
 ```bash
 cd /path/to/site
-chmod -R 755 data/ config/data/ cache/
+chmod -R 755 data/ config/data/ config/logs/ cache/
 chmod 644 data/settings.json config/data/*.json
 ```
 
@@ -79,8 +80,8 @@ chmod 644 data/settings.json config/data/*.json
 - `data/` — пользовательские данные
 - `data/pages/` — страницы
 - `data/menus/` — меню
-- `data/logs/` — логи
 - `config/data/` — системные данные
+- `config/logs/` — логи
 - `cache/` — кеш страниц и ассетов
 - `cache/pages/`
 - `cache/assets/`
@@ -301,7 +302,7 @@ define('DEBUG_ADMIN', false);
 
 **Решение:**
 ```bash
-chmod 755 data/ config/data/ cache/
+chmod 755 data/ config/data/ config/logs/ cache/
 ```
 
 ### Логин не работает

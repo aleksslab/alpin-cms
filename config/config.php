@@ -110,6 +110,7 @@ define('MAX_UPLOAD_SIZE', 2 * 1024 * 1024);
 define('CMS_VERSION', '2.0.0'); // Версия ядра
 define('CONFIG_DIR', APP_ROOT . DIRECTORY_SEPARATOR . 'config');
 define('PLUGINS_DIR', CONFIG_DIR . DIRECTORY_SEPARATOR . 'plugins');
+define('CMS_LOGS_DIR', CONFIG_DIR . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR);
 
 // URL каталога обновлений по умолчанию
 if (!defined('UPDATES_DEFAULT_CATALOG_URL')) {

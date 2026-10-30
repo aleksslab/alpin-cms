@@ -11,6 +11,13 @@
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_dark-theme.zip"
         },
+        "logs": {
+            "type": "plugin",
+            "name": "Логи системы",
+            "description": "Просмотр и настройка журнала действий администратора",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_logs.zip"
+        },
         "maintenance": {
             "type": "plugin",
             "name": "Технические работы",

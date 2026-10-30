@@ -1420,7 +1420,7 @@ if (verifyAdminCredentials($login, $password)) { ... }
 
 ### `fmIsBlacklisted(string $relativePath): bool`
 
-**Запрещённые** **пути:** `config/data`, `config/backups`, `config/core`, `data/logs`.
+**Запрещённые** **пути:** `config/data`, `config/backups`, `config/core`, `config/logs`, `data/logs` (legacy) + кастомный `storage_path` из `getLogSettings()`, если внутри `APP_ROOT`.
 
 ---
 
@@ -1440,7 +1440,7 @@ if (verifyAdminCredentials($login, $password)) { ... }
 
 ### `logAction(string $action, string $message, string $level = 'INFO', ?string $user = null): void`
 
-**Запись** **в** `data/logs/admin.log`.
+**Запись** **в** `config/logs/admin.log` (**по умолчанию**; путь настраивается в плагине `logs`).
 
 ```php
 logAction('page_save', 'Страница сохранена', 'INFO');
@@ -1448,6 +1448,10 @@ logAction('auth_failed', 'Неудачная попытка', 'WARNING');
 ```
 
 **Уровни:** `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+
+**Проверки:** `log_enabled = false` → не пишет; действие отключено в `log_actions` → не пишет; небезопасный `storage_path` → fallback на `CMS_LOGS_DIR` (`config/logs/`).
+
+**Константа:** `CMS_LOGS_DIR` определена в `config.php`.
 
 ---
 
@@ -1457,15 +1461,9 @@ logAction('auth_failed', 'Неудачная попытка', 'WARNING');
 
 ---
 
-### `parseLogLine(string $line): ?array`
+### `getLogSettings(): array`
 
-**Парсинг** **строки** **лога**.
-
----
-
-### `getLogActions(): array`
-
-**Список** **всех** **возможных** **действий** **для** **логирования**.
+Настройки логирования из `settings.json` (`log_settings`) с дефолтами.
 
 ---
 

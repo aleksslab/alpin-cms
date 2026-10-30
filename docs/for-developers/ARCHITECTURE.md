@@ -101,14 +101,6 @@ config/
 │   └── history_modal.php     # Модалка истории изменений
 │
 ├── plugins/               # Плагины (системные расширения)
-│   ├── maintenance/       # Плагин "Технические работы"
-│   │   ├── plugin.json
-│   │   ├── plugin.php
-│   │   └── admin-page.php (опционально)
-│   └── updates/           # Плагин "Обновления"
-│       ├── plugin.json
-│       ├── plugin.php
-│       └── admin-page.php
 │
 ├── modules/               # Админские модули (вкладки)
 │   ├── config_vars.php
@@ -135,11 +127,12 @@ config/
 │   ├── security.php
 │   ├── backups.php
 │   ├── filemanager.php
-│   ├── logs.php
 │   └── module_upload.php
 │
 ├── css/config.css         # Стили админки
 ├── js/                    # JS админки
+├── logs/                  # Логи действий администратора (защищено .htaccess)
+│
 └── data/                  # Системные данные (защищено)
     ├── credentials.json   # Логин/хеш
     ├── .pepper            # Секрет для пароля
@@ -523,7 +516,7 @@ config/data/modules.json│    loadPage,          рендер)
 ```
 POST-форма ──► config/index.php ──► admin_controller.php ──► safeFileWrite ──► data/*.json
                        │
-                       └──► logAction ──► data/logs/admin.log
+                       └──► logAction ──► config/logs/admin.log
 ```
 
 ---

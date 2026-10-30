@@ -120,9 +120,6 @@ function handle_admin_post_actions(): void {
         exit;
     }
     
-    // --- ЛОГИ ---
-    elseif (isset($_POST['save_log_settings'])) { $res = handleSaveLogSettings(); }
-    
     // --- ФЛЭШ-СООБЩЕНИЯ ---
     if (!empty($res['success'])) {
         setFlash($res['success'], 'success');

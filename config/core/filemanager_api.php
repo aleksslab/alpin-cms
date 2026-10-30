@@ -88,7 +88,23 @@ function fmSafeAbsolute(string $relativePath): ?string {
  * @return bool true — путь запрещён
  */
 function fmIsBlacklisted(string $relativePath): bool {
-    $blacklist = ['config/data', 'config/backups', 'config/core', 'data/logs'];
+    // Базовый blacklist: системные папки + оба варианта логов (старый и новый)
+    $blacklist = ['config/data', 'config/backups', 'config/core', 'config/logs', 'data/logs'];
+
+    // Пользовательский путь к логам (если задан и находится внутри APP_ROOT)
+    $logSettings = function_exists('getLogSettings') ? getLogSettings() : [];
+    $customLogPath = trim($logSettings['storage_path'] ?? '');
+    if ($customLogPath !== '') {
+        $realRoot = realpath(FM_SITE_ROOT);
+        $realLogs = realpath($customLogPath);
+        if ($realRoot !== false && $realLogs !== false && strpos($realLogs, $realRoot) === 0) {
+            $relativeLogs = str_replace('\\', '/', trim(str_replace($realRoot, '', $realLogs), '/\\'));
+            if ($relativeLogs !== '' && !in_array($relativeLogs, $blacklist, true)) {
+                $blacklist[] = $relativeLogs;
+            }
+        }
+    }
+
     $normalized = str_replace('\\', '/', $relativePath);
 
     foreach ($blacklist as $blocked) {

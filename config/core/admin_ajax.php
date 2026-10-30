@@ -54,13 +54,6 @@ function handle_admin_ajax_actions(): void {
         exit;
     }
     
-    // --- ЛОГИ (AJAX) ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_logs' && isset($_GET['tab']) && $_GET['tab'] === 'logs') {
-        require_once __DIR__ . '/admin_controller.php';
-        handleGetLogs();
-        exit;
-    }
-    
     // --- СТАТИСТИКА МИНИФИКАЦИИ (AJAX) ---
     if (isset($_GET['action']) && $_GET['action'] === 'get_minify_stats' && isset($_GET['tab']) && $_GET['tab'] === 'config_vars') {
         require_once __DIR__ . '/admin_controller.php';

@@ -219,7 +219,7 @@ function fmSafeAbsolute(string $relativePath): ?string {
 **`fmIsBlacklisted(string $relativePath): bool`** — **запрещённые** **пути**:
 
 ```php
-$blacklist = ['config/data', 'config/backups', 'config/core', 'data/logs'];
+$blacklist = ['config/data', 'config/backups', 'config/core', 'config/logs'];
 ```
 
 **`fmIsSensitiveFile(string $fileName): bool`** — **чувствительные** **файлы**:
@@ -835,7 +835,7 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 - [ ] **ID** — валидация **regex**.
 - [ ] **ZipArchive** — `detectZipSlip` **перед** `extractTo`.
 - [ ] **File write** — `safeFileWrite` (**flock**).
-- [ ] **Логирование** — `logAction`.
+- [ ] **Логирование** — `logAction` (пишет в `config/logs/`).
 - [ ] **Токен крона** — если добавляешь новый крон-эндпоинт, используй `getCronToken()` для проверки; храни только в `settings.json`, не в конфигах подсистем.
 - [ ] **Ошибки** — не **раскрывать** **пути**/**данные**.
 

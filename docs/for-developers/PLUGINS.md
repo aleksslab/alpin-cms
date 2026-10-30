@@ -290,9 +290,9 @@ $token = $_SESSION['csrf_token'];
 **1. `plugin.json`:**
 ```json
 {
+    "id": "maintenance",
     "name": "Технические работы",
     "admin_tab": {
-        "id": "maintenance",
         "title": "Технические работы",
         "icon": "icon-construction",
         "group": "system"
