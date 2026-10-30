@@ -115,6 +115,7 @@ add_action('index_start', function() {
 | `render_head_start` | В `<head>` (до SEO) | — |
 | `render_head_end` | В `<head>` (перед `</head>`) | — |
 | `render_body_end` | Перед `</body>` | — |
+| `after_file_upload` | После успешной загрузки файла через проводник или медиа-модалку | `$filePath` |
 
 ### 🧩 Хуки жизненного цикла плагинов (только для админки)
 

@@ -15,8 +15,15 @@
             "type": "plugin",
             "name": "Технические работы",
             "description": "Заглушка 503 для посетителей, bypass-ссылка, автоснятие.",
-            "version": "1.0.0",
+            "version": "0.9.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_maintenance.zip"
+        },
+        "media-optimization": {
+            "type": "plugin",
+            "name": "Медиа (WebP)",
+            "description": "Конвертация изображений в WebP, статистика и массовая обработка.",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_media-optimization.zip"
         },
         "test-tab": {
             "type": "plugin",
@@ -29,7 +36,7 @@
             "type": "plugin",
             "name": "Обновления",
             "description": "Проверка новых версий ядра, модулей и плагинов",
-            "version": "1.0.0",
+            "version": "0.9.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_updates.zip"
         }
     }

@@ -40,10 +40,6 @@ function handle_admin_post_actions(): void {
     elseif (isset($_POST['clear_page_history'])) { handleClearPageHistory($_POST['page_id'] ?? ''); exit; }
     elseif (isset($_POST['clear_all_history'])) { handleClearAllHistory(); exit; }        
     
-    // --- МЕДИА ---
-    elseif (isset($_POST['delete_all_webp'])) { handleDeleteAllWebp(); exit; }
-    elseif (isset($_POST['convert_existing_images_step'])) { handleConvertExistingImagesStep(); exit; }
-    
     // --- SEO ---
     elseif (isset($_POST['regenerate_seo_files'])) {
         $result = generateSeoFiles();

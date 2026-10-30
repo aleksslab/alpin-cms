@@ -582,8 +582,8 @@ if ($action === 'upload') {
         $targetPath = $currentFullPath . DIRECTORY_SEPARATOR . $finalName;
 
         if (move_uploaded_file($file['tmp_name'], $targetPath)) {
-            // WebP-конвертация (если включена)
-            maybeConvertToWebp($targetPath);
+            // Сообщаем ядру, что файл загружен
+            do_action('after_file_upload', $targetPath);
             
             $successCount++;
         } else {

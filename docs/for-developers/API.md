@@ -257,118 +257,33 @@ $result = getPagesListPaginated(1, 25);
 
 ---
 
-## 🎨 Рендер
-
 ## 🪝 Хуки и Плагины
 
-### `add_action(string $hook, callable $callback, int $priority = 10): void`
+### Список доступных хуков
 
-**Добавляет обработчик события (действия).**
-
-```php
-add_action('index_start', function() {
-    // Код, который выполнится в начале index.php
-});
-```
-
----
-
-### `do_action(string $hook, ...$args): void`
-
-**Выполняет событие (действие).** Все обработчики вызываются по очереди.
-
-```php
-do_action('admin_init');
-```
-
----
-
-### `add_filter(string $hook, callable $callback, int $priority = 10): void`
-
-**Добавляет фильтр (модификатор данных).**
-
-```php
-add_filter('page_title', function($title, $page) {
-    return $title . ' | Мой плагин';
-});
-```
+| Хук | Тип | Где срабатывает | Аргументы |
+|-----|-----|-----------------|-----------|
+| `index_start` | action | В начале `index.php` | — |
+| `admin_init` | action | В админке, после авторизации | — |
+| `admin_header_notifications` | action | В хедере админки | — |
+| `admin_settings_sections` | action | В Настройках сайта | — |
+| `render_head_start` | action | В `<head>` (до SEO) | — |
+| `render_head_end` | action | В `<head>` (перед `</head>`) | — |
+| `render_body_end` | action | Перед `</body>` | — |
+| `after_file_upload` | action | После загрузки файла (проводник / медиа) | `$filePath` |
+| `plugin_before_toggle` | action | Перед вкл/выкл плагина | `$id`, `$active` |
+| `plugin_after_toggle` | action | После вкл/выкл плагина | `$id`, `$active` |
+| `plugin_before_delete` | action | До удаления плагина | `$id` |
+| `plugin_after_delete` | action | После удаления плагина | `$id` |
+| `plugin_before_update` | action | Перед обновлением плагина | `$id`, `$newVersion` |
+| `plugin_after_update` | action | После обновления плагина | `$id`, `$newVersion` |
+| `plugin_after_install` | action | После установки плагина | `$id` |
+| `page_title` | filter | Заголовок страницы | `$title`, `$page` |
+| `save_settings_data` | filter | Массив настроек перед сохранением | `$newSettings` |
 
 ---
 
-### `apply_filters(string $hook, $value, ...$args)`
-
-**Применяет фильтры к значению.**
-
-```php
-$title = apply_filters('page_title', $pageTitle, $page);
-```
-
----
-
-### `add_route(string $pattern, callable $callback): void`
-
-**Регистрирует кастомный маршрут.** Вызывается в `router.php` (если страница не найдена).
-
-```php
-add_route('/callback', function() {
-    echo 'Callback page';
-    exit;
-});
-```
-
----
-
-### `dispatch_custom_route(string $slug): bool`
-
-**Ищет кастомный маршрут и выполняет его.** Возвращает `true`, если маршрут найден.
-
-```php
-if (dispatch_custom_route($slug)) {
-    exit;
-}
-```
-
----
-
-### `add_admin_tab(string $id, string $title, string $icon = 'icon-puzzle', string $group = 'system'): void`
-
-**Добавляет вкладку в сайдбар админки.** Обычно вызывается автоматически из `plugin.json` при загрузке плагина.
-
-```php
-add_admin_tab('updates', 'Обновления', 'icon-refresh-cw', 'system');
-```
-
----
-
-### `getPluginsData(): array`
-
-**Возвращает список плагинов и их статусов из `config/data/plugins.json`.**
-
----
-
-### `syncPluginsData(): array`
-
-**Синхронизирует папку плагинов с `plugins.json`.** Читает `plugin.json` и обновляет метаданные (включая `admin_tab`).
-
----
-
-### `loadActivePlugins(): void`
-
-**Подключает файлы `plugin.php` для всех активных плагинов.** Вызывается в `index.php` и `config/index.php`.
-
----
-
-### `isPluginActive(string $id): bool`
-
-**Проверяет, активен ли конкретный плагин.**
-
----
-
-### `save_plugin_settings(array &$newSettings, string $triggerField, array $defaults = [], array $fields = []): void`
-
-**Безопасно сохраняет настройки плагина.** Если форма плагина не отправлялась (поле `$triggerField` отсутствует в POST), сохраняет старые значения из `settings.json`, предотвращая их затирание.
-
----
+## 🎨 Рендер
 
 ### `renderBreadcrumbs(array $page): string`
 
@@ -978,6 +893,8 @@ mediaImageSrc('data:image/png;base64,...'); // без изменений
 
 **Пропускает:** `data:`, `http(s)://`, `//`, `.webp`, `.svg`, `.avif`, `.ico`.
 
+**Примечание:** Функция только **читает** наличие `.webp`. Сами `.webp` создаются плагином «Медиа (WebP)» (см. `PLUGINS.md`).
+
 **Результат кешируется** в памяти на время запроса (`static $cache`).
 
 **Использование:**
@@ -987,144 +904,11 @@ mediaImageSrc('data:image/png;base64,...'); // без изменений
 
 ---
 
-### Утилиты сканирования (`admin_controller.php`)
+### Утилиты сканирования и WebP
 
-#### `getImageFiles(string $rootDir, bool $recursive = true): array`
+> **Важно:** Функции `getImageFiles()`, `isWebpSupported()`, `convertToWebp()`, `maybeConvertToWebp()`, `getWebpStats()`, `deleteAllWebp()`, `handleDeleteAllWebp()`, `countImagesWithoutWebp()`, `convertExistingImagesStep()`, `handleConvertExistingImagesStep()` **перенесены в плагин** `config/plugins/media-optimization/plugin.php`.
 
-Собирает абсолютные пути к `jpg`/`jpeg`/`png` в директории.
-
-```php
-$files = getImageFiles('/path/to/images', true);
-// ['/path/to/images/a.jpg', '/path/to/images/sub/b.png', ...]
-```
-
-**`$recursive = true`** — обход **всех подпапок** через `RecursiveIteratorIterator`.
-
-**`$recursive = false`** — только верхний уровень (используется для **корня сайта**, чтобы не лезть в `css/`, `js/`, `modules/`).
-
-**Используется в:** `getWebpStats()`, `deleteAllWebp()`, `countImagesWithoutWebp()`, `convertExistingImagesStep()`.
-
-**Правило проекта:** для `images/` — **рекурсивно** (там подпапки: `products/`, `blog/`, `team/`), для **корня** — **только верхний уровень**.
-
----
-
-### WebP-конвертация (`admin_controller.php`)
-
-#### `isWebpSupported(): bool`
-
-Проверяет доступность WebP на сервере.
-
-```php
-isWebpSupported(); // true — есть GD с imagewebp или Imagick с WebP
-                   // false — нет ни того, ни другого
-```
-
-**Результат кешируется** (`static $cache = null`).
-
-**Используется в:**
-- `handleSaveSettings` — защита от POST-инъекции `media_webp_enabled`.
-- `handleConvertExistingImagesStep` — отказ, если нет поддержки.
-- `media.php` — UI: `disabled` + предупреждения.
-
----
-
-#### `convertToWebp(string $sourcePath, int $quality = 82): ?string`
-
-Конвертирует одно изображение в `.webp`. Создаёт файл **рядом** с оригиналом. Оригинал **не удаляет**.
-
-```php
-$webp = convertToWebp('/path/to/photo.jpg', 82);
-// '/path/to/photo.webp' или null при ошибке
-```
-
-**Что конвертирует:** `jpg`, `jpeg`, `png` (прозрачность PNG сохраняется).
-
-**Что пропускает:** `gif`, `svg`, `ico`, `avif`, `webp` (уже).
-
-**Движки:** GD (приоритет) → Imagick (fallback).
-
-**При ошибке:** возвращает `null`, чистит частичный `.webp` (если создался). **Не бросает исключений.**
-
-**Не проверяет** `isWebpSupported()` — предполагает, что поддержка уже проверена снаружи.
-
----
-
-#### `maybeConvertToWebp(string $sourcePath): ?string`
-
-Обёртка: читает настройки и вызывает `convertToWebp()`, если включено.
-
-```php
-maybeConvertToWebp('/path/to/photo.jpg');
-// → '/path/to/photo.webp' (если media_webp_enabled = true и поддержка есть)
-// → null в остальных случаях
-```
-
-**Проверяет:**
-1. `media_webp_enabled` в `settings.json`.
-2. `isWebpSupported()` — защита от рассинхрона «локалка → прод».
-3. Берёт `media_quality` из настроек.
-
-**Используется в:** `handleAjaxImageUpload`, `filemanager_api.php → action=upload`.
-
----
-
-### Статистика и удаление
-
-#### `getWebpStats(): array`
-
-Собирает статистику по `.webp`-файлам.
-
-```php
-$stats = getWebpStats();
-// ['count' => 42, 'size_bytes' => 1258291]
-```
-
-**Обход:**
-- `images/` — **рекурсивно** (включая подпапки: `products/`, `blog/`, `team/`).
-- корень сайта — **только верхний уровень** (логотипы, OG-картинки).
-
-**Считает только те `.webp`, у которых есть парный** `jpg`/`jpeg`/`png`. Нативные `.webp` (без оригинала) — **не считаются**.
-
----
-
-#### `deleteAllWebp(): array`
-
-Удаляет все `.webp`, у которых есть парный оригинал. Оригиналы **не трогает**.
-
-```php
-$result = deleteAllWebp();
-// ['deleted' => 42, 'kept' => 3, 'error' => '']
-// 'kept' — .webp без оригинала (не удалены)
-```
-
-**Обход:**
-- `images/` — **рекурсивно** (включая подпапки).
-- корень сайта — **только верхний уровень**.
-
-**Защита:** удаляет `.webp` **только если** рядом есть `foo.jpg`/`foo.jpeg`/`foo.png`. Нативные `.webp` (загруженные сами по себе) — **не трогает**, считает в `kept`.
-
-**Используется в:** `handleDeleteAllWebp`.
-
----
-
-#### `handleDeleteAllWebp(): void`
-
-AJAX-обработчик удаления всех `.webp`. Вызывается из `config/index.php` при `$_POST['delete_all_webp']`.
-
-**Возвращает JSON:**
-```json
-{
-    "success": true,
-    "deleted": 42,
-    "kept": 3,
-    "error": "",
-    "message": "Удалено .webp: 42. Оставлено (нет оригинала): 3."
-}
-```
-
-**Логирует** в `logAction` при `deleted > 0`.
-
----
+Они доступны, только если плагин «Медиа (WebP)» активен.
 
 ### Массовая конвертация существующих
 
