@@ -19,6 +19,9 @@ require_once __DIR__ . '/hooks.php';
 // Реестр фоновых задач (кронов)
 require_once __DIR__ . '/cron.php';
 
+// Реестр действий логирования
+require_once __DIR__ . '/log.php';
+
 // Загрузчик плагинов
 require_once __DIR__ . '/plugins.php';
 

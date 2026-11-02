@@ -87,6 +87,7 @@ config/
 │   ├── functions.php      # ЧТЕНИЕ данных + утилиты (подключает хуки и плагины)
 │   ├── hooks.php          # Система хуков (add_action, add_filter, add_route)
 │   ├── cron.php           # Реестр фоновых задач (register_cron_task, состояние)
+│   ├── log.php            # Реестр действий логирования (register_log_action, группы)
 │   ├── plugins.php        # Загрузчик плагинов (syncPluginsData, loadActivePlugins)
 │   ├── router.php         # Роутинг фронтенда (вынесен из index.php)
 │   ├── virtual_crons.php  # Виртуальные кроны (задачи плагинов, публикация)

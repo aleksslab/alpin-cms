@@ -2140,37 +2140,68 @@ function rotateLog(string $logDir): void {
 }
 
 /**
+ * Гарантирует существование папки логов (по пути из настроек или CMS_LOGS_DIR) + .htaccess.
+ * Вызывается на admin_init; защита папки не зависит от плагина logs.
+ *
+ * @return void
+ */
+function ensureLogsDir(): void {
+    $settings = getLogSettings();
+    $logDir = trim($settings['storage_path'] ?? '') ?: CMS_LOGS_DIR;
+
+    // Нормализуем trailing separator
+    $logDir = rtrim($logDir, '/\\') . DIRECTORY_SEPARATOR;
+
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+
+    // .htaccess — только если папка внутри сайта (вне сайта не нужно)
+    $realRoot = realpath(APP_ROOT);
+    $realLogs = realpath($logDir);
+    if ($realRoot !== false && $realLogs !== false && strpos($realLogs, $realRoot) === 0) {
+        $htaccess = $logDir . '.htaccess';
+        if (!file_exists($htaccess)) {
+            $data = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
+                  . "<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n";
+            @file_put_contents($htaccess, $data);
+        }
+    }
+}
+
+/**
  * Получить настройки логирования
  */
 function getLogSettings(): array {
     $settings = getData('settings');
+
+    // Список действий берётся из реестра: все по умолчанию включены
+    $logActions = [];
+    foreach (get_log_actions() as $action => $label) {
+        $logActions[$action] = true;
+    }
+
     $defaults = [
         'log_enabled' => true,
         'log_levels' => ['INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         'storage_path' => CMS_LOGS_DIR,
         'max_size' => 5 * 1024 * 1024, // 5 MB
         'keep_count' => 10,
-        'log_actions' => [
-            'page_save' => true,
-            'page_delete' => true,
-            'menu_save' => true,
-            'menu_delete' => true,
-            'settings_save' => true,
-            'backup_create' => true,
-            'backup_restore' => true,
-            'backup_delete' => true,
-            'file_upload' => true,
-            'file_delete' => true,
-            'file_edit' => true,
-            'module_install' => true,
-            'module_delete' => true,
-            'auth_login' => true,
-            'auth_logout' => true,
-        ]
+        'log_actions' => $logActions,
     ];
-    
-    return array_merge($defaults, $settings['log_settings'] ?? []);
+
+    $saved  = $settings['log_settings'] ?? [];
+    $result = array_merge($defaults, $saved);
+
+    // Новые действия включаются по умолчанию; сохранённый выбор приоритетнее
+    if (isset($saved['log_actions']) && is_array($saved['log_actions'])) {
+        $result['log_actions'] = array_merge($logActions, $saved['log_actions']);
+    }
+
+    return $result;
 }
+
+add_action('admin_init', 'ensureLogsDir');
 
 /**
  * =========================================================================

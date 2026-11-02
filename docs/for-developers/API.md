@@ -1460,7 +1460,8 @@ if (verifyAdminCredentials($login, $password)) { ... }
 
 ### `fmIsSensitiveFile(string $fileName): bool`
 
-**Чувствительные** **файлы:** `.pepper`, `credentials.json`, `login_attempts.json`, `backup_config.json`.
+**Чувствительные** **файлы.** Ядро хранит только свои (`.pepper`, `credentials.json`,
+`login_attempts.json`); плагины добавляют свои через фильтр `sensitive_files`.
 
 ---
 
@@ -1477,7 +1478,7 @@ logAction('auth_failed', 'Неудачная попытка', 'WARNING');
 
 **Уровни:** `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
 
-**Проверки:** `log_enabled = false` → не пишет; действие отключено в `log_actions` → не пишет; небезопасный `storage_path` → fallback на `CMS_LOGS_DIR` (`config/logs/`).
+**Проверки:** `log_enabled = false` → не пишет; действие отключено в `log_actions` → не пишет (список действий — из реестра, см. `register_log_action()`); небезопасный `storage_path` → fallback на `CMS_LOGS_DIR` (`config/logs/`).
 
 **Константа:** `CMS_LOGS_DIR` определена в `config.php`.
 
@@ -1491,7 +1492,42 @@ logAction('auth_failed', 'Неудачная попытка', 'WARNING');
 
 ### `getLogSettings(): array`
 
-Настройки логирования из `settings.json` (`log_settings`) с дефолтами.
+Настройки логирования из `settings.json` (`log_settings`). Список `log_actions`
+собирается из реестра: **новые действия включены по умолчанию**, сохранённый
+выбор пользователя приоритетнее.
+
+---
+
+### `register_log_action(string $action, string $label, string $group = 'Прочее', string $icon = 'activity'): void`
+
+**Регистрирует** действие для системы логирования. Реестр — `config/core/log.php`.
+Ядро регистрирует свои действия, плагины — свои (на верхнем уровне `plugin.php`).
+
+```php
+register_log_action('backup_create', 'Создание бэкапа', 'Бэкапы', 'database-backup');
+```
+
+---
+
+### `get_log_actions(): array`
+
+**Возвращает** плоский список зарегистрированных действий: `[action => label]`.
+
+---
+
+### `get_log_action_groups(): array`
+
+**Возвращает** действия, сгруппированные для UI:
+`[group => ['icon' => ..., 'actions' => [action => label]]]`.
+Порядок групп — порядок регистрации.
+
+---
+
+### `ensureLogsDir(): void`
+
+**Создаёт** папку логов и `.htaccess` (если папка внутри сайта) по пути из
+настроек или `CMS_LOGS_DIR`. Вызывается на `admin_init`. Защита папки не зависит
+от плагина `logs`.
 
 ---
 

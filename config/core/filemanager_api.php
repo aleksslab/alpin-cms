@@ -136,12 +136,20 @@ function fmIsAllowedExtension(string $fileName): bool {
 /**
  * Проверяет, является ли файл чувствительным (по имени).
  *
+ * Ядро хранит только свои файлы; плагины добавляют свои через
+ * фильтр sensitive_files.
+ *
  * @param string $fileName Имя файла
  * @return bool true — файл запрещён
  */
 function fmIsSensitiveFile(string $fileName): bool {
-    $sensitive = ['.pepper', 'credentials.json', 'login_attempts.json', 'backup_config.json'];
-    return in_array($fileName, $sensitive, true);
+    $sensitive = apply_filters('sensitive_files', [
+        '.pepper',
+        'credentials.json',
+        'login_attempts.json',
+    ]);
+
+    return is_array($sensitive) && in_array($fileName, $sensitive, true);
 }
 
 // Получаем текущий подкаталог из запроса

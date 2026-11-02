@@ -9,6 +9,8 @@
 - **Реестр фоновых задач**: `register_cron_task()`, `get_cron_tasks()`, `run_cron_task()`, `get_cron_state()`, `set_cron_last_run()`, `get_cron_last_run()`. Состояние — в `config/data/cron_state.json`.
 - **Общий крон-эндпоинт** `config/cron/run.php?task={id}&token=...` для задач, зарегистрированных плагинами.
 - **Флаг `enabled`** у `register_cron_task()` — URL только включённых задач показываются в разделе «Интеграция с планировщиком».
+- **Реестр действий логирования**: `register_log_action()`, `get_log_actions()`, `get_log_action_groups()`. Ядро и плагины регистрируют свои действия, UI вкладки «Логи» строится из реестра.
+- **Фильтр `sensitive_files`** — плагины добавляют свои файлы в список недоступных через проводник.
 
 ### Изменено
 
@@ -16,10 +18,14 @@
 - **`config/cron/backup.php`** заменён общим `config/cron/run.php` (задача `backups`).
 - **Раздел «Интеграция с планировщиком»**: URL задач строятся из реестра (`get_cron_tasks()`), показываются только включённые задачи.
 - **`backup_config.json`**: поле `last_backup_time` больше не используется — расписание хранится в `config/data/cron_state.json`.
+- **`getLogSettings()`**: список `log_actions` собирается из реестра; новые действия включены по умолчанию, сохранённый выбор пользователя приоритетнее.
+- **Плагин `logs`**: UI строится из реестра, локальный `getLogActions()` удалён; при удалении плагина сбрасывается только список действий (путь и лимиты сохраняются).
+- **`ensureLogsDir()`** перенесён в ядро — папка логов и `.htaccess` больше не зависят от плагина `logs`.
+- **`fmIsSensitiveFile()`**: ядро хранит только свои файлы, файлы плагинов — через фильтр `sensitive_files`.
 
 ### Технические детали
 
-- **Новые файлы**: `config/core/cron.php`, `config/cron/run.php`.
+- **Новые файлы**: `config/core/cron.php`, `config/core/log.php`, `config/cron/run.php`.
 
 ## [Release version 2.0.0] — 2026-10-28
 

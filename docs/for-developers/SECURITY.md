@@ -222,11 +222,10 @@ function fmSafeAbsolute(string $relativePath): ?string {
 $blacklist = ['config/data', 'config/backups', 'config/core', 'config/logs'];
 ```
 
-**`fmIsSensitiveFile(string $fileName): bool`** — **чувствительные** **файлы**:
-
-```php
-$sensitive = ['.pepper', 'credentials.json', 'login_attempts.json', 'backup_config.json'];
-```
+**`fmIsSensitiveFile(string $fileName): bool`** — **чувствительные** **файлы**.
+Ядро хранит свои: `.pepper`, `credentials.json`, `login_attempts.json`. Плагины
+добавляют свои через фильтр `sensitive_files` (например, `backups` →
+`backup_config.json`).
 
 ### Защита в `loadPage`
 

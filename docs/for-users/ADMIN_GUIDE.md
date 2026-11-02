@@ -536,7 +536,7 @@ https://твой-сайт/config/cron/publish.php?token=<твой_токен>
 **Ограничения:**
 - **Whitelist** расширений: `php, css, js, json, html, txt, htaccess, jpg, jpeg, png, webp, gif, svg`.
 - **Blacklist** путей: `config/data`, `config/core`, `config/backups`, `data/logs`.
-- **Чувствительные файлы** (`.pepper`, `credentials.json`, `login_attempts.json`, `backup_config.json`) — только чтение.
+- **Чувствительные файлы** (`.pepper`, `credentials.json`, `login_attempts.json`, а также файлы плагинов, например `backup_config.json`) — только чтение.
 
 **Осторожно:** редактирование `config/core/*` может сломать CMS.
 
