@@ -5312,6 +5312,27 @@ function handlePluginAction(): array {
             @unlink($jsMinFile);
         }
         
+        // Удаляем ассеты админки (css и js)
+        $adminCssFile = CONFIG_DIR . '/css/' . $pluginId . '.css';
+        if (file_exists($adminCssFile)) {
+            @unlink($adminCssFile);
+        }
+        
+        $adminCssMinFile = CONFIG_DIR . '/css/' . $pluginId . '.min.css';
+        if (file_exists($adminCssMinFile)) {
+            @unlink($adminCssMinFile);
+        }
+        
+        $adminJsFile = CONFIG_DIR . '/js/' . $pluginId . '.js';
+        if (file_exists($adminJsFile)) {
+            @unlink($adminJsFile);
+        }
+        
+        $adminJsMinFile = CONFIG_DIR . '/js/' . $pluginId . '.min.js';
+        if (file_exists($adminJsMinFile)) {
+            @unlink($adminJsMinFile);
+        }
+        
         // Удаляем из JSON
         // Имя плагина — ДО unset
         $pluginName = $plugins[$pluginId]['name'] ?? $pluginId;

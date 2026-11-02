@@ -305,6 +305,19 @@ function installPluginFromZip(string $zipPath, string $id): array {
         }
     }
     
+    // Копируем ассеты админки (если есть папка admin/)
+    $adminDir = $targetDir . DIRECTORY_SEPARATOR . 'admin';
+    if (is_dir($adminDir)) {
+        // CSS
+        if (file_exists($adminDir . DIRECTORY_SEPARATOR . 'style.css')) {
+            copy($adminDir . DIRECTORY_SEPARATOR . 'style.css', CONFIG_DIR . '/css/' . $id . '.css');
+        }
+        // JS
+        if (file_exists($adminDir . DIRECTORY_SEPARATOR . 'script.js')) {
+            copy($adminDir . DIRECTORY_SEPARATOR . 'script.js', CONFIG_DIR . '/js/' . $id . '.js');
+        }
+    }
+    
     $zip->close();
     
     // Синхронизируем plugins.json
