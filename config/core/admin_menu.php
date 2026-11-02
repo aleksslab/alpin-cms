@@ -30,7 +30,6 @@ function get_admin_tabs(): array {
     $systemTabs[] = ['id' => 'plugins', 'title' => 'Плагины', 'icon' => 'icon-puzzle'];
     $systemTabs[] = ['id' => 'filemanager', 'title' => 'Проводник (Файлы)', 'icon' => 'icon-folder'];
     $systemTabs[] = ['id' => 'security', 'title' => 'Безопасность', 'icon' => 'icon-shield'];
-    $systemTabs[] = ['id' => 'backups', 'title' => 'Резервное копирование', 'icon' => 'icon-database-backup'];
 
     // Добавляем вкладки от плагинов
     if (!empty($GLOBALS['cms_admin_tabs'])) {

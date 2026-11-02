@@ -69,26 +69,8 @@ function handle_admin_post_actions(): void {
     elseif (isset($_POST['ajax_upload_carousel_img'])) { $res = handleAjaxImageUpload(); }
     
     // --- БЭКАПЫ ---
-    elseif (isset($_POST['save_backup_settings'])) { $res = handleSaveBackupSettings(); }
-    elseif (isset($_POST['init_backup_process']))   { 
-        echo json_encode(handleInitBackupProcess());
-        exit;
-    }
-    elseif (isset($_POST['process_backup_step']))  { 
-        echo json_encode(handleProcessBackupStep()); 
-        exit;
-    }
-    elseif (isset($_POST['delete_backup_action'])) {
-        handleDeleteBackup();
-        header('Location: index.php?tab=backups');
-        exit;
-    }
-    elseif (isset($_POST['restore_backup_action'])) {
-        handleRestoreBackup();
-        header('Location: index.php?tab=backups');
-        exit;
-    }
-    
+    // Обрабатываются плагином backups на admin_init.
+
     // --- МОДУЛИ (ДЕЙСТВИЯ) ---
     elseif (isset($_POST['module_action'])) {
         $res = handleModuleAction();

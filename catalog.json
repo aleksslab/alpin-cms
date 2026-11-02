@@ -4,6 +4,13 @@
         "download_url": "https:\/\/github.com\/AlekSSLab\/alpin-cms\/releases\/latest"
     },
     "extensions": {
+        "backups": {
+            "type": "plugin",
+            "name": "Резервное копирование",
+            "description": "Создание, восстановление и скачивание резервных копий",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_backups.zip"
+        },
         "dark-theme": {
             "type": "plugin",
             "name": "Тёмная тема",

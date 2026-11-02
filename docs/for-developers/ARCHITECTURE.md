@@ -79,16 +79,17 @@ config/
 ├── .htaccess              # RewriteEngine Off + Options -Indexes
 │
 ├── cron/                  # Эндпоинты для планировщика (хостинг)
-│   ├── backup.php         # Крон бэкапов
+│   ├── run.php            # Общий запуск задач из реестра (register_cron_task)
 │   ├── publish.php        # Крон публикации/архивации страниц
 │   └── seo.php            # Крон генерации sitemap/robots
 |
 ├── core/
 │   ├── functions.php      # ЧТЕНИЕ данных + утилиты (подключает хуки и плагины)
 │   ├── hooks.php          # Система хуков (add_action, add_filter, add_route)
+│   ├── cron.php           # Реестр фоновых задач (register_cron_task, состояние)
 │   ├── plugins.php        # Загрузчик плагинов (syncPluginsData, loadActivePlugins)
 │   ├── router.php         # Роутинг фронтенда (вынесен из index.php)
-│   ├── virtual_crons.php  # Виртуальные кроны (бэкап, публикация)
+│   ├── virtual_crons.php  # Виртуальные кроны (задачи плагинов, публикация)
 │   ├── admin_actions.php  # Обработка POST-запросов админки
 │   ├── admin_ajax.php     # Обработка GET/AJAX-запросов админки
 │   ├── admin_menu.php     # Формирование вкладок сайдбара (включая плагины)
@@ -125,7 +126,6 @@ config/
 │   ├── plugins.php        # Управление плагинами
 │   ├── modules.php
 │   ├── security.php
-│   ├── backups.php
 │   ├── filemanager.php
 │   └── module_upload.php
 │
@@ -139,7 +139,7 @@ config/
     ├── modules.json       # Список модулей
     ├── plugins.json       # Список плагинов и их статусов
     ├── templates.json     # Список шаблонов
-    └── backup_config.json # Настройки бэкапов
+    └── cron_state.json    # Время последних запусков фоновых задач
 ```
 
 ---
@@ -424,25 +424,17 @@ checkAdminSessionTimeout($bfData);
 
 ### 5. Виртуальные кроны
 
-При заходе админа в админку асинхронно дёргаются два виртуальных крона:
+При заходе админа в админку асинхронно дёргаются виртуальные задачи.
 
-**Крон бэкапов** (если включён `cron_virtual` в `backup_config.json`):
+**Задачи плагинов.** Ядро проходит по реестру `get_cron_tasks()` и для задач с
+флагом `virtual` (и подошедшим интервалом) запрашивает общий эндпоинт
+`config/cron/run.php?task={id}&token=...`. Ядро не знает, что делает задача.
 
 ```php
-$cronSettings = getBackupSettingsData();
-if (!empty($cronSettings['cron_virtual'])) {
-    $lastCronBackup = intval($cronSettings['last_backup_time'] ?? 0);
-    $cronPeriodHours = intval($cronSettings['cron_period'] ?? 24);
-
-    if (time() >= ($lastCronBackup + ($cronPeriodHours * 3600))) {
-        $cronUrl = $protocol . $safeHost . dirname($_SERVER['SCRIPT_NAME'])
-                 . '/cron/backup.php?token=' . urlencode(getCronToken());
-
-        $cronContext = stream_context_create([
-            'http' => ['timeout' => 1.0, 'ignore_errors' => true]
-        ]);
-        @file_get_contents($cronUrl, false, $cronContext);
-    }
+foreach (get_cron_tasks() as $id => $task) {
+    if (empty($task['virtual'])) continue;
+    // проверка интервала по get_cron_state(), затем:
+    // GET /config/cron/run.php?task={id}&token={getCronToken()}
 }
 ```
 
@@ -580,12 +572,6 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `handleModuleAction()` | Модули (upload/delete) |
 | `unpackModule()` | Распаковка модуля |
 | `handleSaveSecurity()` | Настройки безопасности |
-| `handleSaveBackupSettings()` | Настройки бэкапов |
-| `handleInitBackupProcess()` | Инициализация бэкапа |
-| `handleProcessBackupStep()` | Пошаговая архивация |
-| `handleRestoreBackup()` | Восстановление |
-| `handleDownloadBackup()` | Скачивание |
-| `handleCronBackupAction()` | Системный крон бэкапов |
 | `handleCronPublishAction()` | Системный крон публикации/архивации страниц |
 | `getCronToken()` | Общий токен для кронов (из `settings.json`) |
 | `regenerateCronToken()` | Принудительная перегенерация токена |

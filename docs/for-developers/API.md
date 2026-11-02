@@ -478,42 +478,12 @@ $res = handleSaveSettings();
 
 ---
 
-### `handleSaveBackupSettings(): array`
+### Резервное копирование
 
-**Сохраняет** **настройки** **бэкапов**.
-
----
-
-### `handleInitBackupProcess(): array`
-
-**Инициализация** **бэкапа** (**сбор** **файлов**, **разбивка** **на** **пачки**).
-
----
-
-### `handleProcessBackupStep(): array`
-
-**Пошаговая** **архивация** (**50** **файлов** **на** **шаг**).
-
----
-
-### `handleRestoreBackup(): array`
-
-**Восстановление** **из** **бэкапа**.
-
-**`detectZipSlip`** **перед** **распаковкой**.
-
----
-
-### `handleDownloadBackup(): void`
-
-**Отдаёт** **ZIP** **через** `readfile`.
-
----
-
-### `handleCronBackupAction(string $token): void`
-
-**Крон** **бэкапа** (**токен** **из** `$_GET['token']`).  
-**Сравнение с** `getCronToken()` — общий токен для бэкапов и публикации, хранится в `data/settings.json`.
+Функциональность резервного копирования вынесена в плагин `backups` и в ядре
+не документируется. Плагин использует только публичный API ядра:
+`safeFileWrite()`, `detectZipSlip()`, `logAction()`, `setFlash()` и реестр
+фоновых задач (`register_cron_task()`).
 
 ---
 
@@ -1297,6 +1267,64 @@ URL: `/config/cron/seo.php?token=xxx`.
 
 ---
 
+## ⏰ Реестр фоновых задач
+
+Ядро хранит только список зарегистрированных задач и время их последнего запуска.
+Оно не знает, какой плагин какую задачу добавил и что эта задача делает.
+
+### `register_cron_task(string $id, callable $callback, array $options = []): void`
+
+**Регистрирует** задачу в общем реестре. `$options`:
+
+- `interval` — минимальный интервал между запусками в секундах (`0` — только ручной запуск);
+- `virtual` — участвовать ли в виртуальном кроне (запуск при входе админа);
+- `enabled` — активна ли задача (по умолчанию `true`). Только включённые задачи показываются в разделе «Интеграция с планировщиком» Настроек сайта;
+- `label` — человекочитаемое название.
+
+```php
+register_cron_task('my-task', 'my_task_callback', [
+    'interval' => 3600,
+    'virtual'  => true,
+    'enabled'  => true,
+    'label'    => 'Моя задача',
+]);
+```
+
+### `get_cron_tasks(): array`
+
+**Возвращает** все зарегистрированные задачи (ключ — `id`).
+
+### `run_cron_task(string $id): bool`
+
+**Выполняет** задачу по `id`. Возвращает `false`, если задача не найдена или
+вернула `false`/бросила исключение.
+
+### `get_cron_state(): array`
+
+**Читает** состояние кронов из `config/data/cron_state.json`.
+
+### `set_cron_last_run(string $id, int $timestamp): void`
+
+**Сохраняет** время последнего успешного запуска задачи.
+
+### `get_cron_last_run(string $id): int`
+
+**Возвращает** время последнего запуска задачи (`0` — не запускалась).
+
+### Крон `config/cron/run.php`
+
+URL: `/config/cron/run.php?task={id}&token=xxx`.
+
+Единая точка входа для задач плагинов. Ядро проверяет `token` через
+`getCronToken()`, валидирует `id` по regex и вызывает `run_cron_task()`.
+Отдаёт plain-text: `Status: OK`. При ошибке — `403` (токен), `400` (id),
+`500` (задача не выполнена).
+
+Виртуальный крон (`run_virtual_crons()` в `config/core/virtual_crons.php`)
+проходит по задачам с флагом `virtual` и вызывает `run.php` по HTTP.
+
+---
+
 ## ⏰ Cron-публикация
 
 ### `handleCronPublishAction(string $token): void`
@@ -1343,7 +1371,7 @@ setLastCronPublishTime(time());
 --- 
 
 ### `getCronToken(): string`
-**Возвращает общий токен** для cron/backup.php и cron/publish.php.
+**Возвращает общий токен** для всех крон-эндпоинтов в `config/cron/` (в т.ч. `run.php`).
 Если в settings.json токена нет — генерирует bin2hex(random_bytes(16)) и сохраняет.
 
 ```php
@@ -1353,7 +1381,7 @@ $token = getCronToken();
 
 ### `regenerateCronToken(): string`
 **Принудительно генерирует новый токен** и сохраняет в settings.json.
-**Внимание:** сломает все настроенные крон-задачи (бэкап + публикация).
+**Внимание:** сломает все настроенные внешние крон-задачи.
 
 ```php
 $newToken = regenerateCronToken();

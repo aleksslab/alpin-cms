@@ -16,7 +16,7 @@
 | `config/data/modules.json` | Список модулей |
 | `config/data/plugins.json` | Список плагинов |
 | `config/data/templates.json` | Список шаблонов |
-| `config/data/backup_config.json` | Настройки бэкапов |
+| `config/data/cron_state.json` | Время последних запусков фоновых задач |
 | `config/data/login_attempts.json` | Логин-попытки, баны IP |
 | `config/logs/admin.log` | Логи (**не** JSON) |
 
@@ -284,7 +284,7 @@
 
 | Поле | Тип | Описание |
 |------|-----|----------|
-| `cron_token` | string | Общий токен для `config/cron/backup.php` и `config/cron/publish.php`. Генерируется автоматически (`bin2hex(random_bytes(16))`) при первом обращении к `getCronToken()`, если отсутствует. Перегенерация — в секции «Интеграция с планировщиком» в Настройках сайта. **Один токен для обеих крон-задач.** |
+| `cron_token` | string | Общий токен для всех крон-эндпоинтов в `config/cron/` (в т.ч. `run.php`). Генерируется автоматически (`bin2hex(random_bytes(16))`) при первом обращении к `getCronToken()`, если отсутствует. Перегенерация — в секции «Интеграция с планировщиком» в Настройках сайта. **Один токен для всех крон-задач.** |
 | `last_cron_publish` | int | Unix timestamp последнего запуска виртуального крона публикации. Ограничивает частоту — не чаще **1 раза в 5 минут** при заходе админа в админку (`getLastCronPublishTime()` / `setLastCronPublishTime()`). |
 
 **Важно:** оба поля **сохраняются** при сохранении настроек сайта через `handleSaveSettings()`. Не теряются при перезаписи `settings.json`.
@@ -743,23 +743,19 @@
 
 ---
 
-## 📄 `config/data/backup_config.json`
+## 📄 `config/data/cron_state.json`
+
+Время последних запусков фоновых задач. Ключ — `id` задачи, зарегистрированной
+через `register_cron_task()`.
 
 ```json
 {
-    "backup_type": "full",
-    "targets": [],
-    "storage_path": "config/backups/",
-    "encrypt_archive": false,
-    "archive_password": "",
-    "cron_enabled": false,
-    "cron_virtual": false,
-    "cron_period": 24,
-    "last_backup_time": 1705321200
+    "backups": { "last_run": 1705321200 }
 }
 ```
 
-**Что было убрано из этого файла в v1.3.0:** поле `cron_token` **удалено** из `config/data/backup_config.json` и перенесено в `settings.json`, потому что теперь это **общий** токен для бэкапов и публикации страниц.
+Файл создаётся автоматически при первом успешном запуске задачи и обновляется
+через `set_cron_last_run($id, time())`.
 
 ---
 

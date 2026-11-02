@@ -806,7 +806,7 @@
     
     // ===== КРОН: ЗАПРОС НОВОГО ТОКЕНА (без сохранения) =====
     window.regenerateCronToken = function() {
-        if (!confirm('⚠️ Сгенерировать новый токен крона?\n\nОн вступит в силу только после нажатия «Сохранить настройки». После этого все настроенные крон-задачи (бэкап, автопубликация) сломаются — придётся заново настроить планировщики на хостинге.')) {
+        if (!confirm('⚠️ Сгенерировать новый токен крона?\n\nОн вступит в силу только после нажатия «Сохранить настройки». После этого все настроенные крон-задачи сломаются — придётся заново настроить планировщики на хостинге.')) {
             return;
         }
 
@@ -830,10 +830,10 @@
             var hidden = document.getElementById('cron-token-hidden');
             if (hidden) hidden.value = newToken;
 
-            var backupUrl = document.getElementById('cron-backup-url');
-            var publishUrl = document.getElementById('cron-publish-url');
-            if (backupUrl) backupUrl.value = baseUrl + '/config/cron/backup.php?token=' + newToken;
-            if (publishUrl) publishUrl.value = baseUrl + '/config/cron/publish.php?token=' + newToken;
+            var cronInputs = document.querySelectorAll('input[data-cron-url]');
+            for (var i = 0; i < cronInputs.length; i++) {
+                cronInputs[i].value = baseUrl + cronInputs[i].getAttribute('data-cron-url') + newToken;
+            }
 
             if (display) {
                 display.classList.add('ring-2', 'ring-amber-300');

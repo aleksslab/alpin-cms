@@ -5,6 +5,21 @@
 ### Добавлено
 
 - **Ассеты админки для плагинов**: папка `admin/` в ZIP плагина. При установке `admin/style.css` копируется в `config/css/{id}.css`, `admin/script.js` — в `config/js/{id}.js`; при удалении плагина эти файлы (включая `.min`-варианты) удаляются.
+- **Плагин «Резервное копирование»**: вынесен из ядра в `config/plugins/backups/` (создание, скачивание, восстановление и удаление архивов, настройки, крон). Данные (`config/data/backup_config.json`, `config/backups/`) остаются на месте.
+- **Реестр фоновых задач**: `register_cron_task()`, `get_cron_tasks()`, `run_cron_task()`, `get_cron_state()`, `set_cron_last_run()`, `get_cron_last_run()`. Состояние — в `config/data/cron_state.json`.
+- **Общий крон-эндпоинт** `config/cron/run.php?task={id}&token=...` для задач, зарегистрированных плагинами.
+- **Флаг `enabled`** у `register_cron_task()` — URL только включённых задач показываются в разделе «Интеграция с планировщиком».
+
+### Изменено
+
+- **Виртуальные кроны**: цикл по реестру задач (`run_virtual_cron_tasks()`) вместо жёсткого вызова крона бэкапов; блок публикации не изменился.
+- **`config/cron/backup.php`** заменён общим `config/cron/run.php` (задача `backups`).
+- **Раздел «Интеграция с планировщиком»**: URL задач строятся из реестра (`get_cron_tasks()`), показываются только включённые задачи.
+- **`backup_config.json`**: поле `last_backup_time` больше не используется — расписание хранится в `config/data/cron_state.json`.
+
+### Технические детали
+
+- **Новые файлы**: `config/core/cron.php`, `config/cron/run.php`.
 
 ## [Release version 2.0.0] — 2026-10-28
 

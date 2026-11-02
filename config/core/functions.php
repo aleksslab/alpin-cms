@@ -16,6 +16,9 @@ $GLOBALS['DATA_CACHE'] = [];
 // Система хуков (Actions, Filters, Routes)
 require_once __DIR__ . '/hooks.php';
 
+// Реестр фоновых задач (кронов)
+require_once __DIR__ . '/cron.php';
+
 // Загрузчик плагинов
 require_once __DIR__ . '/plugins.php';
 

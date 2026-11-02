@@ -1,6 +1,33 @@
 <?php
 $cronBaseUrl = getBaseUrl();
 $currentToken = getCronToken();
+
+// Ссылки для планировщика: задачи ядра (автопубликация, SEO)
+// и только включённые задачи, зарегистрированные плагинами через register_cron_task().
+$cronLinks = [
+    [
+        'label' => 'Автопубликация страниц',
+        'path'  => '/config/cron/publish.php',
+        'query' => '',
+    ],
+    [
+        'label' => 'Обновление sitemap.xml и robots.txt',
+        'path'  => '/config/cron/seo.php',
+        'query' => '',
+    ],
+];
+
+foreach (get_cron_tasks() as $taskId => $cronTask) {
+    if (empty($cronTask['enabled'])) {
+        continue;
+    }
+
+    $cronLinks[] = [
+        'label' => (string)($cronTask['label'] ?? $taskId),
+        'path'  => '/config/cron/run.php',
+        'query' => 'task=' . urlencode($taskId),
+    ];
+}
 ?>
 <!-- СЕКЦИЯ: Интеграция с планировщиком -->
 <div class="border border-slate-200 rounded-2xl overflow-hidden">
@@ -38,7 +65,7 @@ $currentToken = getCronToken();
                        value="<?php echo e($currentToken); ?>">
 
                 <p class="text-[10px] text-slate-400 mt-1">
-                    Один токен используется для всех крон-задач: резервное копирование, автопубликация, обновление sitemap/robots.
+                    Один токен используется для всех крон-задач.
                     Новый токен вступит в силу <strong>после нажатия «Сохранить настройки»</strong>.
                     После этого все ранее настроенные крон-задачи сломаются.
                 </p>
@@ -48,32 +75,22 @@ $currentToken = getCronToken();
             <div class="border-t border-slate-200/60 pt-4 mt-2">
                 <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Ссылки для планировщика</h4>
 
-                <div class="editor-field mb-3">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Резервное копирование</label>
-                    <input type="text"
-                           id="cron-backup-url"
-                           readonly
-                           value="<?php echo e($cronBaseUrl); ?>/config/cron/backup.php?token=<?php echo e($currentToken); ?>"
-                           class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-600 select-all focus:outline-none">
-                </div>
-
-                <div class="editor-field mb-3">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Автопубликация страниц</label>
-                    <input type="text"
-                           id="cron-publish-url"
-                           readonly
-                           value="<?php echo e($cronBaseUrl); ?>/config/cron/publish.php?token=<?php echo e($currentToken); ?>"
-                           class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-600 select-all focus:outline-none">
-                </div>
-                
-                <div class="editor-field">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Обновление sitemap.xml и robots.txt</label>
-                    <input type="text"
-                           id="cron-seo-url"
-                           readonly
-                           value="<?php echo e($cronBaseUrl); ?>/config/cron/seo.php?token=<?php echo e($currentToken); ?>"
-                           class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-600 select-all focus:outline-none">
-                </div>
+                <?php foreach ($cronLinks as $cronLink): ?>
+                    <?php
+                    $cronPathQuery = $cronLink['path'] . '?'
+                        . ($cronLink['query'] !== '' ? $cronLink['query'] . '&' : '')
+                        . 'token=';
+                    $cronUrl = $cronBaseUrl . $cronPathQuery . $currentToken;
+                    ?>
+                    <div class="editor-field mb-3">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><?php echo e($cronLink['label']); ?></label>
+                        <input type="text"
+                               readonly
+                               data-cron-url="<?php echo e($cronPathQuery); ?>"
+                               value="<?php echo e($cronUrl); ?>"
+                               class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-600 select-all focus:outline-none">
+                    </div>
+                <?php endforeach; ?>
             </div>
 
         </div>

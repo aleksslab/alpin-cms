@@ -158,7 +158,7 @@ function detectZipSlip(ZipArchive $zip): ?string {
 }
 ```
 
-**Используется** **в** `unpackModule` **и** `handleRestoreBackup` **ДО** `extractTo`:
+**Используется** **в** `unpackModule` **и** при восстановлении из бэкапа (плагин `backups`) **ДО** `extractTo`:
 
 ```php
 $zipSlipEntry = detectZipSlip($zip);
@@ -460,7 +460,7 @@ if (!preg_match('~^[a-z0-9\-\.]+(:\d+)?$~i', $safeHost)) {
 **Применяется** **в**:
 - `config.php` — `OG_URL`.
 - `handleSaveSecurity` — `From:`.
-- `config/index.php` — `cron_backup.php`.
+- `config/index.php` — построение URL крон-задач.
 
 ---
 
@@ -563,7 +563,7 @@ if (!file_exists($htaccessFile) ||
 
 **`data/settings.json`** — поле **`cron_token`**.
 
-**Не в `config/data/backup_config.json`** (как было до v1.3.0). Причина: токен **общий** для бэкапов и публикации страниц, а `backup_config.json` — конфиг только бэкапов.
+**Не в конфиге конкретной задачи** (как было до v1.3.0). Причина: токен **общий** для всех крон-задач.
 
 ### Как генерируется
 
@@ -581,14 +581,14 @@ function getCronToken(): string {
 
 ### Где используется
 
-**Два эндпоинта:**
+**Эндпоинты:**
 
 | URL | Обработчик |
 |-----|-----------|
-| `/config/cron/backup.php?token=...` | `handleCronBackupAction()` |
+| `/config/cron/run.php?task={id}&token=...` | `run_cron_task()` (задачи из реестра) |
 | `/config/cron/publish.php?token=...` | `handleCronPublishAction()` |
 
-**Оба сравнивают переданный токен с `getCronToken()`:**
+**Все проверяют переданный токен через `getCronToken()`:**
 
 ```php
 if ($clientToken === '' || $clientToken !== getCronToken()) {
@@ -599,10 +599,10 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 ### Зачем токен вообще
 
-**Защита от случайного/чужого вызова крона.** Эндпоинты `cron/*.php` доступны из браузера. Без токена любой мог бы дёргать бэкап или публикацию.
+**Защита от случайного/чужого вызова крона.** Эндпоинты `cron/*.php` доступны из браузера. Без токена любой мог бы дёргать любую зарегистрированную задачу или публикацию.
 
 **Что токен **не** защищает:**
-- Не защищает `backup_config.json` (если утёк — там нет токена).
+- Не защищает данные задач (в них нет токена).
 - Не защищает от DoS — злоумышленник может долбить endpoint, но получить 403.
 
 ### Перегенерация

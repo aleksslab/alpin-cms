@@ -10,33 +10,16 @@ if (!defined('APP_ROOT')) {
 }
 
 /**
- * Запускает виртуальные кроны (бэкап и публикацию).
+ * Запускает виртуальные кроны: задачи плагинов и автопубликацию страниц.
  * Вызывается из config/index.php после авторизации.
  *
  * @return void
  */
 function run_virtual_crons(): void {
-    // --- ВИРТУАЛЬНЫЙ КРОН БЭКАПА ---
-    $cronSettings = getBackupSettingsData();
-    
-    if (!empty($cronSettings['cron_virtual'])) {
-        $lastCronBackup = intval($cronSettings['last_backup_time'] ?? 0);
-        $cronPeriodHours = intval($cronSettings['cron_period'] ?? 24);
+    // --- ВИРТУАЛЬНЫЙ КРОН ЗАДАЧ, ЗАРЕГИСТРИРОВАННЫХ ЧЕРЕЗ register_cron_task() ---
+    run_virtual_cron_tasks();
 
-        if (time() >= ($lastCronBackup + ($cronPeriodHours * 3600))) {
-            $cronUrl = getBaseUrl() . dirname($_SERVER['SCRIPT_NAME']) . '/cron/backup.php?token=' . urlencode(getCronToken());
-
-            $cronContext = stream_context_create([
-                'http' => [
-                    'timeout' => 1.0, 
-                    'ignore_errors' => true
-                ]
-            ]);
-            @file_get_contents($cronUrl, false, $cronContext);
-        }
-    }
-    
-    // --- ВИРТУАЛЬНЫЙ КРОН ПУБЛИКАЦИИ ---
+    // --- ВИРТУАЛЬНЫЙ КРОН ПУБЛИКАЦИИ (ядро, до выноса в плагин) ---
     $lastPublish = getLastCronPublishTime();
     $publishInterval = getCronPublishMinInterval();
 
@@ -52,5 +35,51 @@ function run_virtual_crons(): void {
             ]
         ]);
         @file_get_contents($publishUrl, false, $publishContext);
+    }
+}
+
+/**
+ * Запускает задачи, у которых подошёл интервал.
+ *
+ * Ядро не знает, что именно делает задача: оно только проверяет расписание
+ * и отправляет запрос на общий endpoint /config/cron/run.php.
+ *
+ * @return void
+ */
+function run_virtual_cron_tasks(): void {
+    $tasks = get_cron_tasks();
+
+    if (empty($tasks)) {
+        return;
+    }
+
+    $state = get_cron_state();
+    $now = time();
+
+    foreach ($tasks as $id => $task) {
+        if (empty($task['virtual']) || (int)$task['interval'] <= 0) {
+            continue;
+        }
+
+        $lastRun = (int)($state[$id]['last_run'] ?? 0);
+
+        if ($now < ($lastRun + (int)$task['interval'])) {
+            continue;
+        }
+
+        // Отмечаем запуск до запроса, чтобы не устроить шторм при нескольких вкладках
+        set_cron_last_run($id, $now);
+
+        $cronUrl = getBaseUrl() . dirname($_SERVER['SCRIPT_NAME'])
+            . '/cron/run.php?task=' . urlencode($id)
+            . '&token=' . urlencode(getCronToken());
+
+        $cronContext = stream_context_create([
+            'http' => [
+                'timeout' => 1.0,
+                'ignore_errors' => true
+            ]
+        ]);
+        @file_get_contents($cronUrl, false, $cronContext);
     }
 }

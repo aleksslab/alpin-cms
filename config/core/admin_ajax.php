@@ -21,10 +21,8 @@ function handle_admin_ajax_actions(): void {
     }
     
     // --- СКАЧИВАНИЕ БЭКАПА ---
-    if (isset($_GET['download_file']) && isset($_GET['tab']) && $_GET['tab'] === 'backups') { 
-        handleDownloadBackup();
-    }
-    
+    // Обрабатывается плагином backups на admin_init.
+
     // --- НАСТРОЙКИ МОДУЛЯ ---
     if (isset($_GET['ajax']) && $_GET['ajax'] === 'module_settings') {
         require_once __DIR__ . '/admin_controller.php';
