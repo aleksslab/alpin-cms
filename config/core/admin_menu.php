@@ -28,7 +28,6 @@ function get_admin_tabs(): array {
     
     // Группа 2: Управление системой
     $systemTabs[] = ['id' => 'plugins', 'title' => 'Плагины', 'icon' => 'icon-puzzle'];
-    $systemTabs[] = ['id' => 'filemanager', 'title' => 'Проводник (Файлы)', 'icon' => 'icon-folder'];
     $systemTabs[] = ['id' => 'security', 'title' => 'Безопасность', 'icon' => 'icon-shield'];
 
     // Добавляем вкладки от плагинов

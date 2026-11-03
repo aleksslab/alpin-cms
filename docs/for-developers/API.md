@@ -1434,34 +1434,13 @@ if (verifyAdminCredentials($login, $password)) { ... }
 
 ## 📁 Файловый менеджер
 
-### `fmSafePath(string $path): ?string`
+Проводник вынесен в плагин `filemanager` (`config/plugins/filemanager/`).
+Его функции (`fmSafePath()`, `fmSafeAbsolute()`, `fmIsBlacklisted()`,
+`fmIsAllowedExtension()`, `fmIsSensitiveFile()`) не входят в публичный API
+ядра.
 
-**Валидация** **относительного** **пути** (**whitelist** **символов**).
-
----
-
-### `fmSafeAbsolute(string $relativePath): ?string`
-
-**`realpath`** + **проверка** **префикса** `FM_SITE_ROOT`.
-
----
-
-### `fmIsBlacklisted(string $relativePath): bool`
-
-**Запрещённые** **пути:** `config/data`, `config/backups`, `config/core`, `config/logs`, `data/logs` (legacy) + кастомный `storage_path` из `getLogSettings()`, если внутри `APP_ROOT`.
-
----
-
-### `fmIsAllowedExtension(string $fileName): bool`
-
-**Whitelist** **расширений**.
-
----
-
-### `fmIsSensitiveFile(string $fileName): bool`
-
-**Чувствительные** **файлы.** Ядро хранит только свои (`.pepper`, `credentials.json`,
-`login_attempts.json`); плагины добавляют свои через фильтр `sensitive_files`.
+Плагины могут запретить доступ к своим служебным файлам через фильтр
+`sensitive_files` (см. `PLUGINS.md`).
 
 ---
 

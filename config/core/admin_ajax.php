@@ -14,12 +14,9 @@ if (!defined('APP_ROOT')) {
  * @return void
  */
 function handle_admin_ajax_actions(): void {
-    // --- ПРОВОДНИК (GET) ---
-    if (isset($_GET['fm_api_action']) && $_SERVER['REQUEST_METHOD'] === 'GET') {
-        require_once __DIR__ . '/filemanager_api.php';
-        exit;
-    }
-    
+    // --- ПРОВОДНИК (GET/POST) ---
+    // Обрабатывается плагином filemanager на admin_init.
+
     // --- СКАЧИВАНИЕ БЭКАПА ---
     // Обрабатывается плагином backups на admin_init.
 

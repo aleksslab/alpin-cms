@@ -6,6 +6,8 @@
 
 - **Ассеты админки для плагинов**: папка `admin/` в ZIP плагина. При установке `admin/style.css` копируется в `config/css/{id}.css`, `admin/script.js` — в `config/js/{id}.js`; при удалении плагина эти файлы (включая `.min`-варианты) удаляются.
 - **Плагин «Резервное копирование»**: вынесен из ядра в `config/plugins/backups/` (создание, скачивание, восстановление и удаление архивов, настройки, крон). Данные (`config/data/backup_config.json`, `config/backups/`) остаются на месте.
+- **Плагин «Проводник (Файлы)»**: вынесен из ядра в `config/plugins/filemanager/` (список файлов, загрузка, правка кода в ACE, CHMOD, создание и удаление). AJAX (`fm_api_action`) перехватывается на `admin_init`; стили — `config/css/filemanager.css` (из `admin/style.css`), скрипт — `config/js/filemanager.js` (из `admin/script.js`).
+- **Мультивыбор файлов в проводнике**: кнопка «Выбрать», Ctrl/Cmd+клик и длительное нажатие на тач-устройствах; массовое удаление через `action=delete_many` (только файлы, папки — по одной).
 - **Реестр фоновых задач**: `register_cron_task()`, `get_cron_tasks()`, `run_cron_task()`, `get_cron_state()`, `set_cron_last_run()`, `get_cron_last_run()`. Состояние — в `config/data/cron_state.json`.
 - **Общий крон-эндпоинт** `config/cron/run.php?task={id}&token=...` для задач, зарегистрированных плагинами.
 - **Флаг `enabled`** у `register_cron_task()` — URL только включённых задач показываются в разделе «Интеграция с планировщиком».
@@ -21,11 +23,12 @@
 - **`getLogSettings()`**: список `log_actions` собирается из реестра; новые действия включены по умолчанию, сохранённый выбор пользователя приоритетнее.
 - **Плагин `logs`**: UI строится из реестра, локальный `getLogActions()` удалён; при удалении плагина сбрасывается только список действий (путь и лимиты сохраняются).
 - **`ensureLogsDir()`** перенесён в ядро — папка логов и `.htaccess` больше не зависят от плагина `logs`.
-- **`fmIsSensitiveFile()`**: ядро хранит только свои файлы, файлы плагинов — через фильтр `sensitive_files`.
+- **`fmIsSensitiveFile()`**: перенесён в плагин `filemanager`; плагины добавляют свои файлы через фильтр `sensitive_files`.
 
 ### Технические детали
 
 - **Новые файлы**: `config/core/cron.php`, `config/core/log.php`, `config/cron/run.php`.
+- **Перенесено в плагин `filemanager`**: `config/core/filemanager_api.php` → `plugin.php` (рефакторинг: `fm*`-функции и `fmAction*()`), `config/modules/filemanager.php` → `admin-page.php`, `config/js/filemanager.js` → `admin/script.js`, fm-стили из `config/css/config.css` → `admin/style.css`.
 
 ## [Release version 2.0.0] — 2026-10-28
 

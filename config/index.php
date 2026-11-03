@@ -126,23 +126,16 @@ if ($isAuth) {
     require_once __DIR__ . '/core/admin_ajax.php';
     handle_admin_ajax_actions();
 
-    // --- Единый барьер для ВСЕХ POST-запросов в системе (и формы, и AJAX Проводника) ---
+    // --- Единый барьер для ВСЕХ POST-запросов в системе (формы и AJAX) ---
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        
+
         // 1. ЖЕЛЕЗНАЯ ПРОВЕРКА CSRF ТОКЕНА ДЛЯ ЛЮБОГО POST-ДЕЙСТВИЯ
         if (empty($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
             header('HTTP/1.1 403 Forbidden');
             exit('Ошибка безопасности: невалидный CSRF-токен сессии.');
         }
-        
-        // 2. ПЕРЕХВАТ POST-ЗАПРОСОВ ПРОВОДНИКА (Удаление action=delete, сохранение кода и т.д.)
-        // Токен уже проверен строкой выше, операция на 100% легитимна!
-        if (isset($_GET['fm_api_action'])) {
-            require_once __DIR__ . '/core/filemanager_api.php';
-            exit;
-        }
 
-        // 3. ОБРАБОТКА POST-ЗАПРОСОВ (ФОРМЫ И AJAX)
+        // 2. ОБРАБОТКА POST-ЗАПРОСОВ (ФОРМЫ И AJAX)
         require_once __DIR__ . '/core/admin_actions.php';
         handle_admin_post_actions();
     }
@@ -296,7 +289,7 @@ if ($isAuth) {
                         $pluginPageFile = PLUGINS_DIR . DIRECTORY_SEPARATOR . $currentTab . DIRECTORY_SEPARATOR . 'admin-page.php';
                     }
                     
-                    $isSystemTab = in_array($currentTab, ['sections', 'config_vars', 'security', 'filemanager']);
+                    $isSystemTab = in_array($currentTab, ['sections', 'config_vars', 'security']);
                     ?>
 
                     <?php if ($adminModuleExists || $pluginPageFile || $isSystemTab): ?>

@@ -179,53 +179,19 @@ $zip->extractTo($tempDir);
 
 **Если** `$path = "../../config/data/credentials.json"`, **можно** **прочитать** **чужой** **файл**.
 
-### Защита в filemanager
+### Защита в проводнике
 
-**Функции** **из** `filemanager_api.php`:
+Проводник вынесен в плагин `filemanager` (`config/plugins/filemanager/`).
+Внутри плагина путь проверяется по цепочке: `fmSafePath()` (**whitelist**
+символов, запрет `..` и `//`), `fmSafeAbsolute()` (`realpath` + проверка
+префикса `APP_ROOT`), `fmIsBlacklisted()` (**запрещённые** **пути**:
+`config/data`, `config/backups`, `config/core`, `config/logs`, `data/logs`
+и кастомный `storage_path` логов).
 
-**`fmSafePath(string $path): ?string`** — **whitelist** **символов**:
-
-```php
-function fmSafePath(string $path): ?string {
-    $path = str_replace('\\', '/', $path);
-    $path = trim($path, '/');
-    if ($path === '') return '';
-    if (!preg_match('~^[a-zA-Z0-9\-_./]+$~', $path)) return null;
-    if (strpos($path, '..') !== false || strpos($path, '//') !== false) return null;
-    return $path;
-}
-```
-
-**`fmSafeAbsolute(string $relativePath): ?string`** — `realpath` + **проверка** **префикса**:
-
-```php
-function fmSafeAbsolute(string $relativePath): ?string {
-    $realRoot = realpath(FM_SITE_ROOT);
-    if ($realRoot === false) return null;
-    
-    $full = FM_SITE_ROOT;
-    if ($relativePath !== '') {
-        $full .= DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
-    }
-    
-    $check = file_exists($full) ? realpath($full) : realpath(dirname($full));
-    if ($check === false) return null;
-    if (strpos($check, $realRoot) !== 0) return null;
-    
-    return $full;
-}
-```
-
-**`fmIsBlacklisted(string $relativePath): bool`** — **запрещённые** **пути**:
-
-```php
-$blacklist = ['config/data', 'config/backups', 'config/core', 'config/logs'];
-```
-
-**`fmIsSensitiveFile(string $fileName): bool`** — **чувствительные** **файлы**.
-Ядро хранит свои: `.pepper`, `credentials.json`, `login_attempts.json`. Плагины
-добавляют свои через фильтр `sensitive_files` (например, `backups` →
-`backup_config.json`).
+**`sensitive_files`** — **фильтр** для **чувствительных** **файлов**.
+Плагины добавляют свои имена (например, `backups` → `backup_config.json`).
+Базовый список (`.pepper`, `credentials.json`, `login_attempts.json`)
+задаёт плагин `filemanager`.
 
 ### Защита в `loadPage`
 

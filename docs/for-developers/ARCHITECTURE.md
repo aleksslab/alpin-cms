@@ -96,7 +96,6 @@ config/
 │   ├── admin_menu.php     # Формирование вкладок сайдбара (включая плагины)
 │   ├── admin_auth.php     # Авторизация, brute-force
 │   ├── admin_controller.php  # ЗАПИСЬ + логика
-│   ├── filemanager_api.php   # API проводника
 │   ├── media_modal.php       # Медиа-модалка
 │   ├── icon_modal.php        # Модалка иконок
 │   ├── trash_modal.php       # Модалка корзины
@@ -127,7 +126,6 @@ config/
 │   ├── plugins.php        # Управление плагинами
 │   ├── modules.php
 │   ├── security.php
-│   ├── filemanager.php
 │   └── module_upload.php
 │
 ├── css/config.css         # Стили админки
@@ -626,24 +624,12 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `getMaintenanceBypassToken()` | Bypass-токен (генерация при отсутствии) |
 | `regenerateMaintenanceToken()` | Перегенерация bypass-токена |
 
-### `filemanager_api.php` — API проводника
+### Проводник (плагин `filemanager`)
 
-| Функция | Что делает |
-|---------|-----------|
-| `fmSafePath()` | Whitelist символов в пути |
-| `fmSafeAbsolute()` | `realpath` + проверка префикса |
-| `fmIsBlacklisted()` | Запрещённые пути |
-| `fmIsAllowedExtension()` | Whitelist расширений |
-| `fmIsSensitiveFile()` | Чувствительные файлы |
-| `action=list` | Список файлов |
-| `action=delete` | Удаление |
-| `action=rename` | Переименование |
-| `action=get_code` | Чтение файла |
-| `action=save_code` | Сохранение файла |
-| `action=upload` | Загрузка |
-| `action=chmod` | Права |
-| `action=create_dir`, `action=create_file` | Создание |
-| `action=translit` | Транслитерация |
+Файловый менеджер вынесен из ядра. Серверная логика, AJAX-диспетчер
+(`fm_api_action` на `admin_init`), разметка вкладки и ассеты — в
+`config/plugins/filemanager/`. Вкладка регистрируется через `admin_tab`
+в `plugin.json`; в ядре остаются только загрузчик плагинов и хуки.
 
 ---
 

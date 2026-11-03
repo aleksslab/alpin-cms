@@ -147,7 +147,6 @@
 │   │   ├── admin_menu.php        # Формирование вкладок
 │   │   ├── admin_auth.php        # Авторизация
 │   │   ├── admin_controller.php  # Запись + логика
-│   │   ├── filemanager_api.php   
 │   │   ├── media_modal.php       
 │   │   ├── icon_modal.php        
 │   │   ├── trash_modal.php       
@@ -161,8 +160,7 @@
 │   │   ├── config_vars.php
 │   │   ├── modules.php
 │   │   ├── plugins.php           # Управление плагинами
-│   │   ├── security.php
-│   │   └── filemanager.php
+│   │   └── security.php
 │   │
 │   ├── css/config.css            
 │   ├── js/                           
