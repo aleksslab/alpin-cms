@@ -64,6 +64,8 @@ $token = $_SESSION['csrf_token'] ?? '';
 
 <form method="POST" action="index.php?tab=config_vars" class="space-y-6">
     <input type="hidden" name="csrf_token" value="<?php echo $token; ?>">
+    <!-- Признак полного сохранения: форма сайта отправляет все поля сразу -->
+    <input type="hidden" name="settings_full" value="1">
     <input type="hidden" name="config_sections_order_json" id="config_sections_order_json" value="<?php echo e(json_encode($settingsData['config_sections_order'] ?? [])); ?>">
     <input type="hidden" name="config_sections_hidden_json" id="config_sections_hidden_json" value="<?php echo e(json_encode($settingsData['config_sections_hidden'] ?? [])); ?>">
     

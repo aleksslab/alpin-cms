@@ -460,7 +460,11 @@ function handleSaveSettings(): array {
         ];
     }
     
-    $newSettings = [
+    // Полное сохранение приходит только из формы сайта (settings_full=1).
+    // Форма плагина шлёт лишь свои поля, её POST ядро из нуля не пересобирает.
+    $isFullSave = isset($_POST['settings_full']) && $_POST['settings_full'] == '1';
+
+    $siteSettings = [
         // БЛОК 1: Контактная информация
         'name'    => $name,
         'slogan'  => $slogan,
@@ -547,10 +551,22 @@ function handleSaveSettings(): array {
         'last_seo_regenerate' => getSettingsData()['last_seo_regenerate'] ?? 0,
     ];
 
+    // Форма сайта — пересобираем настройки ядра из POST.
+    // Форма плагина — берём текущие настройки и меняем только присланные поля.
+    $newSettings = $isFullSave ? $siteSettings : getSettingsData(true);
+
     // Даем плагинам возможность добавить/изменить свои настройки
     $newSettings = apply_filters('save_settings_data', $newSettings);
     
     $oldSettings = getSettingsData(true);
+
+    // Источник сохранения (сайт или плагин) — для флеша и записи в лог, включая ветку ошибки
+    $source = $_POST['settings_source'] ?? 'сайта';
+    // Валидация: только кириллица, пробелы и дефис (защита от инъекций)
+    if (!preg_match('#^[а-яё\s\-]+$#iu', $source)) {
+        $source = 'сайта';
+    }
+    $source = trim($source);
 
     if (saveData('settings', $newSettings)) {
         logAction('settings_save', 'Настройки сайта обновлены', 'INFO');
@@ -585,14 +601,6 @@ function handleSaveSettings(): array {
             clearPageCache();
         }
         
-        // Определяем источник сохранения (сайт или плагин)
-        $source = $_POST['settings_source'] ?? 'сайта';
-        // Валидация: только кириллица, пробелы и дефис (защита от инъекций)
-        if (!preg_match('#^[а-яё\s\-]+$#iu', $source)) {
-            $source = 'сайта';
-        }
-        $source = trim($source);
-
         setFlash('Настройки ' . $source . ' успешно сохранены!');
         
         // Проверяем, откуда пришел запрос (для возврата на нужную вкладку)

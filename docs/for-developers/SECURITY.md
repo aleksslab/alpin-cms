@@ -586,7 +586,7 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 ### Сохранение в handleSaveSettings
 
-**Важно:** `handleSaveSettings()` **полностью пересобирает** `$newSettings`. Без явного сохранения `cron_token` и `last_cron_publish` — они **теряются** при любом сохранении настроек сайта.
+**Важно:** при полном сохранении (скрытое поле `settings_full=1`, форма «Настроек сайта») `handleSaveSettings()` **полностью пересобирает** `$newSettings`. Без явного сохранения `cron_token` и `last_cron_publish` — они **теряются** при таком сохранении.
 
 **Решение** (в блоке «СОХРАНЯЕМ ПОЛЯ, КОТОРЫЕ НЕ В ФОРМЕ»):
 

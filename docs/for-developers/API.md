@@ -279,7 +279,7 @@ $result = getPagesListPaginated(1, 25);
 | `plugin_after_update` | action | После обновления плагина | `$id`, `$newVersion` |
 | `plugin_after_install` | action | После установки плагина | `$id` |
 | `page_title` | filter | Заголовок страницы | `$title`, `$page` |
-| `save_settings_data` | filter | Массив настроек перед сохранением | `$newSettings` |
+| `save_settings_data` | filter | Массив настроек перед сохранением (при полном сохранении — собранный из POST, при сохранении из плагина — текущий `settings.json`) | `$newSettings` |
 
 ---
 
@@ -386,6 +386,13 @@ $res = handleSaveSettings();
 **Валидация** `name`/`slogan`/`footer_copyright` (**санитайзер**).  
 **Валидация** `email`.  
 **Обновление** **кеша** **при** **изменении** **ассетов**.
+
+**Режим сохранения** определяется скрытым полем `settings_full`:
+
+- `settings_full=1` — форма «Настроек сайта» (`config/modules/config_vars.php`): `$newSettings` **пересобирается с нуля** из POST.
+- поля нет — форма плагина (например, вкладка «Логи»): берётся текущий `settings.json`, поверх которого фильтр `save_settings_data` записывает только присланные плагином поля. Настройки сайта не затираются.
+
+Форма плагина `settings_full` **не добавляет**.
 
 ---
 
