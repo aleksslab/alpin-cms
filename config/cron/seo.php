@@ -3,7 +3,7 @@
  * Крон генерации SEO-файлов (sitemap.xml + robots.txt).
  *
  * URL: /config/cron/seo.php?token=xxx
- * Токен — общий (тот же, что для backup.php и publish.php).
+ * Токен — общий (тот же, что у задач `backups` и `publish`).
  *
  * Рекомендуемая частота: 1 раз в сутки.
  */

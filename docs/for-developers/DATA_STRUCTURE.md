@@ -99,7 +99,6 @@
     "home_page_id": "home",
     "main_menu": "header_main"
     "cron_token": "a1b2c3d4e5f6...",
-    "last_cron_publish": 1735689600,
     "seo_sitemap_enabled": true,
     "seo_robots_enabled": true,
     "seo_auto_regenerate": false,
@@ -285,9 +284,8 @@
 | Поле | Тип | Описание |
 |------|-----|----------|
 | `cron_token` | string | Общий токен для всех крон-эндпоинтов в `config/cron/` (в т.ч. `run.php`). Генерируется автоматически (`bin2hex(random_bytes(16))`) при первом обращении к `getCronToken()`, если отсутствует. Перегенерация — в разделе «Интеграция с планировщиком» в Настройках сайта (секция плагина `scheduler`). **Один токен для всех крон-задач.** |
-| `last_cron_publish` | int | Unix timestamp последнего запуска виртуального крона публикации. Ограничивает частоту — не чаще **1 раза в 5 минут** при заходе админа в админку (`getLastCronPublishTime()` / `setLastCronPublishTime()`). |
 
-**Важно:** оба поля **сохраняются** при сохранении настроек сайта через `handleSaveSettings()`. Не теряются при перезаписи `settings.json`.
+**Важно:** поле **сохраняется** при сохранении настроек сайта через `handleSaveSettings()`. Не теряется при перезаписи `settings.json`.
 
 ---
 
@@ -383,7 +381,7 @@
 **Переходы статусов:**
 
 - **Вручную** — через форму редактирования страницы (4 radio).
-- **Автоматически** — через `cron/publish.php`:
+- **Автоматически** — через крон-задачу `publish` (`cron/run.php?task=publish`):
   - `scheduled` → `published`, когда `publish_at <= now`.
   - `published` → `archived`, когда `unpublish_at <= now`.
 

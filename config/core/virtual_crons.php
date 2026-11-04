@@ -10,32 +10,13 @@ if (!defined('APP_ROOT')) {
 }
 
 /**
- * Запускает виртуальные кроны: задачи плагинов и автопубликацию страниц.
+ * Запускает виртуальные кроны: задачи, зарегистрированные через register_cron_task().
  * Вызывается из config/index.php после авторизации.
  *
  * @return void
  */
 function run_virtual_crons(): void {
-    // --- ВИРТУАЛЬНЫЙ КРОН ЗАДАЧ, ЗАРЕГИСТРИРОВАННЫХ ЧЕРЕЗ register_cron_task() ---
     run_virtual_cron_tasks();
-
-    // --- ВИРТУАЛЬНЫЙ КРОН ПУБЛИКАЦИИ (ядро, до выноса в плагин) ---
-    $lastPublish = getLastCronPublishTime();
-    $publishInterval = getCronPublishMinInterval();
-
-    if (time() >= ($lastPublish + $publishInterval)) {
-        setLastCronPublishTime(time());
-
-        $publishUrl = getBaseUrl() . dirname($_SERVER['SCRIPT_NAME']) . '/cron/publish.php?token=' . urlencode(getCronToken());
-
-        $publishContext = stream_context_create([
-            'http' => [
-                'timeout' => 1.0,
-                'ignore_errors' => true
-            ]
-        ]);
-        @file_get_contents($publishUrl, false, $publishContext);
-    }
 }
 
 /**

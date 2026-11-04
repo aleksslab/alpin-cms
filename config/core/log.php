@@ -85,8 +85,6 @@ function _register_core_log_actions(): void {
             'page_trash'        => 'Перемещение страницы в корзину',
             'page_clone'        => 'Клонирование страницы',
             'page_set_home'     => 'Назначение главной страницы',
-            'page_publish'      => 'Автопубликация страницы',
-            'page_archive'      => 'Автоснятие страницы с публикации',
             'page_restore'      => 'Откат страницы к версии',
         ]],
         'Меню' => ['icon' => 'menu', 'actions' => [

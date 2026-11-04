@@ -550,8 +550,7 @@ function getCronToken(): string {
 
 | URL | Обработчик |
 |-----|-----------|
-| `/config/cron/run.php?task={id}&token=...` | `run_cron_task()` (задачи из реестра) |
-| `/config/cron/publish.php?token=...` | `handleCronPublishAction()` |
+| `/config/cron/run.php?task={id}&token=...` | `run_cron_task()` (задачи из реестра, включая `publish`) |
 
 **Все проверяют переданный токен через `getCronToken()`:**
 
@@ -586,7 +585,7 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 ### Сохранение в handleSaveSettings
 
-**Важно:** при полном сохранении (скрытое поле `settings_full=1`, форма «Настроек сайта») `handleSaveSettings()` **полностью пересобирает** `$newSettings`. Без явного сохранения `cron_token` и `last_cron_publish` — они **теряются** при таком сохранении.
+**Важно:** при полном сохранении (скрытое поле `settings_full=1`, форма «Настроек сайта») `handleSaveSettings()` **полностью пересобирает** `$newSettings`. Без явного сохранения `cron_token` **теряется** при таком сохранении.
 
 **Решение** (в блоке «СОХРАНЯЕМ ПОЛЯ, КОТОРЫЕ НЕ В ФОРМЕ»):
 
@@ -598,7 +597,6 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
     }
     return getCronToken();  // текущий
 })(),
-'last_cron_publish' => getLastCronPublishTime(),
 ```
 
 **Валидация `preg_match`** — защита от записи произвольной строки в `cron_token` через POST.

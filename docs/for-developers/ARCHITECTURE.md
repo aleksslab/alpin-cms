@@ -80,7 +80,6 @@ config/
 │
 ├── cron/                  # Эндпоинты для планировщика (хостинг)
 │   ├── run.php            # Общий запуск задач из реестра (register_cron_task)
-│   ├── publish.php        # Крон публикации/архивации страниц
 │   └── seo.php            # Крон генерации sitemap/robots
 |
 ├── core/
@@ -436,28 +435,13 @@ foreach (get_cron_tasks() as $id => $task) {
 }
 ```
 
-**Крон публикации** (без отдельной настройки — работает всегда, но не чаще 1 раза в 5 минут):
-
-```php
-$lastPublish = getLastCronPublishTime();
-if (time() >= ($lastPublish + 300)) {
-    setLastCronPublishTime(time());
-
-    $publishUrl = $protocol . $safeHost . dirname($_SERVER['SCRIPT_NAME'])
-                . '/cron/publish.php?token=' . urlencode(getCronToken());
-
-    $publishContext = stream_context_create([
-        'http' => ['timeout' => 1.0, 'ignore_errors' => true]
-    ]);
-    @file_get_contents($publishUrl, false, $publishContext);
-}
-```
+**Крон публикации** — задача `publish` из плагина `publish` (без отдельной настройки, не чаще 1 раза в 5 минут). Ничем не отличается от прочих задач реестра: помечена `virtual`, поэтому её запускает `run_virtual_cron_tasks()`.
 
 **Особенности:**
 - Запросы асинхронные (`@file_get_contents` с таймаутом 1 секунда) — страница админки открывается мгновенно.
 - Для бэкапа — интервал из настроек (по умолчанию 24 часа).
-- Для публикации — фиксированные 5 минут (`getCronPublishMinInterval()`).
-- Время публикации обновляется **до** запроса — защита от долбёжки при F5.
+- Для публикации — фиксированные 5 минут (опция `interval` задачи `publish`).
+- Время запуска задачи обновляется **до** запроса (`set_cron_last_run()`) — защита от долбёжки при F5.
 
 ---
 
@@ -570,11 +554,8 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `handleModuleAction()` | Модули (upload/delete) |
 | `unpackModule()` | Распаковка модуля |
 | `handleSaveSecurity()` | Настройки безопасности |
-| `handleCronPublishAction()` | Системный крон публикации/архивации страниц |
 | `getCronToken()` | Общий токен для кронов (из `settings.json`) |
 | `regenerateCronToken()` | Принудительная перегенерация токена |
-| `getLastCronPublishTime()` | Время последнего запуска виртуального крона |
-| `setLastCronPublishTime()` | Сохранение времени запуска |
 | `getPageStatusBadge()` | Метка/класс/иконка бейджа статуса |
 | `clearPageCache()` | Очистка всего кеша |
 | `clearPageCacheById()` | Очистка кеша одной страницы |

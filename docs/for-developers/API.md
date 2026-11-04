@@ -518,7 +518,7 @@ clearPageCacheById('about');
 
 handleSavePage() — при сохранении страницы.
 
-handleCronPublishAction() — при автопубликации / архивации.
+Плагин `publish` (cron-задача) — при автопубликации / архивации.
 
 ---
 
@@ -1334,48 +1334,16 @@ URL: `/config/cron/run.php?task={id}&token=xxx`.
 
 ## ⏰ Cron-публикация
 
-### `handleCronPublishAction(string $token): void`
+Логика публикации/архивации вынесена в плагин `publish` (задача `publish`).
+Ядро вызывает её через общий эндпоинт `config/cron/run.php?task=publish&token=...`.
+Расписание задаёт опция `interval` (300 секунд), флаг `virtual` включает запуск
+при заходе админа в админку. Переходы статусов, сброс кеша и логирование
+(`page_publish` / `page_archive`) — внутри плагина.
 
-**Логика крона публикации страниц.** Вызывается из `config/cron/publish.php`.
-
-**Что делает:**
-
-1. Проверяет `token` через `getCronToken()`.
-2. Проходит по всем файлам `data/pages/*.json`.
-3. Применяет переходы:
-   - `scheduled` + `publish_at <= now` → `published`, `publish_at = null`.
-   - Если при этом `unpublish_at` уже в прошлом — сразу `archived` (без промежуточного `published`).
-   - `published` + `unpublish_at <= now` → `archived`, `unpublish_at = null`.
-4. Сбрасывает кеш затронутых страниц через `clearPageCacheById()`.
-5. Логирует переходы (`page_publish`, `page_archive`).
-6. Отдаёт plain-text: `Status: OK, published: N, archived: M`.
-
-**Не использует** `handleSavePage()` — для крона простая прямая запись через `savePageData()` (без POST-валидации).
+Поля страниц `publish_at` / `unpublish_at` и ручное управление статусами
+остаются в ядре (редактор страницы, `handleSavePage()`).
 
 ---
-
-### `getLastCronPublishTime(): int`
-
-**Время последнего запуска виртуального крона публикации** (Unix timestamp).  
-`0` — если ни разу не запускался.
-
-```php
-$last = getLastCronPublishTime();
-setLastCronPublishTime(int $timestamp): void
-```
-**Сохраняет время последнего запуска** виртуального крона публикации в data/settings.json.
-
----
-
-### `setLastCronPublishTime(int $timestamp): void`
-**Сохраняет время последнего запуска** виртуального крона публикации в data/settings.json.
-
-```php
-setLastCronPublishTime(time());
-```
-**Используется в** config/index.php перед асинхронным вызовом крона — ограничивает частоту (не чаще 1 раза в 5 минут).
-
---- 
 
 ### `getCronToken(): string`
 **Возвращает общий токен** для всех крон-эндпоинтов в `config/cron/` (в т.ч. `run.php`).

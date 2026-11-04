@@ -59,39 +59,6 @@ function regenerateCronToken(): string {
 }
 
 /**
- * Возвращает минимальный интервал между запусками виртуального крона публикации.
- * В секундах. Защита от долбёжки при частых перезагрузках админки.
- *
- * @return int
- */
-function getCronPublishMinInterval(): int {
-    return 300; // 5 минут
-}
-
-/**
- * Возвращает время последнего запуска виртуального крона публикации (Unix timestamp).
- * 0 — если ни разу не запускался.
- *
- * @return int
- */
-function getLastCronPublishTime(): int {
-    $settings = getSettingsData();
-    return intval($settings['last_cron_publish'] ?? 0);
-}
-
-/**
- * Сохраняет время последнего запуска виртуального крона публикации.
- *
- * @param int $timestamp
- * @return void
- */
-function setLastCronPublishTime(int $timestamp): void {
-    $settings = getSettingsData();
-    $settings['last_cron_publish'] = $timestamp;
-    saveData('settings', $settings);
-}
-
-/**
  * Проверяет архив на ZIP Slip — небезопасные имена файлов.
  * 
  * Блокирует: .., абсолютные пути (/...), Windows-пути (C:\...), NUL-байты.
@@ -547,7 +514,6 @@ function handleSaveSettings(): array {
             }
             return getCronToken();
         })(),
-        'last_cron_publish' => getLastCronPublishTime(),
         'last_seo_regenerate' => getSettingsData()['last_seo_regenerate'] ?? 0,
     ];
 
@@ -1105,103 +1071,6 @@ function handleSavePage(): array {
     }
     logAction('page_save', 'Ошибка сохранения страницы "' . $title . '" (ID: ' . $id . ')', 'ERROR');
     return ['success' => '', 'error' => 'Ошибка при сохранении файла. Проверьте права на запись.'];
-}
-
-/**
- * ХЭНДЛЕР: Cron-публикация и архивация страниц.
- * 
- * Логика:
- *   - scheduled + publish_at <= now   → published (publish_at = null)
- *   - published + unpublish_at <= now → archived  (unpublish_at = null)
- * 
- * @param string $clientToken Токен из GET
- * @return void
- */
-function handleCronPublishAction(string $clientToken): void {
-    // Проверка токена (тот же, что у крона бэкапов)
-    if ($clientToken === '' || $clientToken !== getCronToken()) {
-        header('HTTP/1.1 403 Forbidden');
-        die('Error: Access denied');
-    }
-
-    $pagesDir = DATA_DIR . 'pages/';
-    if (!is_dir($pagesDir)) {
-        header('Content-Type: text/plain; charset=utf-8');
-        echo "Status: OK, no pages";
-        exit;
-    }
-
-    $files = glob($pagesDir . '*.json');
-    if (empty($files)) {
-        header('Content-Type: text/plain; charset=utf-8');
-        echo "Status: OK, no pages";
-        exit;
-    }
-
-    $now = time();
-    $publishedCount = 0;
-    $archivedCount  = 0;
-    $errors         = 0;
-
-    foreach ($files as $file) {
-        $page = _jsonToArray($file);
-        if (empty($page['id'])) {
-            continue;
-        }
-
-        $changed = false;
-
-        // Сценарий А: scheduled → published
-        if (($page['status'] ?? '') === 'scheduled'
-            && !empty($page['publish_at'])
-            && (int)$page['publish_at'] <= $now
-        ) {
-            $page['status']     = 'published';
-            $page['publish_at'] = null;
-
-            // Если unpublish_at уже в прошлом — сразу archived
-            if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] <= $now) {
-                $page['status']       = 'archived';
-                $page['unpublish_at'] = null;
-                $archivedCount++;
-                logAction('page_archive', 'Автоснятие: "' . ($page['title'] ?? $page['id']) . '" (ID: ' . $page['id'] . ')', 'INFO');
-            } else {
-                $publishedCount++;
-                logAction('page_publish', 'Автопубликация: "' . ($page['title'] ?? $page['id']) . '" (ID: ' . $page['id'] . ')', 'INFO');
-            }
-
-            $changed = true;
-        }
-        // Сценарий Б: published → archived
-        elseif (($page['status'] ?? '') === 'published'
-            && !empty($page['unpublish_at'])
-            && (int)$page['unpublish_at'] <= $now
-        ) {
-            $page['status']       = 'archived';
-            $page['unpublish_at'] = null;
-
-            $archivedCount++;
-            $changed = true;
-
-            logAction('page_archive', 'Автоснятие: "' . ($page['title'] ?? $page['id']) . '" (ID: ' . $page['id'] . ')', 'INFO');
-        }
-
-        if ($changed) {
-            if (savePageData($page['id'], $page)) {
-                clearPageCacheById($page['id']);
-            } else {
-                $errors++;
-                logAction('page_publish', 'Ошибка записи при автопубликации: ' . $page['id'], 'ERROR');
-            }
-        }
-    }
-
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "Status: OK, published: {$publishedCount}, archived: {$archivedCount}";
-    if ($errors > 0) {
-        echo ", errors: {$errors}";
-    }
-    exit;
 }
 
 /**
