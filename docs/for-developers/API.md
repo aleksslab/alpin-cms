@@ -280,6 +280,25 @@ $result = getPagesListPaginated(1, 25);
 | `plugin_after_install` | action | После установки плагина | `$id` |
 | `page_title` | filter | Заголовок страницы | `$title`, `$page` |
 | `save_settings_data` | filter | Массив настроек перед сохранением (при полном сохранении — собранный из POST, при сохранении из плагина — текущий `settings.json`) | `$newSettings` |
+| `page_scheduling_enabled` | filter | Доступно ли планирование публикации. По умолчанию `false`: статус «По расписанию» и поля дат в редакторе не показываются | `$enabled` |
+
+#### `isPageSchedulingEnabled(): bool`
+
+**Возвращает** `true`, если активный плагин включил фильтр `page_scheduling_enabled`. Ядро по умолчанию считает возможность выключенной: без обработчика фильтра страницу со статусом `scheduled` публиковать некому.
+
+```php
+if (isPageSchedulingEnabled()) {
+    // статус «По расписанию» и даты доступны
+}
+```
+
+Влияет на:
+
+- `config/modules/pages/edit.php` — радиокнопка «По расписанию» и поля `publish_at` / `unpublish_at`;
+- `handleSavePage()` — отклоняет `status = scheduled`, если возможность выключена;
+- `config/js/pages.js` — нет полей дат, подсветка статусов продолжает работать.
+
+`loadPage()` проверяет `unpublish_at` независимо от фильтра: это страховка фронта, а не часть планировщика.
 
 ---
 

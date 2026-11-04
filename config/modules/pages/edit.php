@@ -33,6 +33,12 @@ $pageUnpublishAt = $isEdit ? ($editPage['unpublish_at'] ?? null) : null;
 // Конвертируем Unix timestamp в формат datetime-local (Y-m-d\TH:i)
 $publishAtValue   = $pagePublishAt   ? date('Y-m-d\TH:i', (int)$pagePublishAt)   : '';
 $unpublishAtValue = $pageUnpublishAt ? date('Y-m-d\TH:i', (int)$pageUnpublishAt) : '';
+
+// Планирование доступно, только если активен плагин автопубликации.
+$schedulingEnabled = isPageSchedulingEnabled();
+// Запланированную страницу без плагина показываем черновиком: поля «По расписанию»
+// в форме нет, и предпросмотр должен совпадать с тем, что уйдёт в POST.
+$statusForUi = (!$schedulingEnabled && $pageStatus === 'scheduled') ? 'draft' : $pageStatus;
 $pageMetaDesc = $isEdit ? ($editPage['meta']['description'] ?? '') : ($_POST['meta_description'] ?? '');
 $pageMetaKeywords = $isEdit ? ($editPage['meta']['keywords'] ?? '') : ($_POST['meta_keywords'] ?? '');
 
@@ -113,29 +119,54 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
                             <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Статус публикации</label>
 
                             <div class="flex flex-wrap gap-2 mb-4">
-                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'draft' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
-                                    <input type="radio" name="status" value="draft" <?php echo $pageStatus === 'draft' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $statusForUi === 'draft' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="draft" <?php echo $statusForUi === 'draft' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
                                     <span class="text-sm font-medium text-slate-700 whitespace-nowrap">Черновик</span>
                                 </label>
 
-                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'scheduled' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
-                                    <input type="radio" name="status" value="scheduled" <?php echo $pageStatus === 'scheduled' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                <?php if ($schedulingEnabled): ?>
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $statusForUi === 'scheduled' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="scheduled" <?php echo $statusForUi === 'scheduled' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
                                     <span class="text-sm font-medium text-slate-700 whitespace-nowrap">По расписанию</span>
                                 </label>
+                                <?php endif; ?>
 
-                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'published' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
-                                    <input type="radio" name="status" value="published" <?php echo $pageStatus === 'published' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $statusForUi === 'published' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="published" <?php echo $statusForUi === 'published' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
                                     <span class="text-sm font-medium text-slate-700 whitespace-nowrap">Опубликована</span>
                                 </label>
 
-                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'archived' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
-                                    <input type="radio" name="status" value="archived" <?php echo $pageStatus === 'archived' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $statusForUi === 'archived' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="archived" <?php echo $statusForUi === 'archived' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
                                     <span class="text-sm font-medium text-slate-700 whitespace-nowrap">Снята с публикации</span>
                                 </label>
                             </div>
+
+                            <?php if (!$schedulingEnabled && $pageStatus === 'scheduled'): ?>
+                            <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl max-w-xl">
+                                <span class="icon-clock text-amber-600 mt-0.5 flex-shrink-0"></span>
+                                <p class="text-xs text-amber-800 leading-relaxed">
+                                    Плагин «Автопубликация» отключён. Страница была запланирована<?php echo $pagePublishAt ? ' на <strong>' . e(date('d.m.Y H:i', (int)$pagePublishAt)) . '</strong>' : ''; ?>,
+                                    но опубликовать её сейчас некому. При сохранении она станет черновиком.
+                                </p>
+                            </div>
+                            <?php endif; ?>
+
+                            <?php if (!$schedulingEnabled && $pageStatus === 'published' && $pageUnpublishAt && (int)$pageUnpublishAt > time()): ?>
+                            <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl max-w-xl">
+                                <span class="icon-clock text-amber-600 mt-0.5 flex-shrink-0"></span>
+                                <p class="text-xs text-amber-800 leading-relaxed">
+                                    Плагин «Автопубликация» отключён, но у страницы сохранена дата снятия —
+                                    <strong><?php echo e(date('d.m.Y H:i', (int)$pageUnpublishAt)); ?></strong>.
+                                    Сайт скроет страницу в этот момент, изменить дату сейчас нельзя.
+                                    При сохранении дата будет сброшена.
+                                </p>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 
+                    <?php if ($schedulingEnabled): ?>
                     <!-- Даты: отдельная строка, видимость через JS -->
                     <div id="js-dates-row">
                         <div class="editor-row" style="align-items: flex-start !important;">
@@ -162,6 +193,7 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                     <?php
                     // Preview-токен: только для существующих страниц
                     if ($isEdit) {

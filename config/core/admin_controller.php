@@ -856,6 +856,12 @@ function handleSavePage(): array {
     if (!in_array($status, $allowedStatuses, true)) {
         $status = 'draft';
     }
+    // Планирование доступно только при активном плагине автопубликации:
+    // без него статус `scheduled` никто не переведёт в `published`.
+    // Защита от устаревшей открытой вкладки и подделанного POST.
+    if ($status === 'scheduled' && !isPageSchedulingEnabled()) {
+        return ['success' => '', 'error' => 'Автопубликация отключена. Выберите другой статус страницы.'];
+    }
     $metaDescription = trim($_POST['meta_description'] ?? '');
     $metaKeywords = trim($_POST['meta_keywords'] ?? '');
     $showHeader = isset($_POST['show_header']) ? true : false;

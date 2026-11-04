@@ -565,6 +565,7 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `getCronToken()` | Общий токен для кронов (из `settings.json`) |
 | `regenerateCronToken()` | Принудительная перегенерация токена |
 | `getPageStatusBadge()` | Метка/класс/иконка бейджа статуса |
+| `isPageSchedulingEnabled()` | Доступно ли планирование (фильтр `page_scheduling_enabled`) |
 | `clearPageCache()` | Очистка всего кеша |
 | `clearPageCacheById()` | Очистка кеша одной страницы |
 | `logAction()` | Логирование |

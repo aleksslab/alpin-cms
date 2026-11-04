@@ -267,8 +267,6 @@
         var unpublishInput = document.getElementById('unpublish-at-input');
         var requiredStar = document.querySelector('.js-required-star');
 
-        if (!datesRow || !publishField || !unpublishField || !publishInput || !unpublishInput) return;
-
         // Подсветка активной radio-карточки
         document.querySelectorAll('.js-status-radio').forEach(function(label) {
             var input = label.querySelector('input[type="radio"]');
@@ -278,6 +276,10 @@
                 label.classList.remove('border-[var(--primary-color)]', 'bg-emerald-50/30');
             }
         });
+
+        // Полей дат может не быть: планирование доступно только при активном
+        // плагине автопубликации. Подсветку выше это не отменяет.
+        if (!datesRow || !publishField || !unpublishField || !publishInput || !unpublishInput) return;
 
         // Хелперы для управления состоянием
         function setDisabled(input, disabled) {

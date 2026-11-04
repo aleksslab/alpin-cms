@@ -551,6 +551,20 @@ function applyPageDefaults(array $page): array {
 }
 
 /**
+ * Проверяет, доступно ли планирование публикации страниц.
+ *
+ * Возможность включается плагином через фильтр `page_scheduling_enabled`:
+ * именно он регистрирует cron-задачу, которая переводит `scheduled` в
+ * `published`. Пока фильтра нет, статус «По расписанию» и поля дат в
+ * редакторе не показываются: опубликовать такую страницу всё равно некому.
+ *
+ * @return bool true, если расписание поддерживается активным плагином.
+ */
+function isPageSchedulingEnabled(): bool {
+    return (bool) apply_filters('page_scheduling_enabled', false);
+}
+
+/**
  * Загружает страницу из data/pages/{slug}.json по её ЧПУ (slug)
  * 
  * @param string $slug ЧПУ страницы (пустая строка означает главную)
