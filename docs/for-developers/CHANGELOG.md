@@ -8,6 +8,7 @@
 - **Плагин «Резервное копирование»**: вынесен из ядра в `config/plugins/backups/` (создание, скачивание, восстановление и удаление архивов, настройки, крон). Данные (`config/data/backup_config.json`, `config/backups/`) остаются на месте.
 - **Плагин «Проводник (Файлы)»**: вынесен из ядра в `config/plugins/filemanager/` (список файлов, загрузка, правка кода в ACE, CHMOD, создание и удаление). AJAX (`fm_api_action`) перехватывается на `admin_init`; стили — `config/css/filemanager.css` (из `admin/style.css`), скрипт — `config/js/filemanager.js` (из `admin/script.js`).
 - **Мультивыбор файлов в проводнике**: кнопка «Выбрать», Ctrl/Cmd+клик и длительное нажатие на тач-устройствах; массовое удаление через `action=delete_many` (только файлы, папки — по одной).
+- **Плагин «Планировщик задач»**: секция «Интеграция с планировщиком» вынесена из ядра в `config/plugins/scheduler/` (токен крона и список URL крон-задач). Токен, реестр `register_cron_task()` и эндпоинты `config/cron/*` остаются в ядре.
 - **Реестр фоновых задач**: `register_cron_task()`, `get_cron_tasks()`, `run_cron_task()`, `get_cron_state()`, `set_cron_last_run()`, `get_cron_last_run()`. Состояние — в `config/data/cron_state.json`.
 - **Общий крон-эндпоинт** `config/cron/run.php?task={id}&token=...` для задач, зарегистрированных плагинами.
 - **Флаг `enabled`** у `register_cron_task()` — URL только включённых задач показываются в разделе «Интеграция с планировщиком».
@@ -21,6 +22,7 @@
 - **`config/cron/backup.php`** заменён общим `config/cron/run.php` (задача `backups`).
 - **Раздел «Интеграция с планировщиком»**: URL задач строятся из реестра (`get_cron_tasks()`), показываются только включённые задачи.
 - **`backup_config.json`**: поле `last_backup_time` больше не используется — расписание хранится в `config/data/cron_state.json`.
+- **Плагин `backups` (v1.0.2)**: подсказка про Cron URL обновлена — управление токеном и URL теперь в разделе «Интеграция с планировщиком» (секция плагина `scheduler`).
 - **`getLogSettings()`**: список `log_actions` собирается из реестра; новые действия включены по умолчанию, сохранённый выбор пользователя приоритетнее.
 - **Плагин `logs`**: UI строится из реестра, локальный `getLogActions()` удалён; при удалении плагина сбрасывается только список действий (путь и лимиты сохраняются).
 - **`ensureLogsDir()`** перенесён в ядро — папка логов и `.htaccess` больше не зависят от плагина `logs`.
@@ -30,6 +32,7 @@
 
 - **Новые файлы**: `config/core/cron.php`, `config/core/log.php`, `config/cron/run.php`.
 - **Перенесено в плагин `filemanager`**: `config/core/filemanager_api.php` → `plugin.php` (рефакторинг: `fm*`-функции и `fmAction*()`), `config/modules/filemanager.php` → `admin-page.php`, `config/js/filemanager.js` → `admin/script.js`, fm-стили из `config/css/config.css` → `admin/style.css`.
+- **Перенесено в плагин `scheduler`**: `config/modules/config_vars/cron.php` → `admin-section.php`; секция регистрируется через `register_plugin_section()`, чтобы скрытое поле `cron_token` осталось в форме «Настроек сайта».
 
 ## [Release version 2.0.0] — 2026-10-28
 

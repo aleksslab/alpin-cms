@@ -86,7 +86,6 @@ $token = $_SESSION['csrf_token'] ?? '';
             'assets',
             'cache',
             'history',
-            'cron', 
             'custom'
         ];
 
@@ -193,7 +192,6 @@ foreach ($minifyExceptions as $id => $data) {
             'assets' => 'Минификация',
             'cache' => 'Кеширование',
             'history' => 'История изменений',
-            'cron' => 'Интеграция с планировщиком',
             'custom' => 'Произвольный код'
         ];
         

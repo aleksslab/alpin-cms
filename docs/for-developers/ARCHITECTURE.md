@@ -118,7 +118,6 @@ config/
 │   │   ├── media.php      
 │   │   ├── cache.php
 │   │   ├── history.php
-│   │   ├── cron.php
 │   │   ├── custom.php
 │   │   └── modals.php
 │   ├── pages/

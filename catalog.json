@@ -8,7 +8,7 @@
             "type": "plugin",
             "name": "Резервное копирование",
             "description": "Создание, восстановление и скачивание резервных копий",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_backups.zip"
         },
         "dark-theme": {
@@ -45,6 +45,13 @@
             "description": "Конвертация изображений в WebP, статистика и массовая обработка.",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_media-optimization.zip"
+        },
+        "scheduler": {
+            "type": "plugin",
+            "name": "Планировщик задач",
+            "description": "Секция «Интеграция с планировщиком» в Настройках сайта: токен крона и список URL крон-задач.",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_scheduler.zip"
         },
         "test-tab": {
             "type": "plugin",
