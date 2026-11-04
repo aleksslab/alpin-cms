@@ -415,9 +415,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 ### 4. Idle Timeout
 
-```php
-checkAdminSessionTimeout($bfData);
-```
+Сервер: `checkAdminSessionTimeout($bfData)` в `config/index.php` — при
+превышении `session_timeout` сессия уничтожается, редирект на
+`index.php?msg=timeout`.
+
+Клиент: `renderSessionNotice()` + `initSessionTimer()` в `config/js/main.js`
+показывают sticky-полосу за `min(120, max(10, lifetime / 2))` секунд до конца,
+продлевают сессию от активности и на нуле проверяют её через
+`index.php?ajax=session_ping` (если жива — синхронизируют таймер).
 
 ### 5. Виртуальные кроны
 
@@ -535,6 +540,9 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `handleSuccessfulLogin()` | Успешный вход |
 | `handleFailedLogin()` | Неудачная попытка |
 | `handleLiveHashGeneration()` | Генерация хеша |
+| `getAdminSessionTimeoutSeconds()` | Время жизни сессии в секундах |
+| `getAdminSessionRemaining()` | Остаток текущей сессии |
+| `getAdminSessionWarnSeconds()` | Порог предупреждения |
 | `checkAdminSessionTimeout()` | Idle timeout |
 
 ### `admin_controller.php` — запись + логика

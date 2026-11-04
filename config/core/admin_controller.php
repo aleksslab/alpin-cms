@@ -360,6 +360,37 @@ function getToastScript(bool $force = false): string {
 }
 
 /**
+ * Рендерит скрытую sticky-полосу предупреждения об истечении сессии.
+ * Показывается клиентским таймером (config/js/main.js) за N секунд до конца.
+ *
+ * @param int $lifetime Время жизни сессии в секундах.
+ * @return string HTML-код полосы.
+ */
+function renderSessionNotice(int $lifetime): string {
+    $lifetime = max(60, $lifetime);
+    $warn = min(120, max(10, intdiv($lifetime, 2)));
+
+    $html  = '<div id="js-session-notice" class="hidden sticky top-20 z-30 animate-fade-in" role="status" aria-live="polite"';
+    $html .= ' data-lifetime="' . $lifetime . '"';
+    $html .= ' data-warn="' . $warn . '"';
+    $html .= ' data-ping-url="index.php?ajax=session_ping"';
+    $html .= ' data-login-url="index.php?msg=timeout">';
+    $html .= '<div class="border-b border-amber-200 bg-amber-50 px-4 md:px-6 py-3">';
+    $html .= '<div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">';
+    $html .= '<span class="icon-clock text-lg text-amber-700 flex-shrink-0"></span>';
+    $html .= '<p class="flex-1 text-sm text-amber-900">';
+    $html .= 'Сессия истекает через <span class="font-mono font-bold" data-session-countdown aria-live="off">' . gmdate('i:s', $warn) . '</span>. ';
+    $html .= '<span class="text-amber-700/80">Несохранённые изменения будут потеряны.</span>';
+    $html .= '</p>';
+    $html .= '<button type="button" class="js-session-extend flex-shrink-0 bg-amber-700 hover:bg-amber-800 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer">Продолжить сессию</button>';
+    $html .= '</div>';
+    $html .= '</div>';
+    $html .= '</div>';
+
+    return $html;
+}
+
+/**
  * 2. ОБРАБОТКА СОХРАНЕНИЯ НАСТРОЕК САЙТА
  */
 function handleSaveSettings(): array {

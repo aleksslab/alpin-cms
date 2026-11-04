@@ -17,6 +17,7 @@ if (!defined('APP_ROOT')) {
  */
 function handle_admin_post_actions(): void {
     $res = ['success' => '', 'error' => ''];
+    $securityRedirect = false;
 
     // --- НАСТРОЙКИ И СТРАНИЦЫ ---
     if (isset($_POST['save_settings']))       { $res = handleSaveSettings(); }
@@ -63,9 +64,9 @@ function handle_admin_post_actions(): void {
     elseif (isset($_POST['clear_cache']))      { clearPageCache(); echo json_encode(['success' => true, 'message' => 'Кеш очищен']); exit; }
     
     // --- БЕЗОПАСНОСТЬ ---
-    elseif (isset($_POST['action_unban']))        { $res = handleActionUnban(); }
-    elseif (isset($_POST['action_manual_ban']))   { $res = handleActionManualBan(); }
-    elseif (isset($_POST['save_security']))       { $res = handleSaveSecurity(); }
+    elseif (isset($_POST['action_unban']))        { $res = handleActionUnban();      $securityRedirect = true; }
+    elseif (isset($_POST['action_manual_ban']))   { $res = handleActionManualBan(); $securityRedirect = true; }
+    elseif (isset($_POST['save_security']))       { $res = handleSaveSecurity();    $securityRedirect = true; }
     elseif (isset($_POST['ajax_upload_carousel_img'])) { $res = handleAjaxImageUpload(); }
     
     // --- БЭКАПЫ ---
@@ -102,6 +103,19 @@ function handle_admin_post_actions(): void {
         exit;
     }
     
+    // --- PRG ДЛЯ ВКЛАДКИ «БЕЗОПАСНОСТЬ» ---
+    // Без редиректа F5 повторно отправляет POST: действие выполняется заново,
+    // а флеш появляется после каждого обновления страницы.
+    if ($securityRedirect) {
+        if (!empty($res['success'])) {
+            setFlash($res['success']);
+        } elseif (!empty($res['error'])) {
+            setFlash($res['error'], 'error');
+        }
+        header('Location: index.php?tab=security');
+        exit;
+    }
+
     // --- ФЛЭШ-СООБЩЕНИЯ ---
     if (!empty($res['success'])) {
         setFlash($res['success'], 'success');

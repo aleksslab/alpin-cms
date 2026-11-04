@@ -483,6 +483,12 @@ $res = handleSaveSettings();
 
 **Валидация** `From:` (**Host** **Header** **Injection**).
 
+Вызывается диспетчером `handle_admin_post_actions()` по схеме
+Post/Redirect/Get: флеш ставится там же, затем редирект на
+`index.php?tab=security`. Так же обрабатываются `action_unban` и
+`action_manual_ban`. При смене логина или пароля — выход,
+редирект на `index.php?msg=updated`.
+
 ---
 
 ### Резервное копирование
@@ -1403,7 +1409,30 @@ if (verifyAdminCredentials($login, $password)) { ... }
 
 ### `checkAdminSessionTimeout(array $bfData): void`
 
-**Idle timeout** — **уничтожение** **сессии** **при** **неактивности**.
+**Idle timeout** — уничтожение сессии при неактивности. При каждом вызове
+обновляет `$_SESSION['last_activity']`.
+
+### `getAdminSessionTimeoutSeconds(array $bfData): int`
+
+Время жизни сессии в секундах (`session_timeout * 60`, минимум 60).
+
+### `getAdminSessionRemaining(array $bfData): int`
+
+Остаток текущей сессии в секундах (`0` — истекла).
+
+### `getAdminSessionWarnSeconds(array $bfData): int`
+
+Порог предупреждения: `min(120, max(10, lifetime / 2))`.
+
+### `renderSessionNotice(int $lifetime): string`
+
+HTML скрытой sticky-полосы предупреждения. Данные для JS —
+`data-lifetime`, `data-warn`, `data-ping-url`, `data-login-url`.
+
+### `index.php?ajax=session_ping`
+
+GET-эндпоинт таймера. Продлевает сессию и отдаёт JSON
+`{ok, remaining, lifetime, warn}`; без авторизации — `401`.
 
 ---
 

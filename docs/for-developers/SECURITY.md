@@ -374,29 +374,48 @@ $_SESSION['last_activity'] = time();
 
 ### Idle timeout
 
-**`checkAdminSessionTimeout()`** — **если** **неактивность** > **timeout** — **уничтожение** **сессии**:
+**`checkAdminSessionTimeout()`** — если неактивность > `session_timeout` — уничтожение сессии и редирект на `index.php?msg=timeout`:
 
 ```php
-function checkAdminSessionTimeout(array $bfData): void {
-    if (!isset($_SESSION['last_activity'])) return;
-    
-    $timeoutMinutes = intval($bfData['settings']['session_timeout'] ?? 20);
-    $inactiveTime = time() - $_SESSION['last_activity'];
-    
-    if ($inactiveTime > ($timeoutMinutes * 60)) {
-        $_SESSION = [];
-        if (ini_get("session.use_cookies")) {
-            $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000, ...);
-        }
-        session_destroy();
-        header("Location: index.php?msg=timeout");
-        exit;
-    }
-    
-    $_SESSION['last_activity'] = time();
+$timeoutSeconds = getAdminSessionTimeoutSeconds($bfData);
+$inactiveTime   = time() - (int)$_SESSION['last_activity'];
+
+if ($inactiveTime > $timeoutSeconds) {
+    // ...
+    header('Location: index.php?msg=timeout');
+    exit;
 }
+
+$_SESSION['last_activity'] = time();
 ```
+
+**Клиентский таймер.** `renderSessionNotice()` выводит скрытую sticky-полосу
+(`data-lifetime`, `data-warn`), а `initSessionTimer()` в `config/js/main.js`:
+
+- показывает предупреждение за `min(120, max(10, lifetime / 2))` секунд
+  (для таймаута 1 минута — за 30 секунд);
+- на нуле делает `GET index.php?ajax=session_ping`: если сессия жива
+  (работала другая вкладка) — синхронизирует таймер, иначе уходит на
+  `index.php?msg=timeout`;
+- продлевает сессию от любой активности (`pointerdown`, `keydown`, `wheel`,
+  `touchstart`, `mousemove`, `scroll`) с троттлингом
+  `max(15, min(60, lifetime / 4))` секунд;
+- при возврате в вкладку (`visibilitychange`, `pageshow` из bfcache) делает
+  ping и берёт с сервера актуальные `lifetime`/`remaining` — таймаут мог
+  измениться в соседней вкладке;
+- после успешного AJAX к `index.php` сбрасывает локальный отсчёт.
+
+**Смена `session_timeout`.** Формы вкладки «Безопасность» (`save_security`,
+`action_unban`, `action_manual_ban`) работают по схеме Post/Redirect/Get:
+`handle_admin_post_actions()` ставит флеш и делает редирект на
+`index.php?tab=security`. Поэтому `$sessionLifetime` на перерисованной
+странице уже новый, а F5 не отправляет POST повторно — иначе флеш
+«Настройки сохранены» появлялся бы после каждого обновления.
+
+**`index.php?ajax=session_ping`** обрабатывается в `config/index.php` до
+загрузки плагинов и виртуальных кронов. Возвращает JSON
+`{ok, remaining, lifetime, warn}`; без авторизации — `401`. Запрос сам
+обновляет `last_activity`, поэтому служит и продлением, и проверкой.
 
 ---
 

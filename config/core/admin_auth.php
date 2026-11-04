@@ -215,13 +215,67 @@ function handleLiveHashGeneration(string $newPassword): string {
 /**
  * 7. КОНТРОЛЬ СЕССИИ ПО ТАЙМАУТУ НЕАКТИВНОСТИ (Idle Timeout)
  */
+
+/**
+ * Возвращает время жизни админ-сессии в секундах по настройкам безопасности.
+ *
+ * @param array $bfData Данные настроек защиты от брутфорса.
+ * @return int Секунды (минимум 60).
+ */
+function getAdminSessionTimeoutSeconds(array $bfData): int {
+    $minutes = intval($bfData['settings']['session_timeout'] ?? 20);
+    if ($minutes < 1) {
+        $minutes = 1;
+    }
+    return $minutes * 60;
+}
+
+/**
+ * Возвращает остаток времени текущей админ-сессии в секундах.
+ *
+ * @param array $bfData Данные настроек защиты от брутфорса.
+ * @return int Секунды (0 — сессия истекла).
+ */
+function getAdminSessionRemaining(array $bfData): int {
+    $lifetime = getAdminSessionTimeoutSeconds($bfData);
+
+    if (!isset($_SESSION['last_activity'])) {
+        return $lifetime;
+    }
+
+    $remaining = $lifetime - (time() - (int)$_SESSION['last_activity']);
+    return max(0, min($lifetime, $remaining));
+}
+
+/**
+ * Возвращает порог предупреждения об истечении сессии в секундах.
+ * Обычно 2 минуты, но не больше половины времени жизни и не меньше 10 секунд.
+ *
+ * @param array $bfData Данные настроек защиты от брутфорса.
+ * @return int Секунды.
+ */
+function getAdminSessionWarnSeconds(array $bfData): int {
+    $lifetime = getAdminSessionTimeoutSeconds($bfData);
+    return min(120, max(10, intdiv($lifetime, 2)));
+}
+
+/**
+ * Проверяет бездействие админа и завершает сессию при превышении таймаута.
+ * При каждом вызове обновляет время последней активности.
+ *
+ * @param array $bfData Данные настроек защиты от брутфорса.
+ * @return void
+ */
 function checkAdminSessionTimeout(array $bfData): void {
-    if (!isset($_SESSION['last_activity'])) { return; }
-    
-    $timeoutMinutes = intval($bfData['settings']['session_timeout'] ?? 20);
-    $inactiveTime = time() - $_SESSION['last_activity'];
-    
-    if ($inactiveTime > ($timeoutMinutes * 60)) {
+    if (!isset($_SESSION['last_activity'])) {
+        $_SESSION['last_activity'] = time();
+        return;
+    }
+
+    $timeoutSeconds = getAdminSessionTimeoutSeconds($bfData);
+    $inactiveTime = time() - (int)$_SESSION['last_activity'];
+
+    if ($inactiveTime > $timeoutSeconds) {
         $_SESSION = [];
         if (ini_get("session.use_cookies")) {
             $params = session_get_cookie_params();
@@ -231,6 +285,6 @@ function checkAdminSessionTimeout(array $bfData): void {
         header("Location: index.php?msg=timeout");
         exit;
     }
-    
+
     $_SESSION['last_activity'] = time(); // Свежий клик — продлеваем серверное время активности
 }

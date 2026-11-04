@@ -3,6 +3,33 @@ require_once 'config.php';
 require_once 'core/functions.php';
 require_once 'core/admin_auth.php';
 
+// =========================================================================
+// SESSION PING (heartbeat таймера сессии)
+// =========================================================================
+// Обслуживается до синхронизации плагинов и виртуальных кронов: это дешёвый
+// запрос, который лишь продлевает сессию и возвращает остаток времени.
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['ajax']) && $_GET['ajax'] === 'session_ping') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, max-age=0');
+
+    if (empty($_SESSION['admin_auth'])) {
+        http_response_code(401);
+        echo json_encode(['ok' => false]);
+        exit;
+    }
+
+    $bfDataPing = getLoginAttemptsData();
+    checkAdminSessionTimeout($bfDataPing);
+
+    echo json_encode([
+        'ok'        => true,
+        'remaining' => getAdminSessionRemaining($bfDataPing),
+        'lifetime'  => getAdminSessionTimeoutSeconds($bfDataPing),
+        'warn'      => getAdminSessionWarnSeconds($bfDataPing),
+    ]);
+    exit;
+}
+
 // Синхронизируем манифесты плагинов с JSON (подхватываем изменения из plugin.json)
 if (function_exists('syncPluginsData')) {
     syncPluginsData();
@@ -99,6 +126,7 @@ if ($isAuth) {
     // --- КОНТРОЛЬ НЕАКТИВНОСТИ СЕССИИ (Idle Timeout) ---
     $bfData = getLoginAttemptsData();
     checkAdminSessionTimeout($bfData);
+    $sessionLifetime = getAdminSessionTimeoutSeconds($bfData);
     
     require_once 'core/admin_controller.php';    
     
@@ -202,6 +230,8 @@ if ($isAuth) {
                 </a>
             </div>
         </header>
+
+        <?php echo renderSessionNotice($sessionLifetime); ?>
 
         <!-- МОБИЛЬНЫЙ ТЕМНЫЙ ФОН ПРИ ОТКРЫТИИ МЕНЮ -->
         <div id="js-sidebar-backdrop" class="sidebar-backdrop-overlay"></div>

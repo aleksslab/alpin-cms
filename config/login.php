@@ -15,6 +15,10 @@
         <?php if (!empty($error)): ?>
             <div class="p-4 mb-4 text-sm text-rose-800 bg-rose-50 border border-rose-100 rounded-xl"><?php echo e($error); ?></div>
         <?php endif; ?>
+
+        <?php if (isset($_GET['msg']) && $_GET['msg'] === 'timeout'): ?>
+            <div class="p-4 mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl">Сессия завершена из-за неактивности. Войдите снова, чтобы продолжить.</div>
+        <?php endif; ?>
             
         <?php if (isset($_GET['msg']) && $_GET['msg'] === 'updated'): ?>
             <div class="p-4 mb-4 text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-xl">Доступы успешно изменены! Войдите, используя новые учетные данные.</div>
