@@ -85,17 +85,11 @@ function _register_core_log_actions(): void {
             'page_trash'        => 'Перемещение страницы в корзину',
             'page_clone'        => 'Клонирование страницы',
             'page_set_home'     => 'Назначение главной страницы',
-            'page_restore'      => 'Откат страницы к версии',
         ]],
         'Меню' => ['icon' => 'menu', 'actions' => [
             'menu_save'         => 'Сохранение меню',
             'menu_trash'        => 'Перемещение меню в корзину',
             'menu_set_main'     => 'Назначение главного меню',
-        ]],
-        'История' => ['icon' => 'history', 'actions' => [
-            'page_history_delete' => 'Удаление версии истории',
-            'page_history_clear'  => 'Очистка истории страницы',
-            'history_clear'       => 'Очистка всей истории',
         ]],
         'Корзина' => ['icon' => 'trash-2', 'actions' => [
             'trash_restore'     => 'Восстановление из корзины',

@@ -147,8 +147,7 @@
 │   │   ├── admin_controller.php  # Запись + логика
 │   │   ├── media_modal.php       
 │   │   ├── icon_modal.php        
-│   │   ├── trash_modal.php       
-│   │   └── history_modal.php     
+│   │   └── trash_modal.php       
 │   │
 │   ├── plugins/                  # Плагины (системные расширения)
 │   │

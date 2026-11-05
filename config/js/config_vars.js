@@ -605,43 +605,6 @@
         });
     };
     
-    // ===== ИСТОРИЯ: ПОЛНАЯ ОЧИСТКА =====
-    window.clearAllHistory = function() {
-        if (!confirm('Удалить всю историю изменений? Действие необратимо.')) {
-            return;
-        }
-
-        var token = document.querySelector('input[name="csrf_token"]');
-        if (!token) {
-            alert('Ошибка: CSRF-токен не найден');
-            return;
-        }
-
-        fetch('index.php?tab=config_vars', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'clear_all_history=1&csrf_token=' + encodeURIComponent(token.value)
-        })
-        .then(function(response) { return response.json(); })
-        .then(function(data) {
-            if (data.success) {
-                alert(data.message || 'История очищена.');
-
-                var pagesEl = document.getElementById('history-stat-pages');
-                var versionsEl = document.getElementById('history-stat-versions');
-                var sizeEl = document.getElementById('history-stat-size');
-                if (pagesEl) pagesEl.textContent = '0';
-                if (versionsEl) versionsEl.textContent = '0';
-                if (sizeEl) sizeEl.textContent = '0 B';
-            } else {
-                alert(data.error || 'Ошибка очистки.');
-            }
-        })
-        .catch(function() {
-            alert('Ошибка соединения');
-        });
-    };
-    
     // ===== МЕДИА: УДАЛЕНИЕ ВСЕХ WEBP =====
     window.deleteAllWebp = function() {
         if (!confirm('Удалить все сгенерированные .webp-файлы?\n\nОригиналы (jpg, png) останутся. .webp без оригинала не тронем.')) {

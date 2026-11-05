@@ -130,8 +130,9 @@ add_action('index_start', function() {
 
 | Хук | Когда срабатывает | Аргументы |
 |-----|-------------------|-----------|
-| `page_before_save` | Перед записью страницы | `$id`, `$pageData` |
-| `page_saved` | После успешного сохранения страницы | `$id`, `$pageData` |
+| `page_data_before_save` (фильтр) | Перед записью страницы — можно изменить данные | `$pageData`, `$id`, `$oldPage` (null при создании) |
+| `page_before_save` | Перед записью страницы | `$id`, `$pageData`, `$oldPage` |
+| `page_saved` | После успешного сохранения страницы | `$id`, `$pageData`, `$oldPage` |
 | `home_before_change` | Перед сменой главной страницы | `$oldHomeId`, `$newHomeId` |
 | `home_changed` | После смены главной | `$newHomeId` |
 | `page_before_clone` | Перед клонированием страницы | `$sourceId` |
@@ -140,8 +141,16 @@ add_action('index_start', function() {
 | `page_deleted` | После перемещения в корзину | `$pageId` |
 | `page_before_restore` | Перед восстановлением из корзины или истории | `$pageId` |
 | `page_restored` | После восстановления | `$pageId` |
+| `trash_item_purged` | После окончательного удаления элемента корзины | `$trashData` (данные страницы/меню) |
 | `settings_before_save` | Перед записью настроек | `$newSettings` |
 | `settings_saved` | После записи настроек | `$oldSettings`, `$newSettings` |
+
+**Хуки админки для формы страницы:**
+
+| Хук | Когда срабатывает | Аргументы |
+|-----|-------------------|-----------|
+| `edit_page_history_block` | В блоке настроек формы редактирования | `$editPage` |
+| `edit_page_modals` | После формы, до скриптов (для модалок) | `$pageId` |
 
 **Пример: плагин SEO-инструментов (`seo-tools`)**
 
@@ -151,6 +160,19 @@ add_action('page_deleted', function() { seo_maybe_regenerate(); });
 add_action('page_restored', function() { seo_maybe_regenerate(); });
 add_action('page_cloned', function() { seo_maybe_regenerate(); });
 add_action('home_changed', function() { seo_maybe_regenerate(); });
+```
+
+**Пример: плагин истории (`history`) — свой ключ и снапшот**
+
+```php
+add_filter('page_data_before_save', function($pageData, $id, $oldPage) {
+    $pageData['history_key'] = bin2hex(random_bytes(8));
+    return $pageData;
+}, 10, 3);
+
+add_action('page_before_save', function($id, $newPage, $oldPage) {
+    history_save_snapshot($oldPage, $newPage, 'admin');
+}, 10, 3);
 ```
 
 ### 🧩 Хуки жизненного цикла плагинов (только для админки)

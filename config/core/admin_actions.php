@@ -35,12 +35,6 @@ function handle_admin_post_actions(): void {
     // --- КОРЗИНА ---
     elseif (isset($_POST['trash_action'])) { handleTrashAction(); exit; }
     
-    // --- ИСТОРИЯ ---
-    elseif (isset($_POST['restore_page_version'])) { handleRestorePageVersion($_POST['page_id'] ?? '', intval($_POST['version_ts'] ?? 0)); exit; }
-    elseif (isset($_POST['delete_history_version'])) { handleDeleteHistoryVersion($_POST['page_id'] ?? '', intval($_POST['version_ts'] ?? 0)); exit; }
-    elseif (isset($_POST['clear_page_history'])) { handleClearPageHistory($_POST['page_id'] ?? ''); exit; }
-    elseif (isset($_POST['clear_all_history'])) { handleClearAllHistory(); exit; }        
-    
     // --- МОДУЛИ И МИНИФИКАЦИЯ ---
     elseif (isset($_POST['unpack_module']))    { echo json_encode(unpackModule($_POST['module_id'] ?? '')); exit; }
     elseif (isset($_POST['rebuild_min']))      { handleRebuildModuleMin($_POST['module_id'] ?? ''); exit; }

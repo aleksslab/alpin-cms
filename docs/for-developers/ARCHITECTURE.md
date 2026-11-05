@@ -96,8 +96,7 @@ config/
 │   ├── admin_controller.php  # ЗАПИСЬ + логика
 │   ├── media_modal.php       # Медиа-модалка
 │   ├── icon_modal.php        # Модалка иконок
-│   ├── trash_modal.php       # Модалка корзины
-│   └── history_modal.php     # Модалка истории изменений
+│   └── trash_modal.php       # Модалка корзины
 │
 ├── plugins/               # Плагины (системные расширения)
 │
@@ -115,7 +114,6 @@ config/
 │   │   ├── assets.php
 │   │   ├── media.php      
 │   │   ├── cache.php
-│   │   ├── history.php
 │   │   ├── custom.php
 │   │   └── modals.php
 │   ├── pages/
@@ -574,26 +572,6 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `cleanupSessionPagePreviews()` | Очистка previews сессии для страницы |
 | `getPagePreviewToken()` | Чтение постоянного токена |
 | `getPagePreviewUrl()` | Формирование URL постоянного preview |
-| `isHistoryEnabled()` | История включена |
-| `getHistoryLimit()` | Лимит версий |
-| `getHistoryDir()` | Путь к папке истории страницы |
-| `ensureHistoryDir()` | Создание папки истории + `.htaccess` |
-| `getOrCreateHistoryKey()` | Ключ истории страницы |
-| `savePageSnapshot()` | Сохранение снапшота (с дедупликацией) |
-| `rotatePageHistory()` | Удаление старых версий |
-| `getHistoryContentFields()` | Список контентных полей |
-| `extractHistoryContent()` | Извлечение контентных полей |
-| `normalizeHistoryContent()` | Нормализация для сравнения |
-| `getPageHistory()` | Список версий страницы |
-| `getHistorySnapshot()` | Чтение конкретного снапшота |
-| `deleteHistoryVersion()` | Удаление одной версии |
-| `clearPageHistory()` | Очистка истории страницы |
-| `getHistoryStats()` | Статистика истории сайта |
-| `restorePageFromHistory()` | Откат страницы к версии |
-| `handleRestorePageVersion()` | POST-обработчик отката |
-| `handleDeleteHistoryVersion()` | POST-обработчик удаления версии |
-| `handleClearPageHistory()` | POST-обработчик очистки страницы |
-| `handleClearAllHistory()` | AJAX-обработчик очистки всей истории |
 | `isWebpSupported()` | Проверка доступности WebP (GD/Imagick) |
 | `convertToWebp()` | Конвертация одного изображения в .webp |
 | `maybeConvertToWebp()` | Обёртка: настройки + поддержка → convertToWebp |

@@ -18,7 +18,11 @@
 - **Реестр действий логирования**: `register_log_action()`, `get_log_actions()`, `get_log_action_groups()`. Ядро и плагины регистрируют свои действия, UI вкладки «Логи» строится из реестра.
 - **Фильтр `sensitive_files`** — плагины добавляют свои файлы в список недоступных через проводник.
 - **Плагин «SEO-инструменты»**: вынесен из ядра в `config/plugins/seo-tools/` (генерация `sitemap.xml` и `robots.txt`, автообновление при изменении страниц, ручная пересборка, cron-задача `seo`). Настройки (`seo_*`) хранятся в `data/settings.json`; файлы — в корне сайта.
+- **Плагин «История изменений»**: вынесен из ядра в `config/plugins/history/` (снапшоты версий, откат только контента, лимит версий, очистка, модалка в редакторе страницы). Данные (`data/history/`) и поле `history_key` остаются на месте.
 - **Хуки изменения контента**: `page_before_save` / `page_saved`, `home_before_change` / `home_changed`, `page_before_clone` / `page_cloned`, `page_before_delete` / `page_deleted`, `page_before_restore` / `page_restored`, `settings_before_save` / `settings_saved`.
+- **Фильтр `page_data_before_save`** — правка данных страницы перед записью (плагин истории назначает `history_key`).
+- **Хук `trash_item_purged`** — элемент корзины удалён окончательно; аргумент — данные страницы/меню.
+- **Хуки формы страницы**: `edit_page_history_block` (блок в настройках) и `edit_page_modals` (модалки после формы).
 
 ### Изменено
 
@@ -39,6 +43,11 @@
 - **Плагин `scheduler` (v1.0.2)**: убран захардкоженный URL SEO-задачи — список строится только из реестра `get_cron_tasks()`.
 - **Секция SEO**: блок «Технический SEO» рендерится плагином через `register_plugin_settings()`; кнопка пересборки — инлайн-скрипт плагина.
 - **Ядро**: из `handleSavePage()`, `handleSetHomePage()`, `handleClonePage()`, `handleDeletePage()`, `restoreFromTrash()`, `restorePageFromHistory()` убраны вызовы `maybeRegenerateSeoFiles()` — плагин подписан на хуки.
+- **`handleSavePage()`**: перед записью загружается `$oldPage` (версия на диске), применяется фильтр `page_data_before_save`, хуки `page_before_save` / `page_saved` получают третьим аргументом прежнюю версию. Генерация `history_key` и снапшот убраны — это делает плагин.
+- **Корзина**: `deleteFromTrash()` и `clearTrash()` больше не вызывают `clearPageHistory()` напрямую — стреляют `trash_item_purged` с данными удалённого элемента.
+- **Секция «История изменений»**: `config/modules/config_vars/history.php` удалён, секция регистрируется плагином через `register_plugin_section('history', ...)` и выводится в конце списка.
+- **Форма страницы**: кнопка истории и модалка подключаются через `edit_page_history_block` и `edit_page_modals`; из `config_vars.js` удалён `clearAllHistory()` (переехал в секцию плагина).
+- **`log.php`**: из ядра убраны действия `page_restore` и группа «История» — их регистрирует плагин.
 
 ### Технические детали
 
@@ -49,6 +58,10 @@
 - **Новые файлы**: `config/plugins/seo-tools/{plugin.json,plugin.php,admin-section.php}`.
 - **Перенесено в плагин `seo-tools`**: `generateSitemap()`, `generateRobots()`, `generateSeoFiles()`, `maybeRegenerateSeoFiles()` → `seo_generate_sitemap()`, `seo_generate_robots()`, `seo_generate_files()`, `seo_maybe_regenerate()`; POST `regenerate_seo_files` → `admin_init`; лог-действие `seo_regenerate` — в плагине.
 - **Закрыто**: `seo_regenerate` убран из `_register_core_log_actions()`.
+- **Новые файлы**: `config/plugins/history/{plugin.json,plugin.php,admin-section.php,admin-modal.php}`.
+- **Перенесено в плагин `history`**: `isHistoryEnabled()`, `getHistoryLimit()`, `getHistoryDir()`, `ensureHistoryDir()`, `getOrCreateHistoryKey()`, `rotatePageHistory()`, `savePageSnapshot()`, `getPageHistory()`, `getHistorySnapshot()`, `getHistoryContentFields()`, `extractHistoryContent()`, `normalizeHistoryContent()`, `deleteHistoryVersion()`, `clearPageHistory()`, `getHistoryStats()`, `restorePageFromHistory()` → `history_*`; четыре POST-обработчика → `admin_init`; `config/core/history_modal.php` → `admin-modal.php`; `config/js/history_modal.js` — инлайн в нём; секция настроек → `admin-section.php`.
+- **Удалено**: `config/core/history_modal.php`, `config/js/history_modal.js`, `config/modules/config_vars/history.php`, `HISTORY_DIR` и ~743 строки истории в `admin_controller.php`, 4 POST-ветки в `admin_actions.php`.
+- **`data/history/`** и `.htaccess` остаются на месте; каталог создаёт плагин при первом снапшоте.
 
 ## [Release version 2.0.0] — 2026-10-28
 
