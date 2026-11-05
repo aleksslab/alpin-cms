@@ -81,7 +81,11 @@ if (!$success) {
 
 confirm_cron_task_run((string)$task);
 
-logAction('cron_run', 'Задача «' . $taskLabel . '» (' . $task . ') выполнена за ' . $elapsedMs . ' мс', 'INFO');
+// Частые задачи (например, автопубликация) пишут в лог только о реальных
+// изменениях, поэтому техническую запись cron_run отключают опцией 'log' => false.
+if (!empty($taskInfo['log'])) {
+    logAction('cron_run', 'Задача «' . $taskLabel . '» (' . $task . ') выполнена за ' . $elapsedMs . ' мс', 'INFO');
+}
 
 if (!headers_sent()) {
     header('Content-Type: text/plain; charset=utf-8');

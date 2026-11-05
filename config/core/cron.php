@@ -25,7 +25,8 @@ if (!defined('CRON_RETRY_COOLDOWN')) {
  *
  * @param string   $id      Уникальный ID задачи (латиница, цифры, дефис, подчёркивание)
  * @param callable $callback Функция-обработчик. Должна вернуть true при успехе.
- * @param array    $options  Опции: interval (секунды), virtual (участие в виртуальном кроне), label
+ * @param array    $options  Опции: interval (секунды), virtual (участие в виртуальном кроне),
+ *                           enabled (задача активна), log (писать cron_run при успехе), label
  * @return void
  */
 function register_cron_task(string $id, callable $callback, array $options = []): void {
@@ -43,6 +44,7 @@ function register_cron_task(string $id, callable $callback, array $options = [])
         'interval' => max(0, (int)($options['interval'] ?? 0)),
         'virtual'  => !empty($options['virtual']),
         'enabled'  => !array_key_exists('enabled', $options) || !empty($options['enabled']),
+        'log'      => !array_key_exists('log', $options) || !empty($options['log']),
         'label'    => (string)($options['label'] ?? $id),
     ];
 }
