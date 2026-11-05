@@ -145,6 +145,20 @@ add_action('index_start', function() {
 | `settings_before_save` | Перед записью настроек | `$newSettings` |
 | `settings_saved` | После записи настроек | `$oldSettings`, `$newSettings` |
 
+**Если плагин сам пишет страницу** (крон, миграция, импорт) через `savePageData()`, он обязан повторить контракт ядра, иначе SEO, история и кеш не узнают об изменении:
+
+```php
+$page = apply_filters('page_data_before_save', $page, $page['id'], $oldPage);
+do_action('page_before_save', $page['id'], $page, $oldPage);
+
+if (savePageData($page['id'], $page)) {
+    clearPageCacheById($page['id']);
+    do_action('page_saved', $page['id'], $page, $oldPage);
+}
+```
+
+Правило действует и для изменения только статуса: `page_saved` нужен подписчикам, а снапшот истории не создастся — статус не входит в контентные поля.
+
 **Хуки админки для формы страницы:**
 
 | Хук | Когда срабатывает | Аргументы |

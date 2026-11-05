@@ -63,6 +63,10 @@
 - **Удалено**: `config/core/history_modal.php`, `config/js/history_modal.js`, `config/modules/config_vars/history.php`, `HISTORY_DIR` и ~743 строки истории в `admin_controller.php`, 4 POST-ветки в `admin_actions.php`.
 - **`data/history/`** и `.htaccess` остаются на месте; каталог создаёт плагин при первом снапшоте.
 
+### Исправлено
+
+- **Плагин `publish` (v1.0.3)**: автопубликация и автоснятие больше не пишут страницу молча. Крон применяет `page_data_before_save` и стреляет `page_before_save` / `page_saved`, поэтому SEO-плагин пересобирает `sitemap.xml`, а `history_key` появляется у старых страниц. Лишние снапшоты не создаются — статус не входит в контентные поля.
+
 ## [Release version 2.0.0] — 2026-10-28
 
 ### Добавлено
