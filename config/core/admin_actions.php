@@ -32,9 +32,6 @@ function handle_admin_post_actions(): void {
     elseif (isset($_POST['menu_delete']))    { handleDeleteMenu(); exit; }
     elseif (isset($_POST['menu_set_main']))  { handleSetMainMenu(); exit; }
     
-    // --- КОРЗИНА ---
-    elseif (isset($_POST['trash_action'])) { handleTrashAction(); exit; }
-    
     // --- МОДУЛИ И МИНИФИКАЦИЯ ---
     elseif (isset($_POST['unpack_module']))    { echo json_encode(unpackModule($_POST['module_id'] ?? '')); exit; }
     elseif (isset($_POST['rebuild_min']))      { handleRebuildModuleMin($_POST['module_id'] ?? ''); exit; }

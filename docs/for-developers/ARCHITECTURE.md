@@ -95,8 +95,7 @@ config/
 │   ├── admin_auth.php     # Авторизация, brute-force
 │   ├── admin_controller.php  # ЗАПИСЬ + логика
 │   ├── media_modal.php       # Медиа-модалка
-│   ├── icon_modal.php        # Модалка иконок
-│   └── trash_modal.php       # Модалка корзины
+│   └── icon_modal.php        # Модалка иконок
 │
 ├── plugins/               # Плагины (системные расширения)
 │
@@ -555,6 +554,9 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `handleSaveSettings()` | Сохранение настроек |
 | `handleSavePage()` | Сохранение страницы |
 | `handleDeletePage()` | Удаление страницы |
+| `deleteEntityPermanently()` | Окончательное удаление без корзины |
+| `isTrashEnabled()` | Доступна ли корзина (фильтр `trash_enabled`) |
+| `getDeleteConfirmMessage()` | Текст подтверждения удаления |
 | `handleClonePage()` | Клонирование |
 | `handleSetHomePage()` | Назначение главной |
 | `handleSaveMenu()`, `handleDeleteMenu()` | Меню |

@@ -853,6 +853,20 @@ function handleAjaxImageUpload(): void {
 
 
 /**
+ * Проверяет, доступно ли планирование публикации страниц.
+ *
+ * Возможность включается плагином через фильтр `page_scheduling_enabled`:
+ * именно он регистрирует cron-задачу, которая переводит `scheduled` в
+ * `published`. Пока фильтра нет, статус «По расписанию» и поля дат в
+ * редакторе не показываются: опубликовать такую страницу всё равно некому.
+ *
+ * @return bool true, если расписание поддерживается активным плагином.
+ */
+function isPageSchedulingEnabled(): bool {
+    return (bool) apply_filters('page_scheduling_enabled', false);
+}
+
+/**
  * 7. ОБРАБОТКА СОЗДАНИЯ/РЕДАКТИРОВАНИЯ СТРАНИЦЫ
  */
 function handleSavePage(): array {    
@@ -1292,6 +1306,89 @@ function handleClonePage(): void {
 }
 
 /**
+ * Проверяет, доступна ли корзина для страниц и меню.
+ *
+ * Возможность включается плагином через фильтр `trash_enabled`: только он
+ * умеет перемещать файлы в data/trash/ и восстанавливать их. Пока фильтра
+ * нет, удаление выполняется окончательно, а кнопка и модалка корзины не
+ * выводятся.
+ *
+ * @return bool true, если активный плагин включил корзину.
+ */
+function isTrashEnabled(): bool {
+    return (bool) apply_filters('trash_enabled', false);
+}
+
+/**
+ * Возвращает текст подтверждения удаления страницы или меню.
+ *
+ * @param string $type  'page' | 'menu'
+ * @param string $title Название страницы или меню
+ * @return string Текст для confirm()
+ */
+function getDeleteConfirmMessage(string $type, string $title): string {
+    $enabled = isTrashEnabled();
+
+    if ($type === 'menu') {
+        return $enabled
+            ? 'Переместить меню «' . $title . '» в корзину?'
+            : 'Плагин «Корзина» отключён. Меню «' . $title . '» будет удалено окончательно, восстановить его не получится. Удалить?';
+    }
+
+    return $enabled
+        ? 'Переместить страницу «' . $title . '» в корзину?'
+        : 'Плагин «Корзина» отключён. Страница «' . $title . '» будет удалена окончательно, восстановить её не получится. Удалить?';
+}
+
+/**
+ * Окончательно удаляет страницу или меню, когда корзина отключена.
+ *
+ * Читает данные до удаления, чтобы плагины (например, history) получили
+ * history_key и метаданные через `trash_item_purged`.
+ *
+ * @param string $type      'page' | 'menu'
+ * @param string $id        ID сущности
+ * @param string $sourceDir Папка-источник (с trailing separator)
+ * @return array ['success' => bool, 'error' => string]
+ */
+function deleteEntityPermanently(string $type, string $id, string $sourceDir): array {
+    if (!in_array($type, ['page', 'menu'], true)) {
+        return ['success' => false, 'error' => 'Неизвестный тип сущности.'];
+    }
+    if (!preg_match('#^[a-z0-9\-_]+$#i', $id)) {
+        return ['success' => false, 'error' => 'Невалидный ID.'];
+    }
+
+    $sourceFile = $sourceDir . $id . '.json';
+    if (!file_exists($sourceFile)) {
+        return ['success' => false, 'error' => 'Файл не найден.'];
+    }
+
+    $data = json_decode((string)file_get_contents($sourceFile), true);
+    if (!is_array($data)) {
+        return ['success' => false, 'error' => 'Повреждённый JSON.'];
+    }
+
+    $sizeBytes = (int)@filesize($sourceFile);
+
+    if (!@unlink($sourceFile)) {
+        return ['success' => false, 'error' => 'Не удалось удалить файл.'];
+    }
+
+    // Плагины: элемент удалён окончательно (история, превью)
+    $data['_trash'] = [
+        'type'        => $type,
+        'original_id' => $id,
+        'deleted_at'  => time(),
+        'deleted_by'  => $_SESSION['admin_login'] ?? 'system',
+        'size_bytes'  => $sizeBytes,
+    ];
+    do_action('trash_item_purged', $data);
+
+    return ['success' => true, 'error' => ''];
+}
+
+/**
  * 10. ОБРАБОТКА УДАЛЕНИЯ СТРАНИЦЫ
  */
 function handleDeletePage(): void {
@@ -1320,18 +1417,33 @@ function handleDeletePage(): void {
     // Хук «до удаления страницы» (для будущих плагинов)
     do_action('page_before_delete', $pageId);
 
-    $result = trashPage($pageId);
+    // Корзина живёт в плагине. null — плагин не активен, удаляем окончательно.
+    $result = apply_filters('trash_entity_result', null, 'page', $pageId);
+    $permanent = ($result === null);
+
+    if ($permanent) {
+        $result = deleteEntityPermanently('page', $pageId, DATA_DIR . 'pages' . DIRECTORY_SEPARATOR);
+    } elseif (!is_array($result)) {
+        $result = ['success' => false, 'error' => 'Некорректный ответ плагина корзины.'];
+    }
 
     if ($result['success']) {
         clearPageCacheById($pageId);
 
-        // Плагины: страница перемещена в корзину
+        // Плагины: страница удалена (в корзину или окончательно)
         do_action('page_deleted', $pageId);
-        
-        logAction('page_trash', 'Страница "' . $page['title'] . '" перемещена в корзину (ID: ' . $pageId . ')', 'INFO');
-        setFlash('Страница "' . $page['title'] . '" перемещена в корзину.');
+
+        if ($permanent) {
+            logAction('page_delete', 'Страница "' . $page['title'] . '" удалена окончательно (ID: ' . $pageId . ')', 'INFO');
+            setFlash('Страница "' . $page['title'] . '" удалена окончательно.');
+        } else {
+            logAction('page_trash', 'Страница "' . $page['title'] . '" перемещена в корзину (ID: ' . $pageId . ')', 'INFO');
+            setFlash('Страница "' . $page['title'] . '" перемещена в корзину.');
+        }
     } else {
-        logAction('page_trash', 'Ошибка перемещения в корзину "' . $page['title'] . '" (ID: ' . $pageId . '): ' . $result['error'], 'ERROR');
+        $action = $permanent ? 'page_delete' : 'page_trash';
+        $verb   = $permanent ? 'удаления' : 'перемещения в корзину';
+        logAction($action, 'Ошибка ' . $verb . ' "' . $page['title'] . '" (ID: ' . $pageId . '): ' . $result['error'], 'ERROR');
         setFlash('Ошибка: ' . $result['error'], 'error');
     }
 
@@ -1937,13 +2049,28 @@ function handleDeleteMenu(): void {
         exit;
     }
     
-    $result = trashMenu($menuId);
+    // Корзина живёт в плагине. null — плагин не активен, удаляем окончательно.
+    $result = apply_filters('trash_entity_result', null, 'menu', $menuId);
+    $permanent = ($result === null);
+
+    if ($permanent) {
+        $result = deleteEntityPermanently('menu', $menuId, DATA_DIR . 'menus' . DIRECTORY_SEPARATOR);
+    } elseif (!is_array($result)) {
+        $result = ['success' => false, 'error' => 'Некорректный ответ плагина корзины.'];
+    }
 
     if ($result['success']) {
-        logAction('menu_trash', 'Меню "' . $menu['name'] . '" перемещено в корзину (ID: ' . $menuId . ')', 'INFO');
-        setFlash('Меню "' . $menu['name'] . '" перемещено в корзину.');
+        if ($permanent) {
+            logAction('menu_delete', 'Меню "' . $menu['name'] . '" удалено окончательно (ID: ' . $menuId . ')', 'INFO');
+            setFlash('Меню "' . $menu['name'] . '" удалено окончательно.');
+        } else {
+            logAction('menu_trash', 'Меню "' . $menu['name'] . '" перемещено в корзину (ID: ' . $menuId . ')', 'INFO');
+            setFlash('Меню "' . $menu['name'] . '" перемещено в корзину.');
+        }
     } else {
-        logAction('menu_trash', 'Ошибка перемещения в корзину "' . $menu['name'] . '" (ID: ' . $menuId . '): ' . $result['error'], 'ERROR');
+        $action = $permanent ? 'menu_delete' : 'menu_trash';
+        $verb   = $permanent ? 'удаления' : 'перемещения в корзину';
+        logAction($action, 'Ошибка ' . $verb . ' "' . $menu['name'] . '" (ID: ' . $menuId . '): ' . $result['error'], 'ERROR');
         setFlash('Ошибка: ' . $result['error'], 'error');
     }
 
@@ -2617,464 +2744,6 @@ function clearPageCacheById(string $id): void {
             @unlink($file);
         }
     }
-}
-
-/**
- * ОБРАБОТКА КОРЗИНЫ (СТРАНИЦЫ И МЕНЮ)
- */
-// Папка корзины
-if (!defined('TRASH_DIR')) {
-    define('TRASH_DIR', DATA_DIR . 'trash' . DIRECTORY_SEPARATOR);
-}
-
-/**
- * Гарантирует существование папки корзины + .htaccess защиту.
- *
- * @return bool true если папка доступна для записи
- */
-function ensureTrashDir(): bool {
-    if (!is_dir(TRASH_DIR)) {
-        if (!@mkdir(TRASH_DIR, 0755, true)) {
-            return false;
-        }
-    }
-
-    // Защита от прямого доступа
-    $htaccess = TRASH_DIR . '.htaccess';
-    if (!file_exists($htaccess)) {
-        $data = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
-              . "<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n";
-        @file_put_contents($htaccess, $data);
-    }
-
-    return is_writable(TRASH_DIR);
-}
-
-/**
- * Общая функция перемещения сущности в корзину.
- *
- * @param string $type       'page' | 'menu'
- * @param string $id         ID сущности
- * @param string $sourceDir  Папка-источник (с trailing separator)
- * @return array ['success' => bool, 'error' => string]
- */
-function trashEntity(string $type, string $id, string $sourceDir): array {
-    // Валидация
-    if (!in_array($type, ['page', 'menu'], true)) {
-        return ['success' => false, 'error' => 'Неизвестный тип сущности.'];
-    }
-    if (!preg_match('#^[a-z0-9\-_]+$#i', $id)) {
-        return ['success' => false, 'error' => 'Невалидный ID.'];
-    }
-
-    $sourceFile = $sourceDir . $id . '.json';
-    if (!file_exists($sourceFile)) {
-        return ['success' => false, 'error' => 'Файл не найден.'];
-    }
-
-    if (!ensureTrashDir()) {
-        return ['success' => false, 'error' => 'Папка корзины недоступна для записи.'];
-    }
-
-    // Читаем исходные данные
-    $data = json_decode(file_get_contents($sourceFile), true);
-    if (!is_array($data)) {
-        return ['success' => false, 'error' => 'Повреждённый JSON.'];
-    }
-    
-    $login = $_SESSION['admin_login'] ?? 'system';
-
-    // Добавляем метаданные
-    $data['_trash'] = [
-        'type'        => $type,
-        'original_id' => $id,
-        'deleted_at'  => time(),
-        'deleted_by'  => $login,
-        'size_bytes'  => filesize($sourceFile),
-    ];
-
-    // Генерируем имя в корзине
-    $trashName = $type . '_' . $id . '_' . time() . '.json';
-    $trashPath = TRASH_DIR . $trashName;
-
-    // Записываем в корзину
-    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    if (!safeFileWrite($trashPath, $json)) {
-        return ['success' => false, 'error' => 'Не удалось записать файл в корзину.'];
-    }
-
-    // Удаляем оригинал
-    if (!@unlink($sourceFile)) {
-        // Откат: удаляем файл из корзины, если не смогли удалить оригинал
-        @unlink($trashPath);
-        return ['success' => false, 'error' => 'Не удалось удалить оригинал.'];
-    }
-
-    return ['success' => true, 'error' => ''];
-}
-
-/**
- * Перемещает страницу в корзину.
- *
- * @param string $id    ID страницы
- * @return array ['success' => bool, 'error' => string]
- */
-function trashPage(string $id): array {
-    return trashEntity('page', $id, DATA_DIR . 'pages' . DIRECTORY_SEPARATOR);
-}
-
-/**
- * Перемещает меню в корзину.
- *
- * @param string $id    ID меню
- * @return array ['success' => bool, 'error' => string]
- */
-function trashMenu(string $id): array {
-    return trashEntity('menu', $id, DATA_DIR . 'menus' . DIRECTORY_SEPARATOR);
-}
-
-/**
- * Возвращает список файлов в корзине с метаданными.
- *
- * @param string|null $type Фильтр по типу ('page' | 'menu'). null — все.
- * @return array Массив записей, отсортированных по deleted_at (свежие сверху)
- */
-function getTrashList(?string $type = null): array {
-    if (!is_dir(TRASH_DIR)) {
-        return [];
-    }
-
-    $list = [];
-    $files = glob(TRASH_DIR . '*.json');
-
-    foreach ($files as $file) {
-        $name = basename($file);
-        $data = json_decode(file_get_contents($file), true);
-        if (!is_array($data) || empty($data['_trash'])) {
-            continue;
-        }
-
-        $meta = $data['_trash'];
-
-        // Фильтр по типу
-        if ($type !== null && ($meta['type'] ?? '') !== $type) {
-            continue;
-        }
-
-        $list[] = [
-            'file'        => $name,
-            'type'        => $meta['type'] ?? 'unknown',
-            'original_id' => $meta['original_id'] ?? '',
-            'title'       => $data['title'] ?? ($data['name'] ?? $meta['original_id']),
-            'deleted_at'  => (int)($meta['deleted_at'] ?? 0),
-            'deleted_by'  => (string)($meta['deleted_by'] ?? ''),
-            'size_bytes'  => (int)($meta['size_bytes'] ?? 0),
-        ];
-    }
-
-    usort($list, function($a, $b) {
-        return $b['deleted_at'] - $a['deleted_at'];
-    });
-
-    return $list;
-}
-
-/**
- * Возвращает количество файлов в корзине.
- *
- * @param string|null $type Фильтр по типу ('page' | 'menu'). null — все.
- * @return int
- */
-function getTrashCount(?string $type = null): int {
-    if (!is_dir(TRASH_DIR)) {
-        return 0;
-    }
-
-    $pattern = ($type !== null && in_array($type, ['page', 'menu'], true))
-        ? TRASH_DIR . $type . '_*.json'
-        : TRASH_DIR . '*.json';
-
-    $files = glob($pattern);
-    return is_array($files) ? count($files) : 0;
-}
-
-/**
- * Восстанавливает сущность из корзины.
- * Если ID занят — восстанавливает как {id}-restored, {id}-restored-2, ...
- * При восстановлении страницы slug также пересчитывается.
- *
- * @param string $trashFileName Имя файла в корзине (без пути)
- * @return array ['success' => bool, 'message' => string, 'error' => string, 'new_id' => string]
- */
-function restoreFromTrash(string $trashFileName): array {
-    // Валидация имени файла
-    if (!preg_match('#^[a-z]+_[a-z0-9\-_]+_\d+\.json$#i', $trashFileName)) {
-        return ['success' => false, 'message' => '', 'error' => 'Невалидное имя файла.', 'new_id' => ''];
-    }
-
-    $trashPath = TRASH_DIR . $trashFileName;
-    if (!file_exists($trashPath)) {
-        return ['success' => false, 'message' => '', 'error' => 'Файл не найден в корзине.', 'new_id' => ''];
-    }
-
-    $data = json_decode(file_get_contents($trashPath), true);
-    if (!is_array($data) || empty($data['_trash'])) {
-        return ['success' => false, 'message' => '', 'error' => 'Повреждённые данные в корзине.', 'new_id' => ''];
-    }
-
-    $meta = $data['_trash'];
-    $type = $meta['type'] ?? '';
-    $originalId = $meta['original_id'] ?? '';
-
-    if (!in_array($type, ['page', 'menu'], true) || $originalId === '') {
-        return ['success' => false, 'message' => '', 'error' => 'Неизвестный тип сущности.', 'new_id' => ''];
-    }
-
-    // Куда восстанавливать
-    $targetDir = ($type === 'page')
-        ? DATA_DIR . 'pages' . DIRECTORY_SEPARATOR
-        : DATA_DIR . 'menus' . DIRECTORY_SEPARATOR;
-
-    // Разрешаем конфликт ID
-    $newId = $originalId;
-    $counter = 1;
-    while (file_exists($targetDir . $newId . '.json')) {
-        $counter++;
-        $newId = $originalId . '-restored' . ($counter > 2 ? '-' . ($counter - 1) : '');
-        if ($counter > 100) {
-            return ['success' => false, 'message' => '', 'error' => 'Слишком много конфликтов ID.', 'new_id' => ''];
-        }
-    }
-
-    // Обновляем данные
-    $data['id'] = $newId;
-
-    // Пересчитываем slug для страниц
-    if ($type === 'page') {
-        // Если оригинальный slug был равен originalId — пересчитываем
-        // Если был свой (например, пустой для главной) — оставляем, но тоже пересчитываем
-        $data['slug'] = $newId;
-    }
-
-    // Убираем метаданные корзины
-    unset($data['_trash']);
-
-    // Хук «до восстановления из корзины» (для будущих плагинов)
-    if ($type === 'page') {
-        do_action('page_before_restore', $originalId);
-    }
-
-    // Записываем в целевую папку
-    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    $targetPath = $targetDir . $newId . '.json';
-
-    if (!safeFileWrite($targetPath, $json)) {
-        return ['success' => false, 'message' => '', 'error' => 'Не удалось записать восстановленный файл.', 'new_id' => ''];
-    }
-
-    // Удаляем из корзины
-    @unlink($trashPath);
-
-    // Плагины: страница восстановлена из корзины
-    if ($type === 'page') {
-        do_action('page_restored', $newId);
-    }
-
-    $label = ($type === 'page') ? 'Страница' : 'Меню';
-    $message = $label . ' восстановлена' . ($newId !== $originalId ? " как \"$newId\" (оригинальный ID был занят)" : '') . '.';
-
-    return ['success' => true, 'message' => $message, 'error' => '', 'new_id' => $newId];
-}
-
-/**
- * Окончательно удаляет указанные файлы из корзины.
- *
- * @param array $fileNames Массив имён файлов (без пути)
- * @return array ['success' => bool, 'deleted' => int, 'error' => string]
- */
-function deleteFromTrash(array $fileNames): array {
-    if (empty($fileNames)) {
-        return ['success' => false, 'deleted' => 0, 'error' => 'Не выбрано ни одного файла.'];
-    }
-
-    $deleted = 0;
-    $errors = 0;
-
-    foreach ($fileNames as $name) {
-        // Валидация
-        if (!preg_match('#^[a-z]+_[a-z0-9\-_]+_\d+\.json$#i', $name)) {
-            $errors++;
-            continue;
-        }
-
-        $path = TRASH_DIR . $name;
-        if (!file_exists($path)) {
-            $errors++;
-            continue;
-        }
-
-        // Читаем ДО удаления — плагинам нужен history_key и метаданные
-        $trashData = _jsonToArray($path);
-
-        if (@unlink($path)) {
-            $deleted++;
-
-            // Плагины: элемент корзины удалён окончательно (история, превью)
-            do_action('trash_item_purged', $trashData);
-        } else {
-            $errors++;
-        }
-    }
-
-    if ($deleted === 0) {
-        return ['success' => false, 'deleted' => 0, 'error' => 'Не удалось удалить ни один файл.'];
-    }
-
-    return [
-        'success' => true,
-        'deleted' => $deleted,
-        'error'   => $errors > 0 ? "Не удалось удалить файлов: $errors" : '',
-    ];
-}
-
-/**
- * Полностью очищает корзину.
- *
- * @return array ['success' => bool, 'deleted' => int, 'error' => string]
- */
-function clearTrash(): array {
-    if (!is_dir(TRASH_DIR)) {
-        return ['success' => true, 'deleted' => 0, 'error' => ''];
-    }
-
-    $files = glob(TRASH_DIR . '*.json');
-    if (empty($files)) {
-        return ['success' => true, 'deleted' => 0, 'error' => ''];
-    }
-
-    $deleted = 0;
-    foreach ($files as $file) {
-        // Читаем ДО удаления — плагинам нужен history_key и метаданные
-        $trashData = _jsonToArray($file);
-
-        if (@unlink($file)) {
-            $deleted++;
-
-            // Плагины: элемент корзины удалён окончательно
-            do_action('trash_item_purged', $trashData);
-        }
-    }
-
-    return ['success' => true, 'deleted' => $deleted, 'error' => ''];
-}
-
-/**
- * Обработчик POST-действий корзины (восстановление / удаление / очистка).
- * Вызывается из config/index.php.
- *
- * Ожидает:
- * - $_POST['trash_action'] — 'restore' | 'delete_selected' | 'clear_all'
- * - $_POST['trash_context'] — 'page' | 'menu' (для редиректа)
- * - $_POST['trash_return_url'] — URL редиректа
- * - $_POST['trash_files'] — массив имён файлов (для restore/delete_selected)
- *
- * @return void
- */
-function handleTrashAction(): void {
-    $action   = $_POST['trash_action']   ?? '';
-    $context  = $_POST['trash_context']  ?? 'page';
-    $returnUrl = $_POST['trash_return_url'] ?? '?tab=pages';
-
-    // Валидация контекста и URL (защита от open redirect)
-    if (!in_array($context, ['page', 'menu'], true)) {
-        $context = 'page';
-    }
-    if (!preg_match('#^\?tab=[a-z_]+$#', $returnUrl)) {
-        $returnUrl = '?tab=' . ($context === 'page' ? 'pages' : 'menu');
-    }
-
-    // === Восстановление ===
-    if ($action === 'restore') {
-        $files = $_POST['trash_files'] ?? [];
-        if (!is_array($files) || empty($files)) {
-            setFlash('Не выбрано ни одного элемента для восстановления.', 'error');
-            header('Location: ' . $returnUrl);
-            exit;
-        }
-
-        $restored = 0;
-        $errors   = [];
-        foreach ($files as $file) {
-            $result = restoreFromTrash((string)$file);
-            if ($result['success']) {
-                $restored++;
-                logAction('trash_restore', $result['message'], 'INFO');
-            } else {
-                $errors[] = $result['error'];
-            }
-        }
-
-        if ($restored > 0 && empty($errors)) {
-            setFlash("Восстановлено элементов: $restored.");
-        } elseif ($restored > 0 && !empty($errors)) {
-            setFlash("Восстановлено: $restored. Ошибки: " . implode('; ', $errors), 'warning', 8);
-        } else {
-            setFlash('Не удалось восстановить: ' . implode('; ', $errors), 'error');
-        }
-
-        header('Location: ' . $returnUrl);
-        exit;
-    }
-
-    // === Удаление выбранных ===
-    if ($action === 'delete_selected') {
-        $files = $_POST['trash_files'] ?? [];
-        if (!is_array($files) || empty($files)) {
-            setFlash('Не выбрано ни одного элемента для удаления.', 'error');
-            header('Location: ' . $returnUrl);
-            exit;
-        }
-
-        $result = deleteFromTrash($files);
-        if ($result['success']) {
-            $msg = 'Удалено элементов: ' . $result['deleted'] . '.';
-            if (!empty($result['error'])) {
-                $msg .= ' ' . $result['error'];
-                setFlash($msg, 'warning', 6);
-            } else {
-                setFlash($msg);
-            }
-            logAction('trash_delete', 'Удалено из корзины: ' . $result['deleted'], 'INFO');
-        } else {
-            setFlash($result['error'], 'error');
-        }
-
-        header('Location: ' . $returnUrl);
-        exit;
-    }
-
-    // === Очистка всей корзины ===
-    if ($action === 'clear_all') {
-        $result = clearTrash();
-        if ($result['success']) {
-            if ($result['deleted'] > 0) {
-                setFlash('Корзина очищена. Удалено элементов: ' . $result['deleted'] . '.');
-                logAction('trash_clear', 'Корзина очищена: ' . $result['deleted'] . ' элементов', 'INFO');
-            } else {
-                setFlash('Корзина уже пуста.');
-            }
-        } else {
-            setFlash($result['error'] ?: 'Ошибка очистки корзины.', 'error');
-        }
-
-        header('Location: ' . $returnUrl);
-        exit;
-    }
-
-    // Неизвестное действие
-    setFlash('Неизвестное действие корзины.', 'error');
-    header('Location: ' . $returnUrl);
-    exit;
 }
 
 /**

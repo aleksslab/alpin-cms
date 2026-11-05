@@ -137,11 +137,15 @@ add_action('index_start', function() {
 | `home_changed` | После смены главной | `$newHomeId` |
 | `page_before_clone` | Перед клонированием страницы | `$sourceId` |
 | `page_cloned` | После клонирования | `$sourceId`, `$newId` |
-| `page_before_delete` | Перед перемещением в корзину | `$pageId` |
-| `page_deleted` | После перемещения в корзину | `$pageId` |
+| `page_before_delete` | Перед удалением страницы (в корзину или окончательно) | `$pageId` |
+| `page_deleted` | После удаления страницы (в корзину или окончательно) | `$pageId` |
 | `page_before_restore` | Перед восстановлением из корзины или истории | `$pageId` |
 | `page_restored` | После восстановления | `$pageId` |
-| `trash_item_purged` | После окончательного удаления элемента корзины | `$trashData` (данные страницы/меню) |
+| `trash_item_purged` | После окончательного удаления элемента корзины или прямого удаления без корзины | `$trashData` (данные страницы/меню) |
+| `trash_enabled` (фильтр) | Включает корзину. По умолчанию `false` | `$enabled` |
+| `trash_entity_result` (фильтр) | Перемещение страницы/меню в корзину | `$result`, `$type`, `$id` |
+| `trash_button` | Кнопка «Корзина» в шапке списка | `$type`, `$returnUrl` |
+| `trash_modal` | Модалка корзины | `$type`, `$returnUrl` |
 | `settings_before_save` | Перед записью настроек | `$newSettings` |
 | `settings_saved` | После записи настроек | `$oldSettings`, `$newSettings` |
 | `backup_restored` | После успешного восстановления из резервной копии | `$archiveName`, `$itemsToRestore` (корневые элементы архива) |
@@ -244,6 +248,31 @@ add_filter('page_title', function($title, $page) {
 | `page_title` | Заголовок страницы | `$title`, `$page` |
 | `save_settings_data` | Массив настроек перед сохранением | `$newSettings` |
 | `page_scheduling_enabled` | Включает планирование публикации: статус «По расписанию» и поля дат в редакторе. По умолчанию `false` | `$enabled` |
+| `trash_enabled` | Включает корзину для страниц и меню. По умолчанию `false` | `$enabled` |
+
+### Корзина
+
+Корзина — отдельный плагин `trash`. Ядро само не перемещает файлы: оно
+спрашивает фильтр `trash_entity_result` и вызывает `trash_button` /
+`trash_modal` для UI.
+
+```php
+add_filter('trash_enabled', function () {
+    return true;
+});
+
+add_filter('trash_entity_result', function ($result, string $type, string $id) {
+    if ($result !== null) {
+        return $result;
+    }
+
+    return $type === 'page' ? trash_page($id) : trash_menu($id);
+}, 10, 3);
+```
+
+Если фильтр `trash_entity_result` вернул `null`, ядро удаляет файл
+окончательно и пишет `page_delete` / `menu_delete`. Плагин корзины должен
+подписываться на `trash_enabled`, иначе его кнопка и модалка не появятся.
 
 ### Планирование публикации
 

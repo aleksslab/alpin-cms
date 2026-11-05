@@ -281,10 +281,14 @@ $result = getPagesListPaginated(1, 25);
 | `page_title` | filter | Заголовок страницы | `$title`, `$page` |
 | `save_settings_data` | filter | Массив настроек перед сохранением (при полном сохранении — собранный из POST, при сохранении из плагина — текущий `settings.json`) | `$newSettings` |
 | `page_scheduling_enabled` | filter | Доступно ли планирование публикации. По умолчанию `false`: статус «По расписанию» и поля дат в редакторе не показываются | `$enabled` |
+| `trash_enabled` | filter | Доступна ли корзина. По умолчанию `false`: удаление окончательное, кнопки и модалки нет | `$enabled` |
+| `trash_entity_result` | filter | Результат перемещения страницы/меню в корзину | `$result`, `$type`, `$id` |
+| `trash_button` | action | Кнопка «Корзина» в шапке списка | `$type`, `$returnUrl` |
+| `trash_modal` | action | Модалка корзины | `$type`, `$returnUrl` |
 
 #### `isPageSchedulingEnabled(): bool`
 
-**Возвращает** `true`, если активный плагин включил фильтр `page_scheduling_enabled`. Ядро по умолчанию считает возможность выключенной: без обработчика фильтра страницу со статусом `scheduled` публиковать некому.
+**Возвращает** `true`, если активный плагин включил фильтр `page_scheduling_enabled`. Ядро по умолчанию считает возможность выключенной: без обработчика фильтра страницу со статусом `scheduled` публиковать некому. Функция — в `config/core/admin_controller.php`.
 
 ```php
 if (isPageSchedulingEnabled()) {
@@ -549,138 +553,76 @@ handleSavePage() — при сохранении страницы.
 
 ## 🗑 Корзина
 
-### `trashPage(string $id): array`
+Корзина реализована плагином `trash` (`config/plugins/trash/`). Ядро знает
+только возможность и контракт; функции перемещения, восстановления и очистки
+в ядро не входят. Обе функции ниже — в `config/core/admin_controller.php`:
+корзина относится к админке и на фронте не нужна.
 
-**Перемещает страницу в корзину.** Логин для `_trash.deleted_by` берётся из `$_SESSION['admin_login']`.
+### `isTrashEnabled(): bool`
 
-```php
-$result = trashPage('about');
-// ['success' => true, 'error' => '']
-```
-
-**Валидация:** тип `page`, ID по regex `[a-z0-9\-_]+`.
-
----
-
-### `trashMenu(string $id): array`
-
-**Перемещает меню в корзину.** Аналогично `trashPage`, но для `data/menus/`.
+**Проверяет, доступна ли корзина.** Возвращает результат фильтра
+`trash_enabled` (по умолчанию `false`).
 
 ```php
-$result = trashMenu('footer_help');
-```
-
----
-
-### `trashEntity(string $type, string $id, string $sourceDir): array`
-
-**Общая функция перемещения сущности в корзину.** Используется `trashPage()` и `trashMenu()`. Напрямую обычно не вызывается.
-
-**Что делает:**
-1. Валидирует тип и ID.
-2. Читает исходный JSON.
-3. Добавляет `_trash` с метаданными.
-4. Записывает в `data/trash/{type}_{id}_{timestamp}.json`.
-5. Удаляет оригинал.
-6. **Откат:** если не удалось удалить оригинал — удаляет файл из корзины.
-
----
-
-### `getTrashList(?string $type = null): array`
-
-**Возвращает список файлов в корзине с метаданными.** Отсортировано по `deleted_at` (свежие сверху).
-
-```php
-$list = getTrashList('page');
-// [
-//   ['file' => 'page_home_1735689600.json', 'type' => 'page', 'original_id' => 'home', 'title' => 'Главная', 'deleted_at' => 1735689600, 'deleted_by' => 'admin', 'size_bytes' => 4096],
-//   ...
-// ]
-```
-
-**Фильтр `$type`:** `'page'` / `'menu'` / `null` (все).
-
----
-
-### `getTrashCount(?string $type = null): int`
-
-**Возвращает количество файлов в корзине.**
-
-```php
-$total = getTrashCount();          // все
-$pages = getTrashCount('page');    // только страницы
-$menus = getTrashCount('menu');    // только меню
-```
-
-Для фильтра по типу использует `glob("{$type}_*.json")` — быстро.
-
----
-
-### `restoreFromTrash(string $trashFileName): array`
-
-**Восстанавливает сущность из корзины.**
-
-```php
-$result = restoreFromTrash('page_about_1735689600.json');
-// ['success' => true, 'message' => 'Страница восстановлена как "about-restored" (оригинальный ID был занят).', 'error' => '', 'new_id' => 'about-restored']
-```
-
-**Разрешение конфликта ID:**
-1. Если `original_id` свободен — восстанавливает под ним.
-2. Иначе — `{original_id}-restored`, `{original_id}-restored-2`, ... до 100 попыток.
-
-**Для страниц** slug **всегда пересчитывается** в `{new_id}` — чтобы URL не конфликтовал.
-
----
-
-### `deleteFromTrash(array $fileNames): array`
-
-**Окончательно удаляет указанные файлы из корзины.**
-
-```php
-$result = deleteFromTrash(['page_home_1735689600.json', 'menu_x_1735689601.json']);
-// ['success' => true, 'deleted' => 2, 'error' => '']
-```
-
-**Валидация имён файлов:** regex `^[a-z]+_[a-z0-9\-_]+_\d+\.json$`.
-
----
-
-### `clearTrash(): array`
-
-**Полностью очищает корзину.**
-
-```php
-$result = clearTrash();
-// ['success' => true, 'deleted' => 5, 'error' => '']
-```
-
----
-
-### `handleTrashAction(): void`
-
-**Обработчик POST-действий корзины.** Вызывается из `config/index.php` при `$_POST['trash_action']`.
-
-**Действия:**
-- `restore` — восстановить выбранные.
-- `delete_selected` — удалить выбранные.
-- `clear_all` — очистить всё.
-
-**Дополнительные поля формы:** `trash_context` (`page` / `menu`), `trash_return_url`, `trash_files[]`.
-
-**Редирект** — всегда, в конце. `flash` — success / warning / error.
-
----
-
-### `ensureTrashDir(): bool`
-
-**Гарантирует существование `data/trash/` + `.htaccess` защиту.** Вызывается из `trashEntity()`.
-
-```php
-if (!ensureTrashDir()) {
-    return ['success' => false, 'error' => 'Папка корзины недоступна для записи.'];
+if (isTrashEnabled()) {
+    // плагин активен: удаление идёт в корзину
 }
 ```
+
+Плагин включает возможность в своём `plugin.php`:
+
+```php
+add_filter('trash_enabled', function () {
+    return true;
+});
+```
+
+---
+
+### `getDeleteConfirmMessage(string $type, string $title): string`
+
+**Возвращает текст подтверждения удаления** для `confirm()`.
+
+- корзина доступна — «Переместить страницу/меню «…» в корзину?»;
+- корзина отключена — предупреждение об окончательном удалении.
+
+```php
+$message = getDeleteConfirmMessage('page', $page['title']);
+```
+
+---
+
+### Хуки корзины
+
+| Хук | Тип | Что делает |
+|---|---|---|
+| `trash_enabled` | filter | Включает корзину. По умолчанию `false` |
+| `trash_entity_result` | filter | Ядро передаёт `null, $type, $id`; плагин возвращает результат перемещения в корзину или `null` |
+| `trash_button` | action | Вывод кнопки «Корзина» в шапке списка. Аргументы: `$type`, `$returnUrl` |
+| `trash_modal` | action | Вывод модалки корзины. Аргументы: `$type`, `$returnUrl` |
+
+**Поведение ядра:**
+
+- `handleDeletePage()` / `handleDeleteMenu()` вызывают
+  `apply_filters('trash_entity_result', null, $type, $id)`;
+- плагин вернул массив — ядро пишет `page_trash` / `menu_trash`, сбрасывает
+  кеш страницы и показывает «перемещено в корзину»;
+- вернулся `null` — ядро удаляет файл окончательно, пишет `page_delete` /
+  `menu_delete` и вызывает `trash_item_purged` с блоком `_trash`, чтобы
+  плагины (например, `history`) почистили связанные данные.
+
+---
+
+### Контракт событий
+
+Плагин `trash` вызывает события, на которые подписываются другие плагины:
+
+- `page_before_delete($id)`, `page_deleted($id)`;
+- `page_before_restore($originalId)`, `page_restored($newId)`;
+- `trash_item_purged($trashData)` — данные файла корзины с блоком `_trash`.
+
+`trash_item_purged` также вызывается ядром при окончательном удалении, когда
+корзина отключена.
 
 ---
 

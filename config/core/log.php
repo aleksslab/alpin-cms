@@ -83,18 +83,15 @@ function _register_core_log_actions(): void {
         'Страницы' => ['icon' => 'file-text', 'actions' => [
             'page_save'         => 'Сохранение страницы',
             'page_trash'        => 'Перемещение страницы в корзину',
+            'page_delete'       => 'Окончательное удаление страницы',
             'page_clone'        => 'Клонирование страницы',
             'page_set_home'     => 'Назначение главной страницы',
         ]],
         'Меню' => ['icon' => 'menu', 'actions' => [
             'menu_save'         => 'Сохранение меню',
             'menu_trash'        => 'Перемещение меню в корзину',
+            'menu_delete'       => 'Окончательное удаление меню',
             'menu_set_main'     => 'Назначение главного меню',
-        ]],
-        'Корзина' => ['icon' => 'trash-2', 'actions' => [
-            'trash_restore'     => 'Восстановление из корзины',
-            'trash_delete'      => 'Окончательное удаление из корзины',
-            'trash_clear'       => 'Очистка корзины',
         ]],
         'Настройки' => ['icon' => 'settings', 'actions' => [
             'settings_save'     => 'Сохранение настроек сайта',
