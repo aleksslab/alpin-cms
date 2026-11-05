@@ -17,6 +17,8 @@
 - **Флаг `enabled`** у `register_cron_task()` — URL только включённых задач показываются в разделе «Интеграция с планировщиком».
 - **Реестр действий логирования**: `register_log_action()`, `get_log_actions()`, `get_log_action_groups()`. Ядро и плагины регистрируют свои действия, UI вкладки «Логи» строится из реестра.
 - **Фильтр `sensitive_files`** — плагины добавляют свои файлы в список недоступных через проводник.
+- **Плагин «SEO-инструменты»**: вынесен из ядра в `config/plugins/seo-tools/` (генерация `sitemap.xml` и `robots.txt`, автообновление при изменении страниц, ручная пересборка, cron-задача `seo`). Настройки (`seo_*`) хранятся в `data/settings.json`; файлы — в корне сайта.
+- **Хуки изменения контента**: `page_before_save` / `page_saved`, `home_before_change` / `home_changed`, `page_before_clone` / `page_cloned`, `page_before_delete` / `page_deleted`, `page_before_restore` / `page_restored`, `settings_before_save` / `settings_saved`.
 
 ### Изменено
 
@@ -33,6 +35,10 @@
 - **Плагин `logs`**: UI строится из реестра, локальный `getLogActions()` удалён; при удалении плагина сбрасывается только список действий (путь и лимиты сохраняются).
 - **`ensureLogsDir()`** перенесён в ядро — папка логов и `.htaccess` больше не зависят от плагина `logs`.
 - **`fmIsSensitiveFile()`**: перенесён в плагин `filemanager`; плагины добавляют свои файлы через фильтр `sensitive_files`.
+- **`config/cron/seo.php`** удалён; SEO-задача запускается через общий `config/cron/run.php?task=seo`.
+- **Плагин `scheduler` (v1.0.2)**: убран захардкоженный URL SEO-задачи — список строится только из реестра `get_cron_tasks()`.
+- **Секция SEO**: блок «Технический SEO» рендерится плагином через `register_plugin_settings()`; кнопка пересборки — инлайн-скрипт плагина.
+- **Ядро**: из `handleSavePage()`, `handleSetHomePage()`, `handleClonePage()`, `handleDeletePage()`, `restoreFromTrash()`, `restorePageFromHistory()` убраны вызовы `maybeRegenerateSeoFiles()` — плагин подписан на хуки.
 
 ### Технические детали
 
@@ -40,6 +46,9 @@
 - **Перенесено в плагин `filemanager`**: `config/core/filemanager_api.php` → `plugin.php` (рефакторинг: `fm*`-функции и `fmAction*()`), `config/modules/filemanager.php` → `admin-page.php`, `config/js/filemanager.js` → `admin/script.js`, fm-стили из `config/css/config.css` → `admin/style.css`.
 - **Перенесено в плагин `scheduler`**: `config/modules/config_vars/cron.php` → `admin-section.php`; секция регистрируется через `register_plugin_section()`, чтобы скрытое поле `cron_token` осталось в форме «Настроек сайта».
 - **Перенесено в плагин `publish`**: `handleCronPublishAction()` и `config/cron/publish.php`; задача регистрируется через `register_cron_task('publish', ...)`, лог-действия `page_publish` / `page_archive` — в плагине.
+- **Новые файлы**: `config/plugins/seo-tools/{plugin.json,plugin.php,admin-section.php}`.
+- **Перенесено в плагин `seo-tools`**: `generateSitemap()`, `generateRobots()`, `generateSeoFiles()`, `maybeRegenerateSeoFiles()` → `seo_generate_sitemap()`, `seo_generate_robots()`, `seo_generate_files()`, `seo_maybe_regenerate()`; POST `regenerate_seo_files` → `admin_init`; лог-действие `seo_regenerate` — в плагине.
+- **Закрыто**: `seo_regenerate` убран из `_register_core_log_actions()`.
 
 ## [Release version 2.0.0] — 2026-10-28
 

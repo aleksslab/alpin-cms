@@ -79,8 +79,7 @@ config/
 ├── .htaccess              # RewriteEngine Off + Options -Indexes
 │
 ├── cron/                  # Эндпоинты для планировщика (хостинг)
-│   ├── run.php            # Общий запуск задач из реестра (register_cron_task)
-│   └── seo.php            # Крон генерации sitemap/robots
+│   └── run.php            # Общий запуск задач из реестра (register_cron_task)
 |
 ├── core/
 │   ├── functions.php      # ЧТЕНИЕ данных + утилиты (подключает хуки и плагины)
@@ -595,10 +594,6 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `handleDeleteHistoryVersion()` | POST-обработчик удаления версии |
 | `handleClearPageHistory()` | POST-обработчик очистки страницы |
 | `handleClearAllHistory()` | AJAX-обработчик очистки всей истории |
-| `generateSitemap()` | Генерация sitemap.xml |
-| `generateRobots()` | Генерация robots.txt |
-| `generateSeoFiles()` | Обе генерации + удаление при выключенных галочках |
-| `maybeRegenerateSeoFiles()` | Обёртка с проверкой auto |
 | `isWebpSupported()` | Проверка доступности WebP (GD/Imagick) |
 | `convertToWebp()` | Конвертация одного изображения в .webp |
 | `maybeConvertToWebp()` | Обёртка: настройки + поддержка → convertToWebp |

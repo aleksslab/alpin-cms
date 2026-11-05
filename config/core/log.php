@@ -106,9 +106,6 @@ function _register_core_log_actions(): void {
             'settings_save'     => 'Сохранение настроек сайта',
             'security_save'     => 'Сохранение настроек безопасности',
         ]],
-        'SEO' => ['icon' => 'search', 'actions' => [
-            'seo_regenerate'    => 'Пересборка SEO-файлов',
-        ]],
         'Файлы' => ['icon' => 'folder', 'actions' => [
             'file_upload'       => 'Загрузка файлов',
             'file_delete'       => 'Удаление файлов',

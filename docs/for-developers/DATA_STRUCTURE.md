@@ -99,10 +99,6 @@
     "home_page_id": "home",
     "main_menu": "header_main"
     "cron_token": "a1b2c3d4e5f6...",
-    "seo_sitemap_enabled": true,
-    "seo_robots_enabled": true,
-    "seo_auto_regenerate": false,
-    "last_seo_regenerate": 0,
     "history_enabled": false,
     "history_limit": 20,
 
@@ -179,11 +175,6 @@
 | `meta_title` | string | Глобальный meta title. Если пусто — берётся из страницы. |
 | `meta_description` | string | Глобальный meta description. |
 | `meta_keywords` | string | Ключевые слова через запятую. |
-| **SEO: технический** | | |
-| `seo_sitemap_enabled` | bool | Генерировать sitemap.xml |
-| `seo_robots_enabled` | bool | Генерировать robots.txt |
-| `seo_auto_regenerate` | bool | Автообновлять при изменении страниц |
-| `last_seo_regenerate` | int | Unix timestamp последней генерации |
 
 **Open Graph:**
 
@@ -580,15 +571,15 @@
 
 ## 📄 `sitemap.xml` и `robots.txt` (корень)
 
-Генерируются функциями `generateSitemap()` и `generateRobots()`.
+Создаются плагином **SEO-инструменты** (`seo-tools`). Ядро файлы не генерирует.
 
-**Управление:** Настройки сайта → SEO → «Технический SEO».
+**Управление:** Настройки сайта → SEO → «Технический SEO» (секция плагина).
 
 **Триггеры генерации:**
 1. Вручную — кнопка «Пересобрать».
 2. При сохранении настроек SEO (если галочки менялись).
-3. При сохранении/удалении/восстановлении/клонировании страницы — если `seo_auto_regenerate = true`.
-4. Крон — `config/cron/seo.php?token=xxx`.
+3. При сохранении/удалении/восстановлении/клонировании страницы — если автообновление включено.
+4. Крон — `config/cron/run.php?task=seo&token=xxx`.
 
 **Если галочка выключена** — соответствующий файл **удаляется** (если был).
 

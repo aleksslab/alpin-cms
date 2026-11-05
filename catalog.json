@@ -57,8 +57,15 @@
             "type": "plugin",
             "name": "Планировщик задач",
             "description": "Секция «Интеграция с планировщиком» в Настройках сайта: токен крона и список URL крон-задач.",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_scheduler.zip"
+        },
+        "seo-tools": {
+            "type": "plugin",
+            "name": "SEO-инструменты",
+            "description": "Генерация sitemap.xml и robots.txt: автообновление при изменении страниц, ручная пересборка и cron-задача.",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_seo-tools.zip"
         },
         "test-tab": {
             "type": "plugin",

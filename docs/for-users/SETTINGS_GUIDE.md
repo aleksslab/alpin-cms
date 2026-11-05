@@ -648,9 +648,9 @@ document.addEventListener('DOMContentLoaded', function() {
 https://твой-сайт/config/cron/run.php?task=publish&token=<токен>
 ```
 
-**Обновление sitemap.xml и robots.txt:**
+**Обновление sitemap.xml и robots.txt** (при включённом плагине «SEO-инструменты»):
 ```
-https://твой-сайт/config/cron/seo.php?token=<токен>
+https://твой-сайт/config/cron/run.php?task=seo&token=<токен>
 ```
 
 **Резервное копирование** (появляется, когда крон бэкапов включён):

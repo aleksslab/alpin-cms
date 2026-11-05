@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /config/
+Disallow: /data/
+Disallow: /cache/
+Disallow: /*?preview=
+Allow: /
+
+Sitemap: https://alpin.dev/sitemap.xml

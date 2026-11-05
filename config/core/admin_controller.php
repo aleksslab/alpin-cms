@@ -523,9 +523,6 @@ function handleSaveSettings(): array {
         'twitter_title'       => trim($_POST['set_twitter_title'] ?? ''),
         'twitter_description' => trim($_POST['set_twitter_description'] ?? ''),
         'twitter_image'       => trim($_POST['set_twitter_image'] ?? ''),
-        'seo_sitemap_enabled'  => post_flag('seo_sitemap_enabled'),
-        'seo_robots_enabled'   => post_flag('seo_robots_enabled'),
-        'seo_auto_regenerate'  => post_flag('seo_auto_regenerate'),
         
         // БЛОК 8: Социальные сети (массив)
         'socials' => $socials,
@@ -557,7 +554,6 @@ function handleSaveSettings(): array {
             }
             return getCronToken();
         })(),
-        'last_seo_regenerate' => getSettingsData()['last_seo_regenerate'] ?? 0,
     ];
 
     // Форма сайта — пересобираем настройки ядра из POST.
@@ -588,20 +584,15 @@ function handleSaveSettings(): array {
     }
     $source = trim($source);
 
+    // Хук «до сохранения настроек» (для будущих плагинов)
+    do_action('settings_before_save', $newSettings);
+
     if (saveData('settings', $newSettings)) {
         logAction('settings_save', 'Настройки сайта обновлены', 'INFO');
 
-        // SEO: если изменились галочки генерации — сразу собираем (или удаляем)
-        $oldSitemapEnabled = $oldSettings['seo_sitemap_enabled'] ?? true;
-        $oldRobotsEnabled  = $oldSettings['seo_robots_enabled'] ?? true;
+        // Плагины: настройки сохранены (SEO, кеш, .min и т.п.)
+        do_action('settings_saved', $oldSettings, $newSettings);
 
-        $newSitemapEnabled = $newSettings['seo_sitemap_enabled'] ?? true;
-        $newRobotsEnabled  = $newSettings['seo_robots_enabled'] ?? true;
-
-        if ($oldSitemapEnabled !== $newSitemapEnabled || $oldRobotsEnabled !== $newRobotsEnabled) {
-            generateSeoFiles();  // не maybeRegenerate — принудительно, потому что галочки менялись
-        }
-        
         // === АВТОМАТИЧЕСКОЕ СОЗДАНИЕ .min ПРИ ВКЛЮЧЕНИИ ===
         $oldMinify = $oldSettings['assets_minify'] ?? false;
         $newMinify = $newSettings['assets_minify'] ?? false;
@@ -1104,6 +1095,9 @@ function handleSavePage(): array {
         }
     }
     
+    // Хук «до сохранения страницы» (для будущих плагинов)
+    do_action('page_before_save', $id, $pageData);
+
     // Сохраняем файл через безопасную атомарную функцию ядра
     if (savePageData($id, $pageData) !== false) {
         // Удаляем кеш страницы (HTML + объединённые ассеты)
@@ -1120,8 +1114,8 @@ function handleSavePage(): array {
             }
         }
 
-        // SEO: обновить sitemap/robots, если включено автообновление
-        maybeRegenerateSeoFiles();
+        // Плагины: страница сохранена (SEO, история, превью)
+        do_action('page_saved', $id, $pageData);
         
         $msg = 'Страница "' . $title . '" успешно ' . ($action === 'create' ? 'создана' : 'обновлена');
         logAction('page_save', $msg . ' (ID: ' . $id . ')', 'INFO');
@@ -1211,6 +1205,9 @@ function handleSetHomePage(): void {
     $oldHomeId = getHomePageId();
     $oldHome = loadPageById($oldHomeId);
     
+    // Хук «до смены главной страницы» (для будущих плагинов)
+    do_action('home_before_change', $oldHomeId, $pageId);
+
     // Обновляем globals.json
     $globals = getData('settings');
     $globals['home_page_id'] = $pageId;
@@ -1236,8 +1233,8 @@ function handleSetHomePage(): void {
         @unlink($homeCacheFile);
     }
     
-    // SEO: главная сменилась — приоритет в sitemap 1.0 изменился
-    maybeRegenerateSeoFiles();
+    // Плагины: главная страница сменилась
+    do_action('home_changed', $pageId);
     
     logAction('page_set_home', 'Страница "' . $page['title'] . '" назначена главной (ID: ' . $pageId . ')', 'INFO');
     setFlash('Страница "' . $page['title'] . '" теперь главная!');
@@ -1285,14 +1282,16 @@ function handleClonePage(): void {
     // Preview-токен тоже не копируем
     unset($newPage['preview_token']);
     
+    // Хук «до клонирования страницы» (для будущих плагинов)
+    do_action('page_before_clone', $pageId);
+
     // Сохраняем новую страницу
     $filePath = DATA_DIR . 'pages/' . $newId . '.json';
     $jsonString = json_encode($newPage, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     
     if (file_put_contents($filePath, $jsonString) !== false) {
-        // SEO: клонирована страница (draft — не попадёт в sitemap,
-        // но вызов безопасен и обновит метку времени)
-        maybeRegenerateSeoFiles();
+        // Плагины: страница клонирована
+        do_action('page_cloned', $pageId, $newId);
         
         logAction('page_clone', 'Страница "' . $page['title'] . '" клонирована как "' . $newPage['title'] . '" (ID: ' . $newId . ')', 'INFO');
         setFlash('Страница "' . $newPage['title'] . '" успешно создана!');
@@ -1331,13 +1330,16 @@ function handleDeletePage(): void {
         exit;
     }
     
+    // Хук «до удаления страницы» (для будущих плагинов)
+    do_action('page_before_delete', $pageId);
+
     $result = trashPage($pageId);
 
     if ($result['success']) {
         clearPageCacheById($pageId);
 
-        // SEO: обновить sitemap/robots, если включено автообновление
-        maybeRegenerateSeoFiles();
+        // Плагины: страница перемещена в корзину
+        do_action('page_deleted', $pageId);
         
         logAction('page_trash', 'Страница "' . $page['title'] . '" перемещена в корзину (ID: ' . $pageId . ')', 'INFO');
         setFlash('Страница "' . $page['title'] . '" перемещена в корзину.');
@@ -2870,6 +2872,11 @@ function restoreFromTrash(string $trashFileName): array {
     // Убираем метаданные корзины
     unset($data['_trash']);
 
+    // Хук «до восстановления из корзины» (для будущих плагинов)
+    if ($type === 'page') {
+        do_action('page_before_restore', $originalId);
+    }
+
     // Записываем в целевую папку
     $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     $targetPath = $targetDir . $newId . '.json';
@@ -2881,9 +2888,9 @@ function restoreFromTrash(string $trashFileName): array {
     // Удаляем из корзины
     @unlink($trashPath);
 
-    // SEO: обновить sitemap/robots, если включено автообновление
+    // Плагины: страница восстановлена из корзины
     if ($type === 'page') {
-        maybeRegenerateSeoFiles();
+        do_action('page_restored', $newId);
     }
 
     $label = ($type === 'page') ? 'Страница' : 'Меню';
@@ -3343,189 +3350,6 @@ function getPagePreviewUrl(string $pageId, string $token): string {
     }
 
     return getBaseUrl() . $base . '?preview=' . $token;
-}
-
-/**
- * ФУНКЦИИ ГЕНЕРАЦИИ SEO-ФАЙЛОВ
- */
-/**
- * Генерирует sitemap.xml в корне сайта.
- *
- * Включает только published-страницы без истёкшего unpublish_at.
- * Главная получает priority 1.0, остальные — 0.8.
- *
- * @return array ['success' => bool, 'count' => int, 'error' => string]
- */
-function generateSitemap(): array {
-    $pagesDir = DATA_DIR . 'pages/';
-    if (!is_dir($pagesDir)) {
-        return ['success' => false, 'count' => 0, 'error' => 'Папка страниц не найдена.'];
-    }
-
-    // Протокол и хост
-    $baseUrl = getBaseUrl();
-
-    $files = glob($pagesDir . '*.json');
-    $urls = [];
-    $now = time();
-
-    foreach ($files as $file) {
-        $page = _jsonToArray($file);
-        if (empty($page)) {
-            continue;
-        }
-
-        // Только опубликованные
-        if (($page['status'] ?? '') !== 'published') {
-            continue;
-        }
-
-        // Не истёкшие по unpublish_at
-        if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] <= $now) {
-            continue;
-        }
-
-        $slug = $page['slug'] ?? $page['id'] ?? '';
-
-        if ($slug === '') {
-            $loc = $baseUrl . '/';
-            $priority = '1.0';
-        } else {
-            $loc = $baseUrl . '/' . trim($slug, '/');
-            $priority = '0.8';
-        }
-
-        $urls[] = [
-            'loc'        => $loc,
-            'lastmod'    => date('c', filemtime($file)),
-            'changefreq' => 'weekly',
-            'priority'   => $priority,
-        ];
-    }
-
-    // Сортировка: главная вперёд, потом по алфавиту
-    usort($urls, function($a, $b) {
-        if ($a['priority'] === '1.0' && $b['priority'] !== '1.0') return -1;
-        if ($a['priority'] !== '1.0' && $b['priority'] === '1.0') return 1;
-        return strcmp($a['loc'], $b['loc']);
-    });
-
-    // Формируем XML
-    $xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
-
-    foreach ($urls as $url) {
-        $xml .= "    <url>\n";
-        $xml .= "        <loc>" . htmlspecialchars($url['loc'], ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</loc>\n";
-        $xml .= "        <lastmod>" . $url['lastmod'] . "</lastmod>\n";
-        $xml .= "        <changefreq>" . $url['changefreq'] . "</changefreq>\n";
-        $xml .= "        <priority>" . $url['priority'] . "</priority>\n";
-        $xml .= "    </url>\n";
-    }
-
-    $xml .= '</urlset>' . "\n";
-
-    $targetPath = APP_ROOT . DIRECTORY_SEPARATOR . 'sitemap.xml';
-
-    if (!safeFileWrite($targetPath, $xml)) {
-        return ['success' => false, 'count' => 0, 'error' => 'Не удалось записать sitemap.xml.'];
-    }
-
-    return ['success' => true, 'count' => count($urls), 'error' => ''];
-}
-
-/**
- * Генерирует robots.txt в корне сайта.
- *
- * @return array ['success' => bool, 'error' => string]
- */
-function generateRobots(): array {
-    // Протокол и хост
-    $baseUrl = getBaseUrl();
-
-    $lines = [
-        'User-agent: *',
-        'Disallow: /config/',
-        'Disallow: /data/',
-        'Disallow: /cache/',
-        'Disallow: /*?preview=',
-        'Allow: /',
-        '',
-        'Sitemap: ' . $baseUrl . '/sitemap.xml',
-        '',
-    ];
-
-    $content = implode("\n", $lines);
-    $targetPath = APP_ROOT . DIRECTORY_SEPARATOR . 'robots.txt';
-
-    if (!safeFileWrite($targetPath, $content)) {
-        return ['success' => false, 'error' => 'Не удалось записать robots.txt.'];
-    }
-
-    return ['success' => true, 'error' => ''];
-}
-
-/**
- * Генерирует sitemap.xml и robots.txt (если соответствующая галочка включена).
- *
- * Проверяет настройки `seo_sitemap_enabled` и `seo_robots_enabled`.
- * Если галочка выключена — соответствующий файл не создаётся (или удаляется,
- * если существовал ранее).
- *
- * @return array ['sitemap' => array, 'robots' => array]
- */
-function generateSeoFiles(): array {
-    $settings = getSettingsData();
-
-    $sitemapEnabled = $settings['seo_sitemap_enabled'] ?? true;
-    $robotsEnabled  = $settings['seo_robots_enabled'] ?? true;
-
-    $result = [
-        'sitemap' => ['success' => true, 'skipped' => true, 'error' => ''],
-        'robots'  => ['success' => true, 'skipped' => true, 'error' => ''],
-    ];
-
-    // Sitemap
-    if ($sitemapEnabled) {
-        $result['sitemap'] = generateSitemap();
-    } else {
-        // Удаляем существующий файл
-        $path = APP_ROOT . DIRECTORY_SEPARATOR . 'sitemap.xml';
-        if (file_exists($path)) {
-            @unlink($path);
-        }
-    }
-
-    // Robots
-    if ($robotsEnabled) {
-        $result['robots'] = generateRobots();
-    } else {
-        $path = APP_ROOT . DIRECTORY_SEPARATOR . 'robots.txt';
-        if (file_exists($path)) {
-            @unlink($path);
-        }
-    }
-
-    // Обновляем метку времени последней генерации
-    $settings['last_seo_regenerate'] = time();
-    saveData('settings', $settings);
-
-    return $result;
-}
-
-/**
- * Проверяет галочку «Автообновление» и вызывает генерацию, если включена.
- *
- * Вызывается из handleSavePage, handleDeletePage, restoreFromTrash,
- * handleClonePage, handleSetHomePage.
- *
- * @return void
- */
-function maybeRegenerateSeoFiles(): void {
-    $settings = getSettingsData();
-    if (!empty($settings['seo_auto_regenerate'])) {
-        generateSeoFiles();
-    }
 }
 
 /**
@@ -4102,6 +3926,9 @@ function restorePageFromHistory(string $pageId, int $timestamp): array {
         $newPage['preview_token'] = $current['preview_token'];
     }
 
+    // Хук «до восстановления версии» (для будущих плагинов)
+    do_action('page_before_restore', $pageId);
+
     // Сохраняем
     if (!savePageData($pageId, $newPage)) {
         return ['success' => false, 'error' => 'Не удалось сохранить восстановленную версию.', 'message' => ''];
@@ -4110,8 +3937,8 @@ function restorePageFromHistory(string $pageId, int $timestamp): array {
     // Сброс кеша страницы
     clearPageCacheById($pageId);
 
-    // SEO-файлы (если авторегенерация включена)
-    maybeRegenerateSeoFiles();
+    // Плагины: страница восстановлена к версии истории
+    do_action('page_restored', $pageId);
 
     $dateStr = date('d.m.Y H:i', $timestamp);
     return [

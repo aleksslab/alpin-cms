@@ -41,21 +41,6 @@ function handle_admin_post_actions(): void {
     elseif (isset($_POST['clear_page_history'])) { handleClearPageHistory($_POST['page_id'] ?? ''); exit; }
     elseif (isset($_POST['clear_all_history'])) { handleClearAllHistory(); exit; }        
     
-    // --- SEO ---
-    elseif (isset($_POST['regenerate_seo_files'])) {
-        $result = generateSeoFiles();
-
-        if ($result['sitemap']['success'] || $result['robots']['success']) {
-            logAction('seo_regenerate', 'Пересобраны SEO-файлы', 'INFO');
-            echo json_encode(['success' => true, 'message' => 'Файлы пересобраны']);
-        } else {
-            $error = $result['sitemap']['error'] ?: ($result['robots']['error'] ?? 'Неизвестная ошибка');
-            logAction('seo_regenerate', 'Ошибка: ' . $error, 'ERROR');
-            echo json_encode(['success' => false, 'error' => $error]);
-        }
-        exit;
-    }
-    
     // --- МОДУЛИ И МИНИФИКАЦИЯ ---
     elseif (isset($_POST['unpack_module']))    { echo json_encode(unpackModule($_POST['module_id'] ?? '')); exit; }
     elseif (isset($_POST['rebuild_min']))      { handleRebuildModuleMin($_POST['module_id'] ?? ''); exit; }

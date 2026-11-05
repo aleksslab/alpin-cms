@@ -124,6 +124,35 @@ add_action('index_start', function() {
 | `render_body_end` | Перед `</body>` | — |
 | `after_file_upload` | После успешной загрузки файла через проводник или медиа-модалку | `$filePath` |
 
+### 📄 Хуки изменения контента
+
+Пары «до/после» для страниц и настроек. `*_before_*` срабатывают до записи файла, события без `before` — после успешной записи.
+
+| Хук | Когда срабатывает | Аргументы |
+|-----|-------------------|-----------|
+| `page_before_save` | Перед записью страницы | `$id`, `$pageData` |
+| `page_saved` | После успешного сохранения страницы | `$id`, `$pageData` |
+| `home_before_change` | Перед сменой главной страницы | `$oldHomeId`, `$newHomeId` |
+| `home_changed` | После смены главной | `$newHomeId` |
+| `page_before_clone` | Перед клонированием страницы | `$sourceId` |
+| `page_cloned` | После клонирования | `$sourceId`, `$newId` |
+| `page_before_delete` | Перед перемещением в корзину | `$pageId` |
+| `page_deleted` | После перемещения в корзину | `$pageId` |
+| `page_before_restore` | Перед восстановлением из корзины или истории | `$pageId` |
+| `page_restored` | После восстановления | `$pageId` |
+| `settings_before_save` | Перед записью настроек | `$newSettings` |
+| `settings_saved` | После записи настроек | `$oldSettings`, `$newSettings` |
+
+**Пример: плагин SEO-инструментов (`seo-tools`)**
+
+```php
+add_action('page_saved', function() { seo_maybe_regenerate(); });
+add_action('page_deleted', function() { seo_maybe_regenerate(); });
+add_action('page_restored', function() { seo_maybe_regenerate(); });
+add_action('page_cloned', function() { seo_maybe_regenerate(); });
+add_action('home_changed', function() { seo_maybe_regenerate(); });
+```
+
 ### 🧩 Хуки жизненного цикла плагинов (только для админки)
 
 Эти хуки позволяют плагину реагировать на собственное отключение, удаление или обновление. Они срабатывают **только если плагин активен** (кроме `before_delete`, который срабатывает до удаления файлов).
