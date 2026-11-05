@@ -34,26 +34,22 @@ function run_virtual_cron_tasks(): void {
         return;
     }
 
-    $state = get_cron_state();
-    $now = time();
-
     foreach ($tasks as $id => $task) {
-        if (empty($task['virtual']) || (int)$task['interval'] <= 0) {
+        if (empty($task['virtual']) || empty($task['enabled']) || (int)$task['interval'] <= 0) {
             continue;
         }
 
-        $lastRun = (int)($state[$id]['last_run'] ?? 0);
-
-        if ($now < ($lastRun + (int)$task['interval'])) {
+        // Атомарно заявляем запуск: повторные запросы админки не создадут
+        // дублей, а last_run обновится только после реального старта задачи.
+        $runToken = mark_cron_pending($id);
+        if ($runToken === '') {
             continue;
         }
-
-        // Отмечаем запуск до запроса, чтобы не устроить шторм при нескольких вкладках
-        set_cron_last_run($id, $now);
 
         $cronUrl = getBaseUrl() . dirname($_SERVER['SCRIPT_NAME'])
             . '/cron/run.php?task=' . urlencode($id)
-            . '&token=' . urlencode(getCronToken());
+            . '&token=' . urlencode(getCronToken())
+            . '&run=' . urlencode($runToken);
 
         $cronContext = stream_context_create([
             'http' => [

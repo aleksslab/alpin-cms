@@ -24,6 +24,7 @@
 - **Хук `trash_item_purged`** — элемент корзины удалён окончательно; аргумент — данные страницы/меню.
 - **Хуки формы страницы**: `edit_page_history_block` (блок в настройках) и `edit_page_modals` (модалки после формы).
 - **Хук `backup_restored`** — после успешного восстановления из резервной копии; аргументы — имя архива и список восстановленных корневых элементов. Восстановление также сбрасывает кеш страниц.
+- **Логирование фоновых задач**: действие `cron_run` (группа «Фоновые задачи») — успешный запуск с длительностью и ошибка задачи. Плагин `backups` дополнительно пишет `backup_create` с именем архива. Пропуски (`Skipped`) и выключенные задачи не логируются.
 
 ### Изменено
 
@@ -49,6 +50,9 @@
 - **Секция «История изменений»**: `config/modules/config_vars/history.php` удалён, секция регистрируется плагином через `register_plugin_section('history', ...)` и выводится в конце списка.
 - **Форма страницы**: кнопка истории и модалка подключаются через `edit_page_history_block` и `edit_page_modals`; из `config_vars.js` удалён `clearAllHistory()` (переехал в секцию плагина).
 - **`log.php`**: из ядра убраны действия `page_restore` и группа «История» — их регистрирует плагин.
+- **Один запуск за интервал**: виртуальный крон и внешний планировщик делят состояние `config/data/cron_state.json`. Виртуальный крон атомарно ставит заявку (`pending` + одноразовый `pending_token`) и передаёт её в `run.php?run=...`; эндпоинт захватывает запуск по токену или по интервалу и на повторный вызов отвечает `200 Status: Skipped`. Ошибка задачи откатывает `last_run` и ставит паузу 5 минут.
+- **`set_cron_last_run()`** меняет только `last_run`, не затирая `pending` и `retry_after`.
+- **Плагин `backups` (v1.0.4)**: «нечего делать» (крон выключен, пустые `targets`, нет файлов) — успешный запуск, а не ошибка; имена архивов уникальны в пределах секунды.
 
 ### Технические детали
 
@@ -63,12 +67,15 @@
 - **Перенесено в плагин `history`**: `isHistoryEnabled()`, `getHistoryLimit()`, `getHistoryDir()`, `ensureHistoryDir()`, `getOrCreateHistoryKey()`, `rotatePageHistory()`, `savePageSnapshot()`, `getPageHistory()`, `getHistorySnapshot()`, `getHistoryContentFields()`, `extractHistoryContent()`, `normalizeHistoryContent()`, `deleteHistoryVersion()`, `clearPageHistory()`, `getHistoryStats()`, `restorePageFromHistory()` → `history_*`; четыре POST-обработчика → `admin_init`; `config/core/history_modal.php` → `admin-modal.php`; `config/js/history_modal.js` — инлайн в нём; секция настроек → `admin-section.php`.
 - **Удалено**: `config/core/history_modal.php`, `config/js/history_modal.js`, `config/modules/config_vars/history.php`, `HISTORY_DIR` и ~743 строки истории в `admin_controller.php`, 4 POST-ветки в `admin_actions.php`.
 - **`data/history/`** и `.htaccess` остаются на месте; каталог создаёт плагин при первом снапшоте.
+- **Новые функции кронов**: `mark_cron_pending()`, `claim_cron_task_run()`, `release_cron_task_run()`, `confirm_cron_task_run()`, `_cron_update_state()` (flock и read-modify-write); константы `CRON_PENDING_TTL = 900`, `CRON_RETRY_COOLDOWN = 300`.
+- **`config/cron/run.php`**: 404 для неизвестной задачи, `Skipped` для выключенной и неподошедшей по расписанию, запись `cron_run` в лог, release при ошибке.
 
 ### Исправлено
 
 - **Плагин `publish` (v1.0.3)**: автопубликация и автоснятие больше не пишут страницу молча. Крон применяет `page_data_before_save` и стреляет `page_before_save` / `page_saved`, поэтому SEO-плагин пересобирает `sitemap.xml`, а `history_key` появляется у старых страниц. Лишние снапшоты не создаются — статус не входит в контентные поля.
 - **Плагин `backups` (v1.0.3)**: после восстановления архива очищается кеш страниц (раньше посетители видели старый HTML) и стреляет `backup_restored` с именем архива и списком восстановленных элементов. При ошибке (ZIP slip, неверный пароль, пустой архив) кеш не трогается и хук не срабатывает.
 - **Плагин `seo-tools` (v1.0.1)**: подписан на `backup_restored` — при восстановлении каталога `data` перечитывает `settings.json` (сброс `DATA_CACHE`) и пересобирает `sitemap.xml` / `robots.txt`, если включена авторегенерация. Восстановление только `images` или одиночного `sitemap.xml` файлы не перезаписывает.
+- **Дубли `cron_full_*`**: `run.php` не проверял интервал, виртуальный крон читал и писал состояние без блокировки, а `set_cron_last_run()` затирал запись целиком. Теперь за период создаётся ровно один архив, даже если виртуальный и внешний планировщик включены одновременно.
 
 ## [Release version 2.0.0] — 2026-10-28
 

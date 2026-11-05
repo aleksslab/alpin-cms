@@ -569,7 +569,7 @@ function getCronToken(): string {
 
 | URL | Обработчик |
 |-----|-----------|
-| `/config/cron/run.php?task={id}&token=...` | `run_cron_task()` (задачи из реестра, включая `publish`) |
+| `/config/cron/run.php?task={id}&token=...` | проверка `enabled`, захват запуска (`claim_cron_task_run()`), затем `run_cron_task()` (задачи из реестра, включая `publish`) |
 
 **Все проверяют переданный токен через `getCronToken()`:**
 

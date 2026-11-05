@@ -124,6 +124,9 @@ function _register_core_log_actions(): void {
             'plugin_delete'     => 'Удаление плагина',
             'plugin_toggle'     => 'Включение/выключение плагина',
         ]],
+        'Фоновые задачи' => ['icon' => 'clock', 'actions' => [
+            'cron_run'          => 'Выполнение фоновой задачи',
+        ]],
         'Авторизация' => ['icon' => 'shield', 'actions' => [
             'auth_login'        => 'Вход в админку',
             'auth_logout'       => 'Выход из админки',
