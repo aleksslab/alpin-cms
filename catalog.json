@@ -8,7 +8,7 @@
             "type": "plugin",
             "name": "Резервное копирование",
             "description": "Создание, восстановление и скачивание резервных копий",
-            "version": "1.0.2",
+            "version": "1.0.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_backups.zip"
         },
         "dark-theme": {
@@ -71,7 +71,7 @@
             "type": "plugin",
             "name": "SEO-инструменты",
             "description": "Генерация sitemap.xml и robots.txt: автообновление при изменении страниц, ручная пересборка и cron-задача.",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_seo-tools.zip"
         },
         "test-tab": {

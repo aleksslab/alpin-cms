@@ -144,6 +144,7 @@ add_action('index_start', function() {
 | `trash_item_purged` | После окончательного удаления элемента корзины | `$trashData` (данные страницы/меню) |
 | `settings_before_save` | Перед записью настроек | `$newSettings` |
 | `settings_saved` | После записи настроек | `$oldSettings`, `$newSettings` |
+| `backup_restored` | После успешного восстановления из резервной копии | `$archiveName`, `$itemsToRestore` (корневые элементы архива) |
 
 **Если плагин сам пишет страницу** (крон, миграция, импорт) через `savePageData()`, он обязан повторить контракт ядра, иначе SEO, история и кеш не узнают об изменении:
 
@@ -174,6 +175,17 @@ add_action('page_deleted', function() { seo_maybe_regenerate(); });
 add_action('page_restored', function() { seo_maybe_regenerate(); });
 add_action('page_cloned', function() { seo_maybe_regenerate(); });
 add_action('home_changed', function() { seo_maybe_regenerate(); });
+
+// Восстановление бэкапа: sitemap зависит только от страниц,
+// поэтому реагируем лишь на замену каталога data.
+add_action('backup_restored', function($archiveName, $items) {
+    if (!is_array($items) || !in_array('data', $items, true)) {
+        return;
+    }
+
+    clearDataCache('settings'); // settings.json заменён на диске
+    seo_maybe_regenerate();
+}, 10, 2);
 ```
 
 **Пример: плагин истории (`history`) — свой ключ и снапшот**
