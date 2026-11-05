@@ -185,33 +185,84 @@ function loadActivePlugins(): void {
  *
  * @param array  $newSettings   Массив новых настроек (передается по ссылке)
  * @param string $triggerField  Имя поля, наличие которого в POST означает, что форма плагина отправлена
- * @param array  $defaults      Значения по умолчанию
- * @param array  $fields        Массив полей для сохранения (ключи из POST)
+ * @param array  $defaults      Значения по умолчанию. Ключ — путь настройки в settings;
+ *                              поддерживается вложенность через точку ('theme.dark.bg_main')
+ * @param array  $fields        Поля для сохранения. Формат элемента:
+ *                              - 'field'                 → $_POST['field'] пишется в настройку 'field';
+ *                              - 'post_field' => 'a.b.c' → $_POST['post_field'] пишется в настройку a[b][c].
+ * @return bool true, если форма плагина была отправлена
+ */
+function save_plugin_settings(array &$newSettings, string $triggerField, array $defaults = [], array $fields = []): bool {
+    $currentSettings = getSettingsData();
+    $submitted = isset($_POST[$triggerField]);
+
+    foreach ($fields as $key => $value) {
+        // Числовой ключ — имя поля в POST совпадает с путём настройки
+        $postName = is_int($key) ? $value : $key;
+        $path     = $value;
+        // Дефолт можно задать и плоско ('log_settings.log_enabled'), и вложенно
+        $default  = array_key_exists($path, $defaults)
+            ? $defaults[$path]
+            : _settings_path_get($defaults, $path);
+
+        // Форма плагина не отправлялась — сохраняем текущее значение настройки
+        if (!$submitted) {
+            _settings_path_set($newSettings, $path, _settings_path_get($currentSettings, $path, $default));
+            continue;
+        }
+
+        $val = $_POST[$postName] ?? $default;
+
+        // Чекбокс: hidden '0' + checkbox '1'. Приведение по типу значения по умолчанию
+        if (is_bool($default)) {
+            $val = ($val == '1');
+        } elseif (is_int($default)) {
+            $val = intval($val);
+        }
+
+        _settings_path_set($newSettings, $path, $val);
+    }
+
+    return $submitted;
+}
+
+/**
+ * Читает значение настройки по пути с вложенностью через точку.
+ *
+ * @param array  $data     Массив настроек
+ * @param string $path     Путь, например 'theme.dark.bg_main'
+ * @param mixed  $fallback Значение, если путь не найден
+ * @return mixed
+ */
+function _settings_path_get(array $data, string $path, $fallback = null) {
+    $cursor = $data;
+    foreach (explode('.', $path) as $segment) {
+        if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
+            return $fallback;
+        }
+        $cursor = $cursor[$segment];
+    }
+    return $cursor;
+}
+
+/**
+ * Пишет значение настройки по пути с вложенностью через точку,
+ * создавая недостающие уровни.
+ *
+ * @param array  $data  Массив настроек (передается по ссылке)
+ * @param string $path  Путь, например 'theme.dark.bg_main'
+ * @param mixed  $value Значение
  * @return void
  */
-function save_plugin_settings(array &$newSettings, string $triggerField, array $defaults = [], array $fields = []): void {
-    $currentSettings = getSettingsData();
-    
-    // Если форма плагина не отправлялась — сохраняем старые значения
-    if (!isset($_POST[$triggerField])) {
-        foreach ($fields as $field) {
-            $newSettings[$field] = $currentSettings[$field] ?? ($defaults[$field] ?? null);
+function _settings_path_set(array &$data, string $path, $value): void {
+    $cursor = &$data;
+    foreach (explode('.', $path) as $segment) {
+        if (!isset($cursor[$segment]) || !is_array($cursor[$segment])) {
+            $cursor[$segment] = [];
         }
-        return;
+        $cursor = &$cursor[$segment];
     }
-    
-    // Форма отправлена — читаем из POST
-    foreach ($fields as $field) {
-        // Для чекбоксов: если поле есть в POST, но не равно 1, значит это 0
-        $val = $_POST[$field] ?? ($defaults[$field] ?? null);
-        
-        // Если это булево значение (0 или 1 в hidden + checkbox)
-        if (isset($defaults[$field]) && is_bool($defaults[$field])) {
-            $newSettings[$field] = ($val == '1');
-        } else {
-            $newSettings[$field] = $val;
-        }
-    }
+    $cursor = $value;
 }
 
 /**

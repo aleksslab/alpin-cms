@@ -393,6 +393,18 @@ function renderSessionNotice(int $lifetime): string {
 /**
  * 2. ОБРАБОТКА СОХРАНЕНИЯ НАСТРОЕК САЙТА
  */
+
+/**
+ * Значение чекбокса из POST: '1' — включён, отсутствие или '0' — выключен.
+ * Единая замена повторяющемуся isset($_POST[x]) && $_POST[x] == '1'.
+ *
+ * @param string $name Имя поля
+ * @return bool
+ */
+function post_flag(string $name): bool {
+    return isset($_POST[$name]) && $_POST[$name] == '1';
+}
+
 function handleSaveSettings(): array {
     $cleanPhone = preg_replace('/[^0-9+]/', '', $_POST['set_phone'] ?? '');
     // Если остались только символы «+» без цифр — считаем пустым
@@ -460,7 +472,7 @@ function handleSaveSettings(): array {
     
     // Полное сохранение приходит только из формы сайта (settings_full=1).
     // Форма плагина шлёт лишь свои поля, её POST ядро из нуля не пересобирает.
-    $isFullSave = isset($_POST['settings_full']) && $_POST['settings_full'] == '1';
+    $isFullSave = post_flag('settings_full');
 
     $siteSettings = [
         // БЛОК 1: Контактная информация
@@ -490,8 +502,8 @@ function handleSaveSettings(): array {
         
         // БЛОК 4: Настройки хедера (БЕЗ theme_toggle_enabled)
         'header_variant' => $_POST['header_variant'] ?? 'default',
-        'header_fixed' => isset($_POST['header_fixed']) && $_POST['header_fixed'] == '1',
-        'burger_enabled' => isset($_POST['burger_enabled']) && $_POST['burger_enabled'] == '1',
+        'header_fixed' => post_flag('header_fixed'),
+        'burger_enabled' => post_flag('burger_enabled'),
         'burger_breakpoint' => trim($_POST['burger_breakpoint'] ?? 'md'),
                 
         // БЛОК 5: Настройки футера
@@ -511,9 +523,9 @@ function handleSaveSettings(): array {
         'twitter_title'       => trim($_POST['set_twitter_title'] ?? ''),
         'twitter_description' => trim($_POST['set_twitter_description'] ?? ''),
         'twitter_image'       => trim($_POST['set_twitter_image'] ?? ''),
-        'seo_sitemap_enabled'  => isset($_POST['seo_sitemap_enabled']) && $_POST['seo_sitemap_enabled'] == '1',
-        'seo_robots_enabled'   => isset($_POST['seo_robots_enabled']) && $_POST['seo_robots_enabled'] == '1',
-        'seo_auto_regenerate'  => isset($_POST['seo_auto_regenerate']) && $_POST['seo_auto_regenerate'] == '1',
+        'seo_sitemap_enabled'  => post_flag('seo_sitemap_enabled'),
+        'seo_robots_enabled'   => post_flag('seo_robots_enabled'),
+        'seo_auto_regenerate'  => post_flag('seo_auto_regenerate'),
         
         // БЛОК 8: Социальные сети (массив)
         'socials' => $socials,
@@ -523,12 +535,12 @@ function handleSaveSettings(): array {
         'custom_js'  => trim($_POST['set_custom_js'] ?? ''),
     
         // БЛОК 10: Минификация
-        'assets_minify' => isset($_POST['assets_minify']) && $_POST['assets_minify'] == '1',
-        'assets_combine' => isset($_POST['assets_combine']) && $_POST['assets_combine'] == '1',
+        'assets_minify' => post_flag('assets_minify'),
+        'assets_combine' => post_flag('assets_combine'),
         'minify_exceptions' => $minifyExceptions,
         
         // БЛОК 11: Кеширование страниц
-        'cache_enabled' => isset($_POST['cache_enabled']) && $_POST['cache_enabled'] == '1',
+        'cache_enabled' => post_flag('cache_enabled'),
         'cache_ttl' => intval($_POST['cache_ttl'] ?? 86400),
 
         // БЛОК 12: Порядок и видимость секций
@@ -550,12 +562,23 @@ function handleSaveSettings(): array {
 
     // Форма сайта — пересобираем настройки ядра из POST.
     // Форма плагина — берём текущие настройки и меняем только присланные поля.
-    $newSettings = $isFullSave ? $siteSettings : getSettingsData(true);
+    $currentSettings = getSettingsData(true);
+    $newSettings = $isFullSave ? $siteSettings : $currentSettings;
+
+    // Ключи, которых нет в форме сайта (настройки выключенных плагинов, кастомные
+    // поля), сохраняем как есть — иначе полное сохранение их удалит.
+    if ($isFullSave) {
+        foreach ($currentSettings as $key => $value) {
+            if (!array_key_exists($key, $newSettings)) {
+                $newSettings[$key] = $value;
+            }
+        }
+    }
 
     // Даем плагинам возможность добавить/изменить свои настройки
     $newSettings = apply_filters('save_settings_data', $newSettings);
     
-    $oldSettings = getSettingsData(true);
+    $oldSettings = $currentSettings;
 
     // Источник сохранения (сайт или плагин) — для флеша и записи в лог, включая ветку ошибки
     $source = $_POST['settings_source'] ?? 'сайта';
