@@ -138,9 +138,8 @@ function handleSuccessfulLogin(string $userIp, array $bfData): void {
     $_SESSION['last_activity'] = time();
     $_SESSION['admin_auth'] = true;    
 
-    // Флаг: при следующем запросе в админку очистить все preview-файлы.
-    // Реальное удаление — в config/index.php (там уже подключён admin_controller.php).
-    $_SESSION['preview_cleanup_all_pending'] = true;
+    // Плагины: успешный вход (например, очистка временных preview-файлов).
+    do_action('admin_login_success', $userIp);
     
     if (isset($bfData['attempts'][$userIp])) {
         unset($bfData['attempts'][$userIp]);

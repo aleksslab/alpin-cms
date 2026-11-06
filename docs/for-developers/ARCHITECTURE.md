@@ -74,7 +74,6 @@
 config/
 ├── index.php              # Точка входа, роутинг по tab
 ├── config.php             # Константы, сессии, DEBUG
-├── preview.php            # Эндпоинт создания preview (POST)
 ├── login.php              # Форма логина
 ├── .htaccess              # RewriteEngine Off + Options -Indexes
 │
@@ -185,7 +184,8 @@ $page = null;
 ```php
 $previewToken = trim($_GET['preview'] ?? '');
 
-if ($previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
+// Предпросмотр включает только активный плагин preview (фильтр preview_enabled)
+if (isPreviewEnabled() && $previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
     // 1. Временный preview (из конструктора)
     $previewData = loadPreviewById($previewToken);
 
@@ -217,6 +217,7 @@ if ($previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
 ```
 
 **Что делает:**
+- Работает только при включённом плагине `preview` (`isPreviewEnabled()`): без него `?preview=` игнорируется.
 - Ищет preview по токену: **сначала временный, потом постоянный**.
 - Если нашли и slug в URL неактуален — **301** на правильный URL.
 - Устанавливает `$isPreview = true` — это отключает кеш и включает жёлтую плашку.
@@ -522,6 +523,7 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `safeFileWrite()` | Атомарная запись с flock |
 | `loadPreviewById()` | Чтение временного preview |
 | `loadPageByPreviewToken()` | Поиск страницы по постоянному токену |
+| `isPreviewEnabled()` | Доступен ли предпросмотр (фильтр `preview_enabled`) |
 | `findPageBySlugHistory()` | Поиск страницы по slug_history |
 | `applyPageDefaults()` | Дефолты для страницы |
 | `getBaseUrl()` | Протокол + хост сайта |
@@ -570,12 +572,6 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `clearPageCache()` | Очистка всего кеша |
 | `clearPageCacheById()` | Очистка кеша одной страницы |
 | `logAction()` | Логирование |
-| `createPreview()` | Создание/перезапись временного preview |
-| `cleanupAllPreviews()` | Очистка всех previews |
-| `cleanupSessionPreviews()` | Очистка previews сессии |
-| `cleanupSessionPagePreviews()` | Очистка previews сессии для страницы |
-| `getPagePreviewToken()` | Чтение постоянного токена |
-| `getPagePreviewUrl()` | Формирование URL постоянного preview |
 | `isWebpSupported()` | Проверка доступности WebP (GD/Imagick) |
 | `convertToWebp()` | Конвертация одного изображения в .webp |
 | `maybeConvertToWebp()` | Обёртка: настройки + поддержка → convertToWebp |

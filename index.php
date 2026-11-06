@@ -161,15 +161,7 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
 
 </head>
 <body>
-    <?php if ($isPreview): ?>
-    <div class="fixed top-0 left-0 right-0 z-[9999] bg-amber-400 text-amber-900 text-center py-2.5 px-4 text-sm font-bold shadow-md">
-        <span class="inline-flex items-center gap-2">
-            <span class="icon-eye text-base"></span>
-            Предпросмотр — страница не опубликована
-        </span>
-    </div>
-    <div style="height: 44px;"></div>
-    <?php endif; ?>
+    <?php do_action('site_preview_banner', $isPreview); ?>
     
     <?php 
     // --- Рендерим страницу через шаблон ---

@@ -271,6 +271,7 @@ $result = getPagesListPaginated(1, 25);
 | `render_head_end` | action | В `<head>` (перед `</head>`) | — |
 | `render_body_end` | action | Перед `</body>` | — |
 | `after_file_upload` | action | После загрузки файла (проводник / медиа) | `$filePath` |
+| `admin_login_success` | action | После успешного входа в админку | `$userIp` |
 | `plugin_before_toggle` | action | Перед вкл/выкл плагина | `$id`, `$active` |
 | `plugin_after_toggle` | action | После вкл/выкл плагина | `$id`, `$active` |
 | `plugin_before_delete` | action | До удаления плагина | `$id` |
@@ -279,6 +280,10 @@ $result = getPagesListPaginated(1, 25);
 | `plugin_after_update` | action | После обновления плагина | `$id`, `$newVersion` |
 | `plugin_after_install` | action | После установки плагина | `$id` |
 | `page_title` | filter | Заголовок страницы | `$title`, `$page` |
+| `preview_enabled` | filter | Доступен ли предпросмотр. По умолчанию `false`: `?preview=` игнорируется, блок в редакторе и кнопка конструктора скрыты | `$enabled` |
+| `edit_page_preview_block` | action | Блок preview в форме редактирования страницы | `$page`, `$pageId` |
+| `edit_page_scripts` | action | Скрипты редактора страницы (create и edit) | `$pageId`, `$isEdit` |
+| `site_preview_banner` | action | Баннер предпросмотра на фронте | `$isPreview` |
 | `save_settings_data` | filter | Массив настроек перед сохранением (при полном сохранении — собранный из POST, при сохранении из плагина — текущий `settings.json`) | `$newSettings` |
 | `page_scheduling_enabled` | filter | Доступно ли планирование публикации. По умолчанию `false`: статус «По расписанию» и поля дат в редакторе не показываются | `$enabled` |
 | `trash_enabled` | filter | Доступна ли корзина. По умолчанию `false`: удаление окончательное, кнопки и модалки нет | `$enabled` |
@@ -628,98 +633,75 @@ $message = getDeleteConfirmMessage('page', $page['title']);
 
 ## 👁 Предпросмотр
 
-### Временный preview (из конструктора)
+Предпросмотр реализован плагином `preview` (`config/plugins/preview/`). Ядро
+оставляет режим рендера и публичные функции чтения; создание, токены, UI и
+очистка — в плагине.
 
-#### `createPreview(array $pageData, string $sessionId, string $pageId, ?string $existingPreviewId, string $createdBy): array`
+### `isPreviewEnabled(): bool`
 
-Создаёт/перезаписывает preview-файл.
-
-```php
-$result = createPreview($pageData, session_id(), 'about', null, 'admin');
-// ['success' => true, 'preview_id' => 'a1b2...', 'error' => '']
-```
-
-Перезапись — если `$existingPreviewId` задан и совпадает `session_id + page_id`.
-
-#### `loadPreviewById(string $previewId): ?array`
-
-Читает preview-файл, **убирает** служебный блок `_preview`.
+**Проверяет, доступен ли предпросмотр.** Возвращает результат фильтра
+`preview_enabled` (по умолчанию `false`). Функция — в `config/core/functions.php`.
 
 ```php
-$page = loadPreviewById('a1b2c3...');
-```
-
-**Живёт в `functions.php`** — нужна и фронту.
-
-#### `cleanupAllPreviews(): int`
-
-Удаляет **все** preview-файлы. Используется при логине.
-
-#### `cleanupSessionPreviews(string $sessionId): int`
-
-Удаляет previews конкретной сессии.
-
-#### `cleanupSessionPagePreviews(string $sessionId, string $pageId): int`
-
-Удаляет previews сессии **для** конкретной страницы.
-
-#### `ensurePreviewDir(): bool`
-
-Создаёт `data/preview/` + `.htaccess`.
-
-#### `getPreviewUrl(string $previewId, string $slug = ''): string`
-
-Формирует URL вида `/{slug}?preview={id}` или `/?preview={id}`.
-
----
-
-### Постоянный preview-токен (для согласования)
-
-#### `getPagePreviewToken(string $pageId): string`
-
-Читает `preview_token` из JSON страницы. Пустая строка, если не задан.
-
-#### AJAX-эндпоинт `generate_preview_token`
-
-**URL:** `index.php?tab=pages&ajax=generate_preview_token` (GET).
-
-Генерирует **новый** preview-токен **без сохранения** в JSON. Возвращает `{success: true, token: "..."}`.
-
-Запись токена в `data/pages/{id}.json` — **только при сохранении страницы** (через hidden-поле `preview_token` в форме). Удаление — снятие поля при сохранении.
-
-#### `getPagePreviewUrl(string $pageId, string $token): string`
-
-Формирует **полный** URL: `{protocol}://{host}/{slug}?preview={token}`.
-
-#### `loadPageByPreviewToken(string $token): ?array`
-
-Ищет страницу по `preview_token`. Возвращает в **любом** статусе. **Живёт в `functions.php`.**
-
----
-
-### Эндпоинт `config/preview.php`
-
-POST-эндпоинт для создания временного preview.
-
-**Вход (POST):**
-- `csrf_token` — обязательно.
-- `page_id` — ID страницы (пусто для новой).
-- `title`, `slug`, `template`.
-- `show_header`, `show_footer`.
-- `meta_description`, `meta_keywords`.
-- `rows_json` — JSON конструктора.
-- `existing_preview_id` — опционально (перезапись).
-
-**Выход (JSON):**
-```json
-{
-    "success": true,
-    "preview_id": "a1b2c3...",
-    "url": "/about?preview=a1b2c3..."
+if (isPreviewEnabled()) {
+    // ?preview= и блок в редакторе доступны
 }
 ```
 
-**Требует авторизации и CSRF.**
+Плагин включает возможность в `plugin.php`:
+
+```php
+add_filter('preview_enabled', function () {
+    return true;
+});
+```
+
+Пока фильтра нет:
+
+- `?preview={token}` игнорируется, старые ссылки не открывают страницы;
+- блок «Ссылка для согласования» и кнопка «Предпросмотр» не выводятся;
+- AJAX-эндпоинты preview не отвечают.
+
+### `loadPreviewById(string $previewId): ?array`
+
+Читает временный preview-файл `data/preview/{id}.json`, **убирает** служебный
+блок `_preview`. **Живёт в `functions.php`** — нужна фронту.
+
+### `loadPageByPreviewToken(string $token): ?array`
+
+Ищет страницу по `preview_token` в `data/pages/*.json`. Возвращает страницу в
+**любом** статусе. **Живёт в `functions.php`.**
+
+### Создание временного preview
+
+Создание и перезапись временных preview, а также генерация постоянных токенов —
+внутри плагина (обработчики на `admin_init`). Ядро своих preview-эндпоинтов не
+регистрирует. Внешний контракт для других плагинов — только чтение через
+`loadPreviewById()` и `loadPageByPreviewToken()`.
+
+### Запись preview_token
+
+`preview_token` записывается в `data/pages/{id}.json` **только при сохранении
+страницы**: плагин ловит `page_data_before_save` и читает hidden-поле
+`preview_token`. Пустое значение удаляет токен. При создании страницы токен не
+пишется. `handleClonePage()` не копирует `preview_token` — защита от дублей.
+
+### Хуки предпросмотра
+
+| Хук | Где | Что делает |
+|---|---|---|
+| `preview_enabled` (фильтр) | `functions.php` | Включает предпросмотр |
+| `admin_login_success` | `admin_auth.php` | Событие входа (плагин чистит временные preview) |
+| `edit_page_preview_block` | `pages/edit.php` | Блок в форме редактирования страницы |
+| `edit_page_scripts` | `pages/edit.php` | Скрипты редактора (create и edit) |
+| `site_preview_banner` | корневой `index.php` | Баннер предпросмотра |
+
+### Данные
+
+- `data/preview/{preview_id}.json` — временные preview (32 hex), `.htaccess` рядом;
+- `data/pages/{id}.json` → `preview_token` — постоянная ссылка для согласования.
+
+Файлы данных остаются на месте при выключении и удалении плагина.
 
 ---
 

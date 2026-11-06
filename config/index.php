@@ -130,15 +130,6 @@ if ($isAuth) {
     
     require_once 'core/admin_controller.php';    
     
-    // === PREVIEW CLEANUP TRIGGERS ===
-    
-    // Успешный логин — очистка ВСЕГО
-    // Флаг устанавливается в handleSuccessfulLogin, обрабатывается здесь
-    if (!empty($_SESSION['preview_cleanup_all_pending'])) {
-        cleanupAllPreviews();
-        unset($_SESSION['preview_cleanup_all_pending']);
-    }
-    
     // --- ВИРТУАЛЬНЫЕ КРОНЫ (БЭКАП И ПУБЛИКАЦИЯ) ---
     require_once __DIR__ . '/core/virtual_crons.php';
     run_virtual_crons();

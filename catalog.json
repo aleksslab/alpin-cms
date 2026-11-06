@@ -53,6 +53,13 @@
             "version": "1.0.2",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_media-optimization.zip"
         },
+        "preview": {
+            "type": "plugin",
+            "name": "Предпросмотр",
+            "description": "Временный предпросмотр из конструктора и постоянные preview-ссылки для согласования страниц.",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/plg_preview.zip"
+        },
         "publish": {
             "type": "plugin",
             "name": "Автопубликация страниц",

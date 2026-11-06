@@ -551,6 +551,20 @@ function applyPageDefaults(array $page): array {
 }
 
 /**
+ * Проверяет, доступен ли предпросмотр страниц.
+ *
+ * Возможность включается плагином через фильтр `preview_enabled`: только он
+ * умеет создавать временные preview-файлы и хранить постоянные preview-токены.
+ * Пока фильтра нет, параметр `?preview=` игнорируется, а блок предпросмотра в
+ * редакторе и кнопка конструктора не выводятся.
+ *
+ * @return bool true, если активный плагин включил предпросмотр.
+ */
+function isPreviewEnabled(): bool {
+    return (bool) apply_filters('preview_enabled', false);
+}
+
+/**
  * Загружает страницу из data/pages/{slug}.json по её ЧПУ (slug)
  * 
  * @param string $slug ЧПУ страницы (пустая строка означает главную)

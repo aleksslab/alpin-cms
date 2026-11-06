@@ -123,6 +123,8 @@ add_action('index_start', function() {
 | `render_head_end` | В `<head>` (перед `</head>`) | — |
 | `render_body_end` | Перед `</body>` | — |
 | `after_file_upload` | После успешной загрузки файла через проводник или медиа-модалку | `$filePath` |
+| `admin_login_success` | После успешного входа в админку | `$userIp` |
+| `site_preview_banner` | На фронте, перед контентом | `$isPreview` |
 
 ### 📄 Хуки изменения контента
 
@@ -169,6 +171,8 @@ if (savePageData($page['id'], $page)) {
 | Хук | Когда срабатывает | Аргументы |
 |-----|-------------------|-----------|
 | `edit_page_history_block` | В блоке настроек формы редактирования | `$editPage` |
+| `edit_page_preview_block` | В блоке настроек формы редактирования (preview-ссылка) | `$editPage`, `$pageId` |
+| `edit_page_scripts` | Перед скриптами редактора (create и edit) | `$pageId`, `$isEdit` |
 | `edit_page_modals` | После формы, до скриптов (для модалок) | `$pageId` |
 
 **Пример: плагин SEO-инструментов (`seo-tools`)**
@@ -249,6 +253,7 @@ add_filter('page_title', function($title, $page) {
 | `save_settings_data` | Массив настроек перед сохранением | `$newSettings` |
 | `page_scheduling_enabled` | Включает планирование публикации: статус «По расписанию» и поля дат в редакторе. По умолчанию `false` | `$enabled` |
 | `trash_enabled` | Включает корзину для страниц и меню. По умолчанию `false` | `$enabled` |
+| `preview_enabled` | Включает предпросмотр: `?preview=`, блок в редакторе и кнопку конструктора. По умолчанию `false` | `$enabled` |
 
 ### Корзина
 
@@ -285,6 +290,23 @@ add_filter('page_scheduling_enabled', function () {
 ```
 
 Ядро по умолчанию считает планирование выключенным, поэтому UI расписания не появляется без обработчика фильтра. Проверка доступна через `isPageSchedulingEnabled()`.
+
+### Предпросмотр
+
+Предпросмотр — отдельный плагин `preview`. Ядро оставляет режим рендера
+(`$isPreview`), публичные `loadPreviewById()` / `loadPageByPreviewToken()` и
+проверку `isPreviewEnabled()`. Плагин создаёт временные preview-файлы, хранит
+постоянные токены и рисует UI.
+
+```php
+add_filter('preview_enabled', function () {
+    return true;
+});
+```
+
+Пока фильтра нет, `?preview=` игнорируется, блок в редакторе и кнопка
+конструктора скрыты, AJAX-эндпоинты плагина не отвечают. Данные
+(`data/preview/`, поле `preview_token`) остаются на месте.
 
 ### Кастомные маршруты
 

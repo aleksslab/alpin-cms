@@ -57,7 +57,7 @@ function handle_admin_ajax_actions(): void {
     }
     
     // --- ГЕНЕРАЦИЯ ТОКЕНОВ (AJAX) ---
-    if (isset($_GET['ajax']) && in_array($_GET['ajax'], ['generate_cron_token', 'generate_preview_token', 'generate_maintenance_token'])) {
+    if (isset($_GET['ajax']) && in_array($_GET['ajax'], ['generate_cron_token', 'generate_maintenance_token'])) {
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true, 'token' => bin2hex(random_bytes(16))]);
         exit;

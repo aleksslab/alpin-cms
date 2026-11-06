@@ -41,9 +41,10 @@ function resolve_route(): array {
     $page = null;
 
     // --- PREVIEW MODE ---
+    // Включается только активным плагином preview (фильтр preview_enabled).
     $previewToken = trim($_GET['preview'] ?? '');
 
-    if ($previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
+    if (isPreviewEnabled() && $previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
         // 1. Временный preview (из конструктора)
         $previewData = loadPreviewById($previewToken);
 
