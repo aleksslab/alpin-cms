@@ -173,13 +173,6 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
     }
     ?>
 
-    <?php // COOKIE BANNER ?>
-    <div id="cookie-banner" class="fixed bottom-6 left-6 z-50 max-w-xs sm:max-w-sm bg-slate-100 p-5 rounded-xl shadow-lg border border-slate-200">
-        <button id="close-cookie-banner" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 cursor-pointer">
-            <span class="icon-x text-lg"></span></button>
-        <p class="text-sm text-slate-600 pr-4 font-medium">Мы используем cookies. Продолжая использовать сайт, вы соглашаетесь с нашей <button onclick="openPolicy('cookie')" class="underline cursor-pointer">Политикой cookie</button>.</p>
-    </div>
-
     <?php // BACK TO TOP ?>
     <button id="back-to-top" onclick="window.scrollTo({top:0, behavior:'smooth'})" class="fixed bottom-6 right-6 z-50 w-12 h-12 bg-[var(--primary-color)] text-white rounded-full shadow-lg hover:bg-[var(--primary-dark)] hover:-translate-y-1 transition-all hidden items-center justify-center group cursor-pointer">
         <span class="icon-chevron-up text-2xl group-hover:-translate-y-0.5 transition-transform"></span>
