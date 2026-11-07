@@ -33,6 +33,7 @@
 
 - **`handleSaveSettings()`**: сохранение из формы плагина больше не затирает настройки сайта. Признак полного сохранения — скрытое поле `settings_full` в форме «Настроек сайта»; без него ядро берёт текущий `settings.json` и применяет только поля из POST. При полном сохранении ключи, которых нет в форме (настройки выключенных плагинов, пользовательские поля), больше не теряются — переносятся из текущего `settings.json`.
 - **Единый механизм сохранения настроек плагинов**: `save_plugin_settings()` теперь возвращает признак отправки формы и поддерживает вложенные пути (`log_settings.storage_path`). Плагины `maintenance`, `dark-theme`, `logs`, `media-optimization` переведены на него.
+- **Плагин `cookie-banner` (v1.1.0)**: добавлены настройки — текст баннера, подписи и URL ссылок на политику и условия cookie, срок хранения согласия. Пустые текст и подписи берутся из дефолтов плагина, пустой URL открывает встроенную модалку ядра; при сохранении настроек сбрасывается HTML-кеш.
 - **Плагин `maintenance` (v0.9.1)**: исправлено затирание настроек техработы при сохранении формы другого плагина (например, «Обновления») — фильтр срабатывает только при отправке своей формы.
 - **Виртуальные кроны**: цикл по реестру задач (`run_virtual_cron_tasks()`) вместо жёстких вызовов; автопубликация тоже стала задачей реестра (`publish`).
 - **`config/cron/backup.php`** заменён общим `config/cron/run.php` (задача `backups`).
@@ -77,8 +78,8 @@
 - **Новые файлы**: `config/plugins/preview/{plugin.json,plugin.php,admin-preview-block.php,admin/script.js}`; `config/js/preview.js`.
 - **Перенесено в плагин `preview`**: `createPreview()`, `ensurePreviewDir()`, `cleanupAllPreviews()`, `cleanupSessionPreviews()`, `cleanupSessionPagePreviews()`, `getPreviewUrl()`, `getPagePreviewToken()`, `getPagePreviewUrl()` → `preview_*`; `generate_preview_token` и `preview_create` → `admin_init`; preview-JS из `pages.js` и `constructor.js` → `admin/script.js`; блок редактора → `admin-preview-block.php`; баннер фронта → хук `site_preview_banner`.
 - **Удалено**: `config/preview.php`, `cleanupSessionPreviews()` (не использовалась), preview-функции из `admin_controller.php`, `generate_preview_token` из списка токенов `admin_ajax.php`, флаг `preview_cleanup_all_pending` из `admin_auth.php` (заменён хуком `admin_login_success`).
-- **Новые файлы**: `config/plugins/cookie-banner/{plugin.json,plugin.php,site/script.js}`.
-- **Перенесено в плагин `cookie-banner`**: разметка баннера из `index.php` и клиентская логика из `js/script.js` → `render_body_end` и `site/script.js`; при toggle/update/delete плагин очищает HTML-кеш, чтобы баннер не оставался в старых страницах.
+- **Новые файлы**: `config/plugins/cookie-banner/{plugin.json,plugin.php,admin-section.php,site/script.js}`.
+- **Перенесено в плагин `cookie-banner`**: разметка баннера из `index.php` и клиентская логика из `js/script.js` → `render_body_end` и `site/script.js`; настройки — в секции `cookie-banner` через `register_plugin_section()`; при toggle/update/delete и изменении настроек плагин очищает HTML-кеш, чтобы баннер не оставался в старых страницах.
 - **Удалено**: `config/core/history_modal.php`, `config/js/history_modal.js`, `config/modules/config_vars/history.php`, `HISTORY_DIR` и ~743 строки истории в `admin_controller.php`, 4 POST-ветки в `admin_actions.php`.
 - **`data/history/`** и `.htaccess` остаются на месте; каталог создаёт плагин при первом снапшоте.
 - **Новые функции кронов**: `mark_cron_pending()`, `claim_cron_task_run()`, `release_cron_task_run()`, `confirm_cron_task_run()`, `_cron_update_state()` (flock и read-modify-write); константы `CRON_PENDING_TTL = 900`, `CRON_RETRY_COOLDOWN = 300`.
