@@ -142,7 +142,7 @@ function dispatch_custom_route(string $slug): bool {
  */
 function add_admin_tab(string $id, string $title, string $icon = 'icon-puzzle', string $group = 'system'): void {
     // Валидация ID
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $id)) {
+    if (!isValidId($id)) {
         return;
     }
 
@@ -168,7 +168,7 @@ function add_admin_tab(string $id, string $title, string $icon = 'icon-puzzle', 
  * @return void
  */
 function register_plugin_section(string $id, string $title, callable $callback): void {
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $id)) {
+    if (!isValidId($id)) {
         return;
     }
     

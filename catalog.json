@@ -4,6 +4,198 @@
         "download_url": "https:\/\/github.com\/AlekSSLab\/alpin-cms\/releases\/latest"
     },
     "extensions": {
+        "before-after": {
+            "type": "module",
+            "name": "До и После",
+            "description": "Слайдер для сравнения двух изображений",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_before-after.zip",
+            "icon": "icon-split"
+        },
+        "brands-marquee": {
+            "type": "module",
+            "name": "Бегущая лента",
+            "description": "Бесконечная лента с логотипами партнеров и клиентов",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_brands-marquee.zip",
+            "icon": "icon-images"
+        },
+        "calculator": {
+            "type": "module",
+            "name": "Калькулятор корма",
+            "description": "Интерактивный калькулятор подбора порции для собак и кошек",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_calculator.zip",
+            "icon": "icon-calculator"
+        },
+        "cards": {
+            "type": "module",
+            "name": "Плитка с карточками",
+            "description": "Сетка карточек с изображением, названием и ссылкой",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_cards.zip",
+            "icon": "icon-award"
+        },
+        "carousel": {
+            "type": "module",
+            "name": "Слайдер",
+            "description": "Слайдер с изображениями и текстом",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_carousel.zip",
+            "icon": "icon-image"
+        },
+        "contacts": {
+            "type": "module",
+            "name": "Контакты",
+            "description": "Контактная информация, форма обратной связи и карта",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_contacts.zip",
+            "icon": "icon-phone"
+        },
+        "countdown": {
+            "type": "module",
+            "name": "Таймер обратного отсчета",
+            "description": "Таймер до указанной даты с визуальным оформлением",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_countdown.zip",
+            "icon": "icon-clock"
+        },
+        "faq": {
+            "type": "module",
+            "name": "FAQ (Вопрос-Ответ)",
+            "description": "Аккордеон с вопросами и ответами",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_faq.zip",
+            "icon": "icon-help-circle"
+        },
+        "hero-landing": {
+            "type": "module",
+            "name": "Обложка-лендинг",
+            "description": "Hero для лендинга: две кнопки, визуал, микро-факты, split-раскладка",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_hero-landing.zip",
+            "icon": "icon-layout-panel-top"
+        },
+        "hero": {
+            "type": "module",
+            "name": "Обложка (Hero)",
+            "description": "Полноэкранный баннер с заголовком и кнопкой",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_hero.zip",
+            "icon": "icon-layout-dashboard"
+        },
+        "icons-list": {
+            "type": "module",
+            "name": "Список с иконками",
+            "description": "Элементы с иконкой, заголовком и описанием",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_icons-list.zip",
+            "icon": "icon-list"
+        },
+        "lead-form": {
+            "type": "module",
+            "name": "Форма захвата лидов",
+            "description": "Готовая форма обратной связи с настройками полей",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_lead-form.zip",
+            "icon": "icon-mail"
+        },
+        "map-advanced": {
+            "type": "module",
+            "name": "Яндекс.Карты",
+            "description": "Интерактивная карта с кастомными метками",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_map-advanced.zip",
+            "icon": "icon-map-pin"
+        },
+        "portfolio": {
+            "type": "module",
+            "name": "Портфолио",
+            "description": "Сетка портфолио с фильтрацией по категориям",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_portfolio.zip",
+            "icon": "icon-grid"
+        },
+        "pricing": {
+            "type": "module",
+            "name": "Тарифная сетка",
+            "description": "Тарифы с переключателем месячной\/годовой оплаты",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_pricing.zip",
+            "icon": "icon-credit-card"
+        },
+        "quiz": {
+            "type": "module",
+            "name": "Квиз",
+            "description": "Интерактивный квиз для сбора данных и квалификации лидов",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_quiz.zip",
+            "icon": "icon-message-square"
+        },
+        "site-menu": {
+            "type": "module",
+            "name": "Меню сайта",
+            "description": "Выводит любое созданное в системе меню в виде списка ссылок",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_site-menu.zip",
+            "icon": "icon-menu"
+        },
+        "slider-advanced": {
+            "type": "module",
+            "name": "Слайдер продвинутый",
+            "description": "Полноэкранный слайдер с эффектами перехода",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_slider-advanced.zip",
+            "icon": "icon-images"
+        },
+        "social-icons": {
+            "type": "module",
+            "name": "Социальные иконки",
+            "description": "Иконки социальных сетей из настроек сайта",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_social-icons.zip",
+            "icon": "icon-share-2"
+        },
+        "stats": {
+            "type": "module",
+            "name": "Счетчики (Статистика)",
+            "description": "Блок со счетчиками и анимацией при скролле",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_stats.zip",
+            "icon": "icon-trending-up"
+        },
+        "testimonials": {
+            "type": "module",
+            "name": "Отзывы клиентов",
+            "description": "Отзывы клиентов с фото, видео и рейтингом",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_testimonials.zip",
+            "icon": "icon-message-square"
+        },
+        "text-media": {
+            "type": "module",
+            "name": "Текст + Медиа",
+            "description": "Блок с текстом и изображением, особенностями и статистикой",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_text-media.zip",
+            "icon": "icon-file-text"
+        },
+        "text": {
+            "type": "module",
+            "name": "Произвольный HTML\/текст",
+            "description": "Блок с произвольным HTML\/текстом",
+            "version": "1.0.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_text.zip",
+            "icon": "icon-file-text"
+        },
+        "timeline": {
+            "type": "module",
+            "name": "Временная шкала",
+            "description": "Отображение этапов работы, истории или плана действий",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/v2.0.0-core-refactor\/catalog\/mod_timeline.zip",
+            "icon": "icon-timeline"
+        },
         "backups": {
             "type": "plugin",
             "name": "Резервное копирование",

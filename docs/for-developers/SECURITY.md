@@ -137,7 +137,7 @@ $name = sanitizeHtml($name);
 
 ### Защита
 
-**Функция** `detectZipSlip(ZipArchive $zip): ?string`:
+**Функция** `detectZipSlip(ZipArchive $zip): ?string` (определена в `config/core/security.php`):
 
 ```php
 function detectZipSlip(ZipArchive $zip): ?string {
@@ -158,7 +158,7 @@ function detectZipSlip(ZipArchive $zip): ?string {
 }
 ```
 
-**Используется** **в** `unpackModule` **и** при восстановлении из бэкапа (плагин `backups`) **ДО** `extractTo`:
+**Используется** **в** `unpackModuleArchive()`/`validateModuleArchive()` (**установка** **модулей**) **и** при восстановлении из бэкапа (плагин `backups`) **ДО** `extractTo`:
 
 ```php
 $zipSlipEntry = detectZipSlip($zip);
@@ -245,10 +245,10 @@ include APP_ROOT . '/config/modules/' . $moduleType . '/module.php';
 
 ### Защита
 
-**Всегда** **валидировать** **ID** **модуля**:
+**Всегда** **валидировать** **ID** **модуля** **через** `isValidId()` (`config/core/security.php`):
 
 ```php
-if (!preg_match('~^[a-z0-9\-_]+$~i', $moduleType)) {
+if (!isValidId($moduleId)) {
     echo json_encode(['success' => false, 'error' => 'Невалидный ID модуля']);
     exit;
 }
@@ -257,7 +257,10 @@ if (!preg_match('~^[a-z0-9\-_]+$~i', $moduleType)) {
 **Применяется** **в**:
 - `handleGetModuleSettings()`.
 - `unpackModule()`.
-- `removeModuleFiles()`.
+- `unpackModuleArchive()`.
+- `removeModuleFiles()`, `purgeModule()`.
+- `validateModuleArchive()`, `installModuleFromZip()`.
+- `downloadModuleZip()`.
 - `handleModuleAction()`.
 - `check_module` (**в** `config/index.php`).
 

@@ -2,8 +2,10 @@
 header('Content-Type: application/json');
 $response = ['status' => '', 'head' => '', 'message' => ''];
 
+require_once __DIR__ . '/../config/core/security.php';
+
 session_start();
-if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
     $response['status'] = 'error';
     $response['head'] = 'Ошибка безопасности!';
     $response['message'] = 'Произошла ошибка при проверке токена безопасности. Попробуйте позже.';

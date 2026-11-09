@@ -98,6 +98,56 @@ safeFileWrite($logFile, $line, true);  // append
 
 ---
 
+### `verifyCsrfToken(?string $token): bool`
+
+**Сравнение** **CSRF-токена** **из** **запроса** **с** `$_SESSION['csrf_token']`
+**через** `hash_equals()`. **Пустая** **сессия** **или** **пустой** **токен** →
+`false`.
+
+```php
+if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+    die('CSRF');
+}
+```
+
+---
+
+### `isValidId(string $id): bool`
+
+**Проверка** **ID** (**модуль**, **плагин**, **страница**, **файл**) — **только**
+`[a-z0-9\-_]+`: **нижний** **регистр**, **без** **точек** **и** **слэшей**.
+**Защищает** **от** **path traversal**.
+
+```php
+isValidId('hero');        // true
+isValidId('../etc');      // false
+isValidId('Hero');        // false
+```
+
+---
+
+### `detectZipSlip(ZipArchive $zip): ?string`
+
+**Проверка** **имён** **файлов** **в** **ZIP** **до** `extractTo()`. **Возвращает**
+**имя** **опасной** **записи** **или** `null`.
+
+**Блокирует:** `..`, **абсолютные** **пути** (`/`, `C:\`), **NUL-байты**.
+
+```php
+$entry = detectZipSlip($zip);
+if ($entry !== null) {
+    $zip->close();
+    // установка отменяется
+}
+```
+
+`verifyCsrfToken()`, `isValidId()` и `detectZipSlip()` **живут** **в**
+`config/core/security.php`. **Файл** **подключается** **из** `config.php` **и**
+`functions.php`; **сессию** **и** **заголовки** **он** **не** **трогает**, **только**
+**чистые** **помощники**.
+
+---
+
 ## 📖 Чтение данных
 
 ### `getData(string $fileName, bool $refresh = false): array`
@@ -398,7 +448,27 @@ $assets = getModuleAssets(['hero', 'faq'], $settings, 'home');
 
 ### `saveModulesData(array $data): bool`
 
-**Сохраняет** `config/data/modules.json`.
+**Сохраняет** `config/data/modules.json` **через** `safeFileWrite()`.
+
+**Формат** — **объект**, **ключ** — **ID** **модуля**:
+
+```json
+{
+    "hero": {
+        "name": "Герой (Hero)",
+        "icon": "icon-layout-dashboard",
+        "description": "Полноэкранный блок",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    }
+}
+```
+
+**Порядок** **ключей** — **порядок** **вывода** **в** **админке**.
+`syncModulesData()` **сохраняет** **его** **и** **добавляет** **новые** **модули**
+**в** **конец**.
 
 ---
 
@@ -481,27 +551,124 @@ $res = handleSaveSettings();
 
 ### `handleModuleAction(): array`
 
-**Управление** **модулями**:
-- `module_action=upload` — загрузка ZIP.
-- `module_action=delete` — удаление.
+**Управление** **модулями** (POST `module_action`):
+- `upload` — загрузка ZIP из формы.
+- `delete` — удалить **только код** (архив и запись в реестре остаются).
+- `purge` — удалить **полностью**: код, архив, превью и запись в
+  `config/data/modules.json`.
 
-**Валидация** `manifest.id`.  
-**`detectZipSlip`** **перед** **распаковкой**.
+**Распаковка** — отдельный POST `unpack_module=1` (`admin_actions.php` →
+`unpackModule()`).
+
+**Валидация** `manifest.id` и `isValidId()`.  
+**`detectZipSlip`** **перед** **распаковкой**.  
+**Проверка** `findModuleUsage()`: используемый на страницах модуль удалить
+нельзя.  
+**Flash** — через `setFlash()`/`renderFlash()`.
 
 ---
 
 ### `unpackModule(string $moduleId): array`
 
-**Распаковывает** **модуль** **из** **ZIP**.
+**Распаковывает** **модуль** **из** `config/modules/archives/{id}.zip`
+**в** `config/modules/{id}/`, `modules/{id}.php`, `css/{id}.css`,
+`js/{id}.js`.
 
-**Валидация** `$moduleId`.  
+**Валидация** `$moduleId` (**`isValidId`**).  
 **`detectZipSlip`**.
+
+`unpackModule()` **доступна** **на** **фронте**: **определена** **в**
+`config/core/modules.php`, **подключается** **через** `functions.php`.
+
+---
+
+### `unpackModuleArchive(string $zipPath, string $moduleId): array`
+
+**Внутренняя** **распаковка** **произвольного** **ZIP** **во** **временную**
+**папку** `config/modules/_temp/{id}/`, **затем** **копирование** `admin/` **и**
+`site/` **по** **местам**. **`.min`-файлы** **и** **кеш** **обновляются** **только**
+**в** **админке** (**через** `function_exists()`).
 
 ---
 
 ### `removeModuleFiles(string $moduleId): array`
 
-**Удаляет** **файлы** **модуля**.
+**Удаляет** **распакованный** **код** **модуля**: `config/modules/{id}/`,
+`modules/{id}.php`, `css/{id}.css`, `css/{id}.min.css`, `js/{id}.js`,
+`js/{id}.min.js`.
+
+**Возвращает:** `['success' => bool, 'message' => string, 'deleted' => int]`.  
+**Архив** **и** **запись** **в** `modules.json` **остаются** — **для** **этого**
+**есть** `purgeModule()`.
+
+---
+
+### `purgeModule(string $moduleId): array`
+
+**Полное** **удаление**: `removeModuleFiles()` + архив
+`config/modules/archives/{id}.zip` + превью
+`config/modules/previews/{id}.png` + запись в `modules.json`.
+
+---
+
+### `reinstallModule(string $moduleId): array`
+
+**Удаляет** **код** **и** **распаковывает** **архив** **заново**.
+
+---
+
+### `validateModuleArchive(string $zipPath, string $moduleId): array`
+
+**Проверка** **ZIP** **перед** **установкой**:
+
+- `manifest.json` **в** **корне**;
+- `id` **в** **манифесте** **совпадает** **с** `$moduleId`;
+- **нет** `plugin.json` (**это** **не** **плагин**);
+- **есть** `site/module.php`;
+- **версия** **не** **ниже** **установленной** (**запрет** **даунгрейда**);
+- **нет** **ZIP Slip**.
+
+**Возвращает:** `['success' => bool, 'message' => string, 'manifest' => array]`.
+
+---
+
+### `installModuleFromZip(string $zipPath, string $id, bool $replace = false): array`
+
+**Установка** **или** **обновление** **модуля** **из** **ZIP**:
+
+1. `validateModuleArchive()`;
+2. **если** **модуль** **уже** **установлен** **и** `$replace = false` — **отказ**;
+3. `unpackModuleArchive()`;
+4. **копия** **архива** **в** `config/modules/archives/{id}.zip`;
+5. **превью** **из** `preview.png` **в** `config/modules/previews/{id}.png`;
+6. **запись** **в** `modules.json`.
+
+**Используется** **вкладкой** «Модули», **AJAX**
+`module_install_from_url` **и** **плагином** `updates`.
+
+---
+
+### `downloadModuleZip(string $url, string $id): ?string`
+
+**Скачивает** **архив** **модуля** **во** **временный** **файл**
+`data/module_{id}.zip`.
+
+**Ограничения:** **только** `http(s)://`, **не** **более** **10 МБ**, **таймаут**
+**30 с**. **Возвращает** `null` **при** **ошибке** — **файл** **удаляется**.
+
+---
+
+### `syncModulesData(): array`
+
+**Синхронизирует** `config/data/modules.json` **с** **архивами** **в**
+`config/modules/archives/`.
+
+- **существующие** **записи** **обновляются** **на** **месте**, **порядок**
+  **сохраняется**;
+- **новые** **архивы** **добавляются** **в** **конец**;
+- **записи** **без** **архива** **удаляются**.
+
+**Возвращает** **актуальный** **список** **модулей**.
 
 ---
 

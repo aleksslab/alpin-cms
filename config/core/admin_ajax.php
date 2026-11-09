@@ -40,7 +40,7 @@ function handle_admin_ajax_actions(): void {
     if (isset($_GET['ajax']) && $_GET['ajax'] === 'check_module') {
         $moduleId = $_GET['module'] ?? '';        
     
-        if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleId)) {
+        if (!isValidId($moduleId)) {
             echo json_encode(['installed' => false, 'error' => 'Невалидный ID модуля']);
             exit;
         }
@@ -68,9 +68,7 @@ function handle_admin_ajax_actions(): void {
         header('Content-Type: application/json; charset=utf-8');
         
         // Проверка CSRF
-        $incomingToken = $_POST['csrf_token'] ?? '';
-        $sessionToken  = $_SESSION['csrf_token'] ?? '';
-        if (empty($sessionToken) || !hash_equals($sessionToken, $incomingToken)) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: CSRF-токен невалиден.']);
             exit;
         }
@@ -94,9 +92,7 @@ function handle_admin_ajax_actions(): void {
         header('Content-Type: application/json; charset=utf-8');
         
         // Проверка CSRF
-        $incomingToken = $_POST['csrf_token'] ?? '';
-        $sessionToken  = $_SESSION['csrf_token'] ?? '';
-        if (empty($sessionToken) || !hash_equals($sessionToken, $incomingToken)) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: CSRF-токен невалиден.']);
             exit;
         }
@@ -104,7 +100,7 @@ function handle_admin_ajax_actions(): void {
         $url = $_POST['url'] ?? '';
         $id = $_POST['id'] ?? '';
         
-        if (!filter_var($url, FILTER_VALIDATE_URL) || !preg_match('/^[a-z0-9\-_]+$/i', $id)) {
+        if (!filter_var($url, FILTER_VALIDATE_URL) || !isValidId($id)) {
             echo json_encode(['success' => false, 'error' => 'Неверные параметры запроса.']);
             exit;
         }
@@ -148,8 +144,60 @@ function handle_admin_ajax_actions(): void {
         exit;
     }
     
-    // --- ОБНОВЛЕНИЕ КАТАЛОГА ПЛАГИНОВ (AJAX) ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'refresh_catalog' && isset($_GET['tab']) && $_GET['tab'] === 'plugins') {
+    // --- МОДУЛИ (AJAX-ДЕЙСТВИЯ: УСТАНОВКА ИЗ КАТАЛОГА) ---
+    if (isset($_GET['ajax']) && $_GET['ajax'] === 'module_install_from_url' && isset($_GET['tab']) && $_GET['tab'] === 'modules') {
+        header('Content-Type: application/json; charset=utf-8');
+
+        // Проверка CSRF
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+            echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: CSRF-токен невалиден.']);
+            exit;
+        }
+
+        $url = $_POST['url'] ?? '';
+        $id = $_POST['id'] ?? '';
+
+        if (!filter_var($url, FILTER_VALIDATE_URL) || !isValidId($id)) {
+            echo json_encode(['success' => false, 'error' => 'Неверные параметры запроса.']);
+            exit;
+        }
+
+        if (!function_exists('downloadModuleZip') || !function_exists('installModuleFromZip')) {
+            echo json_encode(['success' => false, 'error' => 'Функции установки модулей не найдены в ядре.']);
+            exit;
+        }
+
+        $zipPath = downloadModuleZip($url, $id);
+        if (!$zipPath) {
+            echo json_encode(['success' => false, 'error' => 'Не удалось скачать архив модуля.']);
+            exit;
+        }
+
+        $result = installModuleFromZip($zipPath, $id, true);
+        @unlink($zipPath);
+
+        if ($result['success']) {
+            // Удаляем из кеша "новых" и "обновлений"
+            $cacheFile = DATA_DIR . 'updates_cache.json';
+            if (file_exists($cacheFile) && is_writable($cacheFile)) {
+                $cache = json_decode(file_get_contents($cacheFile), true);
+                if (is_array($cache)) {
+                    unset($cache['data']['new'][$id], $cache['data']['updates'][$id]);
+                    safeFileWrite($cacheFile, json_encode($cache, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                }
+            }
+
+            setFlash($result['message']);
+            echo json_encode(['success' => true, 'message' => $result['message']]);
+        } else {
+            setFlash($result['message'], 'error');
+            echo json_encode(['success' => false, 'error' => $result['message']]);
+        }
+        exit;
+    }
+
+    // --- ОБНОВЛЕНИЕ КАТАЛОГА (AJAX) ---
+    if (isset($_GET['ajax']) && $_GET['ajax'] === 'refresh_catalog' && isset($_GET['tab']) && in_array($_GET['tab'], ['plugins', 'modules'], true)) {
         header('Content-Type: application/json; charset=utf-8');
         
         $settings = getSettingsData();

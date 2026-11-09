@@ -22,6 +22,7 @@
 - **Плагин «Корзина»**: вынесен из ядра в `config/plugins/trash/` (перемещение в `data/trash/`, список, восстановление, окончательное удаление, очистка, кнопка и модалка). Ядро включает корзину через фильтр `trash_enabled` (по умолчанию `false`); при выключенном плагине удаление выполняется окончательно с отдельным подтверждением. Данные и `.htaccess` остаются на месте.
 - **Плагин «Предпросмотр»**: вынесен из ядра в `config/plugins/preview/` (временные preview-файлы из конструктора, постоянные preview-ссылки для согласования, AJAX, блок в редакторе и баннер). Ядро включает предпросмотр через фильтр `preview_enabled` (по умолчанию `false`); при выключенном плагине `?preview=` игнорируется, блок в редакторе и кнопка конструктора скрыты, AJAX не отвечает. Данные (`data/preview/`, поле `preview_token`) и `.htaccess` остаются на месте.
 - **Плагин «Cookie-баннер»**: вынесен из ядра в `config/plugins/cookie-banner/` (уведомление о cookies, закрытие с сохранением согласия на 30 дней). Плагин выводит разметку на `render_body_end` и подключает `js/cookie-banner.js`; при выключении баннер исчезает, модалка политик остаётся в ядре.
+- **Каталог модулей**: установка и обновление модулей из общего каталога — блок «Доступные для установки», бейдж `vX → vY`, кнопка «Обновить», скачивание `catalog/mod_{id}.zip`. Удаление — «Удалить код» (только распакованные файлы) и «Удалить полностью» (код, архив, превью и запись). Обе кнопки блокируются, пока модуль используется на страницах.
 - **Хуки изменения контента**: `page_before_save` / `page_saved`, `home_before_change` / `home_changed`, `page_before_clone` / `page_cloned`, `page_before_delete` / `page_deleted`, `page_before_restore` / `page_restored`, `settings_before_save` / `settings_saved`.
 - **Фильтр `page_data_before_save`** — правка данных страницы перед записью (плагин истории назначает `history_key`).
 - **Хук `trash_item_purged`** — элемент корзины удалён окончательно или страница/меню удалены напрямую при выключенной корзине; аргумент — данные страницы/меню с блоком `_trash`.
@@ -67,6 +68,10 @@
 ### Технические детали
 
 - **Новые файлы**: `config/core/cron.php`, `config/core/log.php`, `config/cron/run.php`.
+- **Новые файлы**: `config/core/security.php` — чистые помощники без старта сессии и заголовков: `e()`, `escapeJsString()`, `safeUrl()`, `validateHtml()`, `sanitizeHtml()`, `safeFileWrite()`, `detectZipSlip()`, `verifyCsrfToken()`, `isValidId()`.
+- **Новые файлы**: `config/core/modules.php` — установка, обновление и удаление модулей: `saveModulesData()`, `unpackModule()`, `unpackModuleArchive()`, `removeModuleFiles()`, `purgeModule()`, `reinstallModule()`, `downloadModuleZip()`, `validateModuleArchive()`, `installModuleFromZip()`, `syncModulesData()`.
+- **`config/core/modules.php`** подключается из `functions.php`: `render_module()` может распаковать модуль на фронте, где `admin_controller.php` недоступен. Админские вызовы (`logAction()`, `createMinFilesForModule()`, `clearPageCache()`) — через `function_exists()`.
+- **`installModuleFromZip(..., true)`** перед распаковкой удаляет старый код, чтобы после обновления не оставались файлы, которых нет в новой версии.
 - **Перенесено в плагин `filemanager`**: `config/core/filemanager_api.php` → `plugin.php` (рефакторинг: `fm*`-функции и `fmAction*()`), `config/modules/filemanager.php` → `admin-page.php`, `config/js/filemanager.js` → `admin/script.js`, fm-стили из `config/css/config.css` → `admin/style.css`.
 - **Перенесено в плагин `scheduler`**: `config/modules/config_vars/cron.php` → `admin-section.php`; секция регистрируется через `register_plugin_section()`, чтобы скрытое поле `cron_token` осталось в форме «Настроек сайта».
 - **Перенесено в плагин `publish`**: `handleCronPublishAction()` и `config/cron/publish.php`; задача регистрируется через `register_cron_task('publish', ...)`, лог-действия `page_publish` / `page_archive` — в плагине.
@@ -87,6 +92,7 @@
 
 ### Исправлено
 
+- **Модули (v1.0.1)**: исправлен parse error в `hero`, URL меню и карты — через `safeUrl()`/`e()`, `json_encode` в атрибутах — через `e()`, числовые `data-*` — через `(int)`, ответы форм в JS — через `textContent`, карта `contacts` собирается заново из проверенного `src`, в `quiz` исправлен абсолютный путь к `includes/mailer.php`, в `text` убрано подключение несуществующего редактора, а в его админке добавлено предупреждение, что HTML вставляется без санитизации.
 - **Плагин `publish` (v1.0.3)**: автопубликация и автоснятие больше не пишут страницу молча. Крон применяет `page_data_before_save` и стреляет `page_before_save` / `page_saved`, поэтому SEO-плагин пересобирает `sitemap.xml`, а `history_key` появляется у старых страниц. Лишние снапшоты не создаются — статус не входит в контентные поля.
 - **Плагин `backups` (v1.0.3)**: после восстановления архива очищается кеш страниц (раньше посетители видели старый HTML) и стреляет `backup_restored` с именем архива и списком восстановленных элементов. При ошибке (ZIP slip, неверный пароль, пустой архив) кеш не трогается и хук не срабатывает.
 - **Плагин `seo-tools` (v1.0.1)**: подписан на `backup_restored` — при восстановлении каталога `data` перечитывает `settings.json` (сброс `DATA_CACHE`) и пересобирает `sitemap.xml` / `robots.txt`, если включена авторегенерация. Восстановление только `images` или одиночного `sitemap.xml` файлы не перезаписывает.

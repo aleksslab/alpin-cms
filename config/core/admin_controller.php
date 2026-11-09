@@ -59,36 +59,6 @@ function regenerateCronToken(): string {
 }
 
 /**
- * Проверяет архив на ZIP Slip — небезопасные имена файлов.
- * 
- * Блокирует: .., абсолютные пути (/...), Windows-пути (C:\...), NUL-байты.
- * Возвращает имя первого небезопасного файла или null, если всё чисто.
- * 
- * @param ZipArchive $zip Открытый архив
- * @return string|null Имя небезопасного файла или null
- */
-function detectZipSlip(ZipArchive $zip): ?string {
-    for ($i = 0; $i < $zip->numFiles; $i++) {
-        $stat = $zip->statIndex($i);
-        if ($stat === false) continue;
-
-        $entryName = $stat['name'];
-        $normalized = str_replace('\\', '/', $entryName);
-
-        if (
-            strpos($normalized, '..') !== false ||
-            strpos($normalized, "\0") !== false ||
-            strpos($normalized, '/') === 0 ||
-            preg_match('#^[a-zA-Z]:#', $normalized) === 1
-        ) {
-            return $entryName;
-        }
-    }
-
-    return null;
-}
-
-/**
  * Сохраняет данные в JSON-файл с красивым форматированием
  *
  * @param string $fileName Имя файла без расширения (например, 'settings')
@@ -118,18 +88,6 @@ function savePageData(string $id, array $data): bool {
     $filePath = DATA_DIR . 'pages/' . $id . '.json';
     $jsonString = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     return safeFileWrite($filePath, $jsonString);
-}
-
-/**
- * Сохраняет список модулей в config/data/modules.json
- *
- * @param array $data Массив с данными модулей
- * @return bool true при успешной записи, false при ошибке
- */
-function saveModulesData(array $data): bool {
-    $path = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'modules.json';
-    $jsonString = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    return safeFileWrite($path, $jsonString);
 }
 
 /**
@@ -750,9 +708,7 @@ function handleAjaxImageUpload(): void {
     header('Content-Type: application/json');
     
     // 1. Проверяем CSRF-токен
-    $incomingToken = $_POST['csrf_token'] ?? '';
-    $sessionToken  = $_SESSION['csrf_token'] ?? '';
-    if (empty($sessionToken) || !hash_equals($sessionToken, $incomingToken)) {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
         echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: невалидный CSRF-токен.']);
         exit;
     }
@@ -1335,7 +1291,7 @@ function deleteEntityPermanently(string $type, string $id, string $sourceDir): a
     if (!in_array($type, ['page', 'menu'], true)) {
         return ['success' => false, 'error' => 'Неизвестный тип сущности.'];
     }
-    if (!preg_match('#^[a-z0-9\-_]+$#i', $id)) {
+    if (!isValidId($id)) {
         return ['success' => false, 'error' => 'Невалидный ID.'];
     }
 
@@ -1437,10 +1393,7 @@ function handleDeletePage(): void {
 function handleGetModuleSettings(): void {
     // Проверяем CSRF-токен (для POST-запросов)
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $clientToken = $_POST['csrf_token'] ?? '';
-        $sessionToken = $_SESSION['csrf_token'] ?? '';
-        
-        if (empty($sessionToken) || !hash_equals($sessionToken, $clientToken)) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             header('HTTP/1.1 403 Forbidden');
             echo json_encode(['success' => false, 'error' => 'Критическая ошибка безопасности: CSRF-токен невалиден или устарел. Обновите страницу.']);
             exit;
@@ -1458,7 +1411,7 @@ function handleGetModuleSettings(): void {
     $moduleSettings = [];
 
     // === ВАЛИДАЦИЯ ID МОДУЛЯ ===
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleType)) {
+    if (!isValidId($moduleType)) {
         logAction('module_settings', 'Невалидный module_type: ' . $moduleType, 'ERROR');
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'error' => 'Невалидный ID модуля']);
@@ -1524,28 +1477,39 @@ function handleGetModuleSettings(): void {
 function handleModuleAction(): array {
     $action = $_POST['module_action'] ?? '';
     $moduleId = $_POST['module_id'] ?? '';
-    
-    if ($action === 'delete' && $moduleId) {
+
+    if (($action === 'delete' || $action === 'purge') && $moduleId) {
+        if (!isValidId($moduleId)) {
+            logAction('module_delete', 'Попытка удаления модуля с невалидным ID: ' . $moduleId, 'ERROR');
+            setFlash('Невалидный ID модуля.', 'error');
+            return ['success' => false];
+        }
+
         // Проверяем использование
         $usedIn = findModuleUsage($moduleId);
         if (!empty($usedIn)) {
             logAction('module_delete', 'Модуль "' . $moduleId . '" используется. Удалите модуль со страниц, чтобы удалить его.', 'ERROR');
-            $_SESSION['module_error'] = 'Модуль используется на страницах: ' . implode(', ', $usedIn) . '. Удалите модуль со страниц, чтобы удалить его.';
+            setFlash('Модуль используется на страницах: ' . implode(', ', $usedIn) . '. Удалите модуль со страниц, чтобы удалить его.', 'error');
             return ['success' => false];
         }
-        
-        // Удаляем распакованные файлы
+
+        if ($action === 'purge') {
+            $result = purgeModule($moduleId);
+            logAction('module_purge', 'Модуль "' . $moduleId . '" удалён полностью. Удалено файлов: ' . $result['deleted'], 'INFO');
+            setFlash('Модуль "' . $moduleId . '" удалён полностью. Удалено файлов: ' . $result['deleted']);
+            return ['success' => true];
+        }
+
+        // Удаляем только распакованные файлы
         $result = removeModuleFiles($moduleId);
         logAction('module_delete', 'Модуль "' . $moduleId . '" удалён. Удалено файлов: ' . $result['deleted'], 'INFO');
-        $_SESSION['module_success'] = 'Модуль "' . $moduleId . '" удалён. Удалено файлов: ' . $result['deleted'];
+        setFlash('Модуль "' . $moduleId . '" удалён. Удалено файлов: ' . $result['deleted']);
         return ['success' => true];
     }
     
     if ($action === 'upload') {
         // Проверяем CSRF
-        $clientToken = $_POST['csrf_token'] ?? '';
-        $sessionToken = $_SESSION['csrf_token'] ?? '';
-        if (empty($sessionToken) || !hash_equals($sessionToken, $clientToken)) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: CSRF-токен невалиден']);
             exit;
         }
@@ -1557,6 +1521,13 @@ function handleModuleAction(): array {
         }
 
         $file = $_FILES['module_archive'];
+
+        // Лимит размера архива — 10 МБ
+        if (($file['size'] ?? 0) > 10 * 1024 * 1024) {
+            echo json_encode(['success' => false, 'error' => 'Архив больше 10 МБ']);
+            exit;
+        }
+
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
         if ($ext !== 'zip') {
@@ -1582,7 +1553,11 @@ function handleModuleAction(): array {
         }
 
         $manifest = json_decode($manifestContent, true);
-        $moduleId = $manifest['id'];
+        if (!is_array($manifest)) {
+            echo json_encode(['success' => false, 'error' => 'manifest.json имеет неверный формат']);
+            exit;
+        }
+        $moduleId = (string)($manifest['id'] ?? '');
         
         if (empty($moduleId)) {
             echo json_encode(['success' => false, 'error' => 'В manifest.json отсутствует поле "id"']);
@@ -1590,7 +1565,7 @@ function handleModuleAction(): array {
         }
 
         // Валидация ID модуля: только латиница, цифры, дефис, подчёркивание
-        if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleId)) {
+        if (!isValidId($moduleId)) {
             logAction('module_install', 'Попытка установки модуля с невалидным ID: ' . $moduleId, 'ERROR');
             echo json_encode(['success' => false, 'error' => 'Невалидный ID модуля. Разрешены только латиница, цифры, дефис и подчёркивание.']);
             exit;
@@ -1705,181 +1680,6 @@ function handleModuleAction(): array {
     
     $_SESSION['module_error'] = 'Неизвестное действие';
     return ['success' => false];
-}
-
-/**
- * Распаковывает модуль из архива в общие папки
- * 
- * @param string $moduleId Идентификатор модуля
- * @return array ['success' => bool, 'message' => string]
- */
-function unpackModule(string $moduleId): array {
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleId)) {
-        return ['success' => false, 'message' => 'Невалидный ID модуля'];
-    }
-    
-    $archivePath = APP_ROOT . '/config/modules/archives/' . $moduleId . '.zip';
-    
-    if (!file_exists($archivePath)) {
-        return ['success' => false, 'message' => 'Архив модуля не найден'];
-    }
-    
-    // Проверяем, распакован ли уже
-    if (isModuleInstalled($moduleId)) {
-        return ['success' => true, 'message' => 'Модуль уже распакован'];
-    }
-    
-    $zip = new ZipArchive();
-    if ($zip->open($archivePath) !== true) {
-        return ['success' => false, 'message' => 'Не удалось открыть архив'];
-    }
-    
-    // === ЗАЩИТА ОТ ZIP SLIP ===
-    $zipSlipEntry = detectZipSlip($zip);
-    if ($zipSlipEntry !== null) {
-        $zip->close();
-        logAction('module_unpack', 'ZIP Slip заблокирован: ' . $zipSlipEntry, 'ERROR');
-        return ['success' => false, 'message' => 'Архив содержит небезопасные имена файлов. Установка отменена.'];
-    }
-    // === КОНЕЦ ЗАЩИТЫ ===
-    
-    // Создаём временную папку для распаковки
-    $tempDir = APP_ROOT . '/config/modules/_temp/' . $moduleId;
-    if (!is_dir($tempDir)) {
-        mkdir($tempDir, 0755, true);
-    }
-    
-    // Распаковываем архив во временную папку
-    $zip->extractTo($tempDir);
-    $zip->close();
-    
-    // Копируем файлы из admin/ в config/modules/{id}/
-    $adminSource = $tempDir . '/admin/';
-    if (is_dir($adminSource)) {
-        $adminDest = APP_ROOT . '/config/modules/' . $moduleId . '/';
-        if (!is_dir($adminDest)) {
-            mkdir($adminDest, 0755, true);
-        }
-        
-        // Копируем все файлы из admin/
-        $files = scandir($adminSource);
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') continue;
-            copy($adminSource . $file, $adminDest . $file);
-        }
-    }
-    
-    // Копируем файлы из site/ в общие папки
-    $siteSource = $tempDir . '/site/';
-    if (is_dir($siteSource)) {
-        // site/module.php → modules/{id}.php
-        if (file_exists($siteSource . 'module.php')) {
-            copy($siteSource . 'module.php', APP_ROOT . '/modules/' . $moduleId . '.php');
-        }
-        // site/style.css → css/{id}.css
-        if (file_exists($siteSource . 'style.css')) {
-            copy($siteSource . 'style.css', APP_ROOT . '/css/' . $moduleId . '.css');
-        }
-        // site/script.js → js/{id}.js
-        if (file_exists($siteSource . 'script.js')) {
-            copy($siteSource . 'script.js', APP_ROOT . '/js/' . $moduleId . '.js');
-        }
-    }
-    
-    // Удаляем временную папку
-    $files = array_diff(scandir($tempDir), ['.', '..']);
-    foreach ($files as $file) {
-        $path = $tempDir . '/' . $file;
-        if (is_dir($path)) {
-            $subFiles = array_diff(scandir($path), ['.', '..']);
-            foreach ($subFiles as $subFile) {
-                unlink($path . '/' . $subFile);
-            }
-            rmdir($path);
-        } else {
-            unlink($path);
-        }
-    }
-    rmdir($tempDir);
-    
-    // ===== СОЗДАЁМ .min ФАЙЛЫ, ЕСЛИ МИНИФИКАЦИЯ ВКЛЮЧЕНА =====
-    $settings = getSettingsData();
-    if (!empty($settings['assets_minify'])) {
-        $exceptions = $settings['minify_exceptions'] ?? [];
-        // Проверяем, не в исключениях ли модуль
-        if (empty($exceptions[$moduleId]['css']) || empty($exceptions[$moduleId]['js'])) {
-            createMinFilesForModule($moduleId);
-        }
-    }
-    
-    clearPageCache();
-    
-    return ['success' => true, 'message' => 'Модуль успешно распакован'];
-}
-
-/**
- * Удаляет распакованные файлы модуля
- * 
- * @param string $moduleId Идентификатор модуля
- * @return array ['success' => bool, 'message' => string, 'deleted' => int]
- */
-function removeModuleFiles(string $moduleId): array {
-    $deleted = 0;   
-    
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleId)) {
-        return ['success' => false, 'message' => 'Невалидный ID модуля', 'deleted'=>$deleted];
-    }    
-    
-    // 1. Удаляем папку модуля в админке
-    $adminDir = APP_ROOT . '/config/modules/' . $moduleId;
-    if (is_dir($adminDir)) {
-        $files = array_diff(scandir($adminDir), ['.', '..']);
-        foreach ($files as $file) {
-            if (unlink($adminDir . '/' . $file)) {
-                $deleted++;
-            }
-        }
-        if (rmdir($adminDir)) {
-            $deleted++;
-        }
-    }
-
-    // 2. Удаляем файлы на сайте
-    $siteFiles = [
-        APP_ROOT . '/modules/' . $moduleId . '.php',
-        APP_ROOT . '/css/' . $moduleId . '.css',
-        APP_ROOT . '/css/' . $moduleId . '.min.css',
-        APP_ROOT . '/js/' . $moduleId . '.js',
-        APP_ROOT . '/js/' . $moduleId . '.min.js'
-    ];
-    
-    foreach ($siteFiles as $file) {
-        if (file_exists($file) && unlink($file)) {
-            $deleted++;
-        }
-    }
-    
-    clearPageCache();
-    
-    return [
-        'success' => true,
-        'message' => 'Удалено файлов: ' . $deleted,
-        'deleted' => $deleted
-    ];
-}
-
-/**
- * Обновляет модуль (удаляет старые файлы и распаковывает заново)
- * 
- * @param string $moduleId Идентификатор модуля
- * @return array ['success' => bool, 'message' => string]
- */
-function reinstallModule(string $moduleId): array {
-    // Удаляем старые файлы
-    removeModuleFiles($moduleId);
-    
-    // Распаковываем заново
-    return unpackModule($moduleId);
 }
 
 /**
@@ -2645,8 +2445,7 @@ function handleDeleteAllMin(): void {
  */
 function handleSaveMinifyExceptionsAjax(): void {
     // Проверка CSRF
-    $token = $_POST['csrf_token'] ?? '';
-    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
         echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: CSRF-токен невалиден']);
         exit;
     }
@@ -2761,7 +2560,7 @@ function handlePluginUpload(): array {
     $id = $manifest['id'] ?? '';
     
     // Валидация ID
-    if (empty($id) || !preg_match('/^[a-z0-9\-_]+$/i', $id)) {
+    if (empty($id) || !isValidId($id)) {
         return ['success' => '', 'error' => 'В plugin.json отсутствует или невалидное поле "id".'];
     }
     
@@ -2822,7 +2621,7 @@ function handlePluginAction(): array {
     
     // --- УДАЛЕНИЕ ---
     if ($action === 'delete' && $pluginId) {
-        if (!preg_match('/^[a-z0-9\-_]+$/i', $pluginId)) {
+        if (!isValidId($pluginId)) {
             return ['success' => '', 'error' => 'Невалидный ID плагина.'];
         }
         
@@ -2916,7 +2715,7 @@ function handlePluginAction(): array {
     
     // --- ПЕРЕКЛЮЧЕНИЕ СТАТУСА ---
     if ($action === 'toggle' && $pluginId) {
-        if (!preg_match('/^[a-z0-9\-_]+$/i', $pluginId)) {
+        if (!isValidId($pluginId)) {
             return ['success' => '', 'error' => 'Невалидный ID плагина.'];
         }
         

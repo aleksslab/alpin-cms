@@ -23,7 +23,7 @@ if ($token === '' || !hash_equals(getCronToken(), (string)$token)) {
 
 $task = $_GET['task'] ?? '';
 
-if (!preg_match('/^[a-z0-9\-_]+$/i', (string)$task)) {
+if (!isValidId((string)$task)) {
     header('HTTP/1.1 400 Bad Request');
     die('Error: Invalid task');
 }

@@ -13,6 +13,9 @@ if (!defined('DATA_DIR')) { define('DATA_DIR', APP_ROOT . DIRECTORY_SEPARATOR . 
 // Глобальный массив кэша в памяти
 $GLOBALS['DATA_CACHE'] = [];
 
+// Безопасность кода: экранирование, запись файлов, ZIP, CSRF, ID
+require_once __DIR__ . '/security.php';
+
 // Система хуков (Actions, Filters, Routes)
 require_once __DIR__ . '/hooks.php';
 
@@ -24,6 +27,9 @@ require_once __DIR__ . '/log.php';
 
 // Загрузчик плагинов
 require_once __DIR__ . '/plugins.php';
+
+// Установка, обновление и удаление модулей
+require_once __DIR__ . '/modules.php';
 
 // Роутер
 require_once __DIR__ . '/router.php';
@@ -74,44 +80,6 @@ function formatPhone(string $phone): string {
 function _jsonToArray($path): array {
     if (!file_exists($path)) { return []; }
     return json_decode(file_get_contents($path), true) ?? [];
-}
-
-/**
- * Экранирует строку для безопасного вывода в HTML
- *
- * @param string|null $str Строка для экранирования
- * @return string Экранированная строка
- */
-function e(?string $str): string { 
-    return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); 
-}
-
-/**
- * Атомарная запись файла с блокировкой (flock).
- * 
- * @param string $path Путь к файлу
- * @param string $content Содержимое
- * @param bool $append Режим добавления (true) или перезаписи (false)
- * @return bool
- */
-function safeFileWrite(string $path, string $content, bool $append = false): bool {
-    $flags = $append ? (FILE_APPEND | LOCK_EX) : LOCK_EX;
-    return @file_put_contents($path, $content, $flags) !== false;
-}
-
-/**
- * Экранирует строку для безопасной вставки в JS-строку внутри HTML-атрибута.
- * 
- * @param string|null $str
- * @return string
- */
-function escapeJsString(?string $str): string {
-    $str = $str ?? '';
-    return str_replace(
-        ['\\', "'", '"', "\n", "\r", '<', '>', '&'],
-        ['\\\\', "\\'", '\\"', '\\n', '\\r', '\\x3C', '\\x3E', '\\x26'],
-        $str
-    );
 }
 
 /**
@@ -199,93 +167,6 @@ function mediaImageSrc(string $url): string {
     }
 
     return $cache[$url] = $url;
-}
-
-/**
- * Проверяет URL на безопасность (whitelist схем).
- * 
- * @param string $url URL для проверки
- * @return string Безопасный URL или '#' при ошибке
- */
-function safeUrl(string $url): string {
-    $url = trim($url);
-    
-    if ($url === '') {
-        return '#';
-    }
-    
-    // Разрешаем: /path, #anchor, mailto:, tel:, http(s)://
-    // Запрещаем: javascript:, vbscript:, data:, всё остальное с :
-    
-    // Если URL начинается с / или # — ок
-    if ($url[0] === '/' || $url[0] === '#') {
-        return $url;
-    }
-    
-    // Если содержит протокол
-    if (preg_match('#^([a-z][a-z0-9+\-.]*):#i', $url, $m)) {
-        $scheme = strtolower($m[1]);
-        $allowed = ['http', 'https', 'mailto', 'tel'];
-        if (!in_array($scheme, $allowed, true)) {
-            return '#';
-        }
-    }
-    
-    return $url;
-}
-
-/**
- * Проверяет HTML на опасные конструкции.
- * 
- * @param string $html Проверяемый HTML
- * @return string|null Текст ошибки или null, если всё ок
- */
-function validateHtml(string $html): ?string {
-    if ($html === '') return null;
-    
-    $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    
-    $dangerous = [
-        '/<script/i'               => 'тег <script>',
-        '/<iframe/i'               => 'тег <iframe>',
-        '/<object/i'               => 'тег <object>',
-        '/<embed/i'                => 'тег <embed>',
-        '/<form/i'                 => 'тег <form>',
-        '/<meta/i'                 => 'тег <meta>',
-        '/<link/i'                 => 'тег <link>',
-        '/on\w+\s*=/i'             => 'событие on*',
-        '/javascript\s*:/i'        => 'javascript:',
-        '/vbscript\s*:/i'          => 'vbscript:',
-        '/data\s*:\s*text\/html/i' => 'data:text/html',
-        '/expression\s*\(/i'       => 'CSS expression',
-        '/\\\\x[0-9a-f]{2}/i'      => 'escape \\x',
-        '/\\\\u[0-9a-f]{4}/i'      => 'escape \\u',
-    ];
-    
-    foreach ($dangerous as $pattern => $label) {
-        if (preg_match($pattern, $decoded)) {
-            return 'Обнаружено недопустимое содержимое: ' . $label;
-        }
-    }
-    
-    return null;
-}
-
-/**
- * Очищает HTML — оставляет только безопасные теги.
- * 
- * @param string $html Исходный HTML
- * @return string Очищенный HTML
- */
-function sanitizeHtml(string $html): string {
-    $allowed = ['b', 'i', 'u', 'strong', 'em', 'span', 'ul', 'ol', 'li', 'p', 'br', 'a', 'h1', 'h2', 'h3', 'h4'];
-    $html = strip_tags($html, '<' . implode('><', $allowed) . '>');
-    
-    // Убираем опасные атрибуты
-    $html = preg_replace('/\s(on\w+|style|srcdoc|formaction)\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
-    $html = preg_replace('/javascript\s*:/i', '', $html);
-    
-    return $html;
 }
 
 /**
@@ -621,10 +502,10 @@ function loadPage(string $slug): ?array {
  * @return array|null Массив с данными страницы или null, если страница не найдена
  */
 function loadPageById(string $id): ?array {
-    if (!preg_match('#^[a-z0-9\-_]+$#i', $id)) {
+    if (!isValidId($id)) {
         return null;
     }
-    
+
     $filePath = DATA_DIR . 'pages/' . $id . '.json';
     if (!file_exists($filePath)) {
         return null;

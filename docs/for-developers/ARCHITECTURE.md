@@ -82,10 +82,12 @@ config/
 |
 ├── core/
 │   ├── functions.php      # ЧТЕНИЕ данных + утилиты (подключает хуки и плагины)
+│   ├── security.php       # Чистые помощники: e(), safeUrl(), CSRF, ID, ZIP Slip
 │   ├── hooks.php          # Система хуков (add_action, add_filter, add_route)
 │   ├── cron.php           # Реестр фоновых задач (register_cron_task, состояние)
 │   ├── log.php            # Реестр действий логирования (register_log_action, группы)
 │   ├── plugins.php        # Загрузчик плагинов (syncPluginsData, loadActivePlugins)
+│   ├── modules.php        # Установка/обновление/удаление модулей, syncModulesData
 │   ├── router.php         # Роутинг фронтенда (вынесен из index.php)
 │   ├── virtual_crons.php  # Виртуальные кроны (задачи плагинов, публикация)
 │   ├── admin_actions.php  # Обработка POST-запросов админки
@@ -501,7 +503,7 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 
 ## 🧩 Ядро
 
-### `functions.php` — чтение + утилиты
+### `security.php` — чистые помощники
 
 | Функция | Что делает |
 |---------|-----------|
@@ -510,6 +512,44 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `safeUrl()` | Whitelist схем URL |
 | `validateHtml()` | Проверка HTML на опасные теги |
 | `sanitizeHtml()` | Очистка HTML (whitelist) |
+| `safeFileWrite()` | Атомарная запись с flock |
+| `detectZipSlip()` | Защита от ZIP Slip |
+| `verifyCsrfToken()` | Сравнение CSRF-токена (`hash_equals`) |
+| `isValidId()` | Валидация ID (`[a-z0-9\-_]+`) |
+
+**Правило:** файл **не** **стартует** **сессию**, **не** **ставит** **заголовки** **и**
+**ничего** **не** **пишет**. **Bootstrap** — **в** `config.php`, **авторизация** — **в**
+`admin_auth.php`, **журнал** — **в** `log.php`.
+
+### `modules.php` — установка модулей
+
+| Функция | Что делает |
+|---------|-----------|
+| `saveModulesData()` | Запись `config/data/modules.json` |
+| `unpackModule()` | Распаковка из `config/modules/archives/{id}.zip` |
+| `unpackModuleArchive()` | Распаковка произвольного ZIP во временную папку |
+| `removeModuleFiles()` | Удалить только код |
+| `purgeModule()` | Удалить код, архив, превью и запись |
+| `reinstallModule()` | Удалить код и распаковать заново |
+| `downloadModuleZip()` | Скачать архив (http(s), 10 МБ) |
+| `validateModuleArchive()` | Проверка манифеста, ID и версии |
+| `installModuleFromZip()` | Установка/обновление из ZIP |
+| `syncModulesData()` | Синхронизация реестра с архивами |
+
+**Почему в `functions.php`:** функция `render_module()` на фронте
+**может** **распаковать** **модуль** **при** **первом** **использовании**, **а**
+`admin_controller.php` **на** **фронте** **не** **подключается**. **Поэтому**
+`unpackModule()` **и** **её** **зависимости** **живут** **в** `config/core/modules.php`
+**и** **доступны** **всегда**.
+
+**`logAction()`**, `createMinFilesForModule()` **и** `clearPageCache()` **—**
+**админские**: **в** `modules.php` **они** **вызываются** **только** **через**
+`function_exists()`.
+
+### `functions.php` — чтение + утилиты
+
+| Функция | Что делает |
+|---------|-----------|
 | `getData()` | Чтение JSON с кешем |
 | `getSettingsData()` | Настройки сайта |
 | `loadPage()` | Загрузка опубликованной страницы (проверяет `status` + `unpublish_at`) |
@@ -520,7 +560,6 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `renderMainMenu()`, `renderMobileMenu()` | Рендер меню |
 | `render_module()` | Рендер модуля |
 | `getModuleAssets()`, `getCombinedAssets()` | Ассеты |
-| `safeFileWrite()` | Атомарная запись с flock |
 | `loadPreviewById()` | Чтение временного preview |
 | `loadPageByPreviewToken()` | Поиск страницы по постоянному токену |
 | `isPreviewEnabled()` | Доступен ли предпросмотр (фильтр `preview_enabled`) |
@@ -551,8 +590,7 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 |---------|-----------|
 | `saveData()` | Запись JSON |
 | `savePageData()` | Запись страницы |
-| `saveMenu()`, `saveModulesData()` | Запись меню/модулей |
-| `detectZipSlip()` | Защита от ZIP Slip |
+| `saveMenu()` | Запись меню |
 | `handleSaveSettings()` | Сохранение настроек |
 | `handleSavePage()` | Сохранение страницы |
 | `handleDeletePage()` | Удаление страницы |
@@ -562,8 +600,7 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `handleClonePage()` | Клонирование |
 | `handleSetHomePage()` | Назначение главной |
 | `handleSaveMenu()`, `handleDeleteMenu()` | Меню |
-| `handleModuleAction()` | Модули (upload/delete) |
-| `unpackModule()` | Распаковка модуля |
+| `handleModuleAction()` | Модули: upload / delete / purge |
 | `handleSaveSecurity()` | Настройки безопасности |
 | `getCronToken()` | Общий токен для кронов (из `settings.json`) |
 | `regenerateCronToken()` | Принудительная перегенерация токена |

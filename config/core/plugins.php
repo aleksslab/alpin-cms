@@ -72,7 +72,7 @@ function scanPluginsDir(): array {
         if ($item === '.' || $item === '..') continue;
         
         // Валидация ID плагина (защита от опасных имен папок)
-        if (!preg_match('/^[a-z0-9\-_]+$/i', $item)) continue;
+        if (!isValidId($item)) continue;
         
         $pluginDir = PLUGINS_DIR . DIRECTORY_SEPARATOR . $item;
         if (!is_dir($pluginDir)) continue;
@@ -150,7 +150,7 @@ function loadActivePlugins(): void {
         if (empty($data['active'])) continue;
         
         // Валидация ID
-        if (!preg_match('/^[a-z0-9\-_]+$/i', $id)) continue;
+        if (!isValidId($id)) continue;
         
         // Если в манифесте указана вкладка — добавляем её автоматически
         if (!empty($data['admin_tab']) && is_array($data['admin_tab'])) {
@@ -316,7 +316,7 @@ function downloadPluginZip(string $url, string $id): ?string {
  */
 function installPluginFromZip(string $zipPath, string $id): array {
     // Валидация ID
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $id)) {
+    if (!isValidId($id)) {
         return ['success' => false, 'message' => 'Невалидный ID плагина.'];
     }
     
@@ -325,11 +325,7 @@ function installPluginFromZip(string $zipPath, string $id): array {
         return ['success' => false, 'message' => 'Не удалось открыть ZIP-архив.'];
     }
     
-    // Защита от ZIP Slip (функция из admin_controller.php)
-    if (!function_exists('detectZipSlip')) {
-        require_once __DIR__ . '/admin_controller.php';
-    }
-    
+    // Защита от ZIP Slip (функция из config/core/security.php)
     $zipSlip = detectZipSlip($zip);
     if ($zipSlip !== null) {
         $zip->close();
@@ -440,9 +436,16 @@ function refresh_updates_cache(string $catalogUrl) {
             $name = $extInfo['name'] ?? $extId;
             
             $installedVersion = null;
-            if ($type === 'module' && isset($installedModules[$extId])) {
-                $installedVersion = $installedModules[$extId]['version'] ?? '0.0.0';
-                $name = $installedModules[$extId]['name'] ?? $name;
+            if ($type === 'module') {
+                $isInstalled = function_exists('isModuleInstalled') ? isModuleInstalled($extId) : false;
+                $hasArchive = function_exists('getModuleArchivePath') ? file_exists(getModuleArchivePath($extId)) : false;
+
+                if ($isInstalled || $hasArchive) {
+                    $installedVersion = $installedModules[$extId]['version'] ?? '0.0.0';
+                }
+                if (isset($installedModules[$extId]['name'])) {
+                    $name = $installedModules[$extId]['name'];
+                }
             } elseif ($type === 'plugin' && isset($installedPlugins[$extId])) {
                 $installedVersion = $installedPlugins[$extId]['version'] ?? '0.0.0';
                 $name = $installedPlugins[$extId]['name'] ?? $name;

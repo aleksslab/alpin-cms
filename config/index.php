@@ -114,10 +114,7 @@ if ($isAuth) {
     
     // --- ЗАЩИТА ОТ CSRF-АТАК ---
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $incomingToken = $_POST['csrf_token'] ?? '';
-        $sessionToken  = $_SESSION['csrf_token'] ?? '';
-        
-        if (empty($sessionToken) || !hash_equals($sessionToken, $incomingToken)) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             header('HTTP/1.1 403 Forbidden');
             exit('Критическая ошибка безопасности: CSRF-токен невалиден или устарел. Обновите страницу.');
         }
@@ -149,7 +146,7 @@ if ($isAuth) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // 1. ЖЕЛЕЗНАЯ ПРОВЕРКА CSRF ТОКЕНА ДЛЯ ЛЮБОГО POST-ДЕЙСТВИЯ
-        if (empty($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             header('HTTP/1.1 403 Forbidden');
             exit('Ошибка безопасности: невалидный CSRF-токен сессии.');
         }

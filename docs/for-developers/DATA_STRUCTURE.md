@@ -647,6 +647,20 @@
 }
 ```
 
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `name` | string | Название в админке |
+| `icon` | string | Lucide-класс иконки |
+| `description` | string | Краткое описание |
+| `has_settings` | bool | Есть форма настроек |
+| `auto_unpack` | bool | Распаковывать сразу при установке |
+| `version` | string | Версия из `manifest.json` |
+| `author` | string | Автор |
+
+**Порядок ключей** — порядок вывода. `syncModulesData()` сохраняет его и
+добавляет новые модули в конец; записи без архива в
+`config/modules/archives/` удаляются.
+
 ---
 
 ## 📄 `config/data/templates.json`
