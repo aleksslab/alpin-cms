@@ -82,6 +82,8 @@ if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $tok
 | `escapeJsString($str)` | JS-строки в HTML-атрибутах | `\`, `'`, `"`, `\n`, `<`, `>`, `&` |
 | `sanitizeHtml($html)` | HTML с разрешёнными тегами | whitelist тегов + атрибутов |
 
+**SVG** — это XML с исполняемыми возможностями. Перед сохранением загруженного `.svg` вызывается `validateSvgContent($content)`: `<script>`, `on*`, `foreignObject`, встроенные HTML-элементы, `ENTITY`, `xml-stylesheet`, `javascript:`/`vbscript:`, CSS `expression()` и внешние `href` отклоняются. Дополнительно файл должен быть корректным XML (`SimpleXML` + `LIBXML_NONET`).
+
 ### Правила
 
 **1. В** **HTML-контенте** — **всегда** `e()`:
@@ -822,6 +824,7 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 - [ ] **GET-параметры** — валидация (`intval`, `preg_match`).
 - [ ] **Вывод** — через `e()` / `escapeJsString()`.
 - [ ] **HTML-поля** — `validateHtml` + `sanitizeHtml`.
+- [ ] **Загрузка SVG** — `validateSvgContent` перед сохранением.
 - [ ] **URL** — `safeUrl()`.
 - [ ] **Пути** — `fmSafePath` + `fmSafeAbsolute`.
 - [ ] **ID** — валидация **regex**.

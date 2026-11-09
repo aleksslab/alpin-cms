@@ -215,7 +215,16 @@ if ($cacheEnabled && !$isPreview) {
     if (!is_dir($cacheDir)) {
         mkdir($cacheDir, 0755, true);
     }
-    file_put_contents($cacheFile, $html);
+
+    // Пишем во временный файл и подменяем атомарно: читатель не увидит
+    // недописанный HTML, а два параллельных запроса не переплетут вывод.
+    $tmpCache = $cacheFile . '.' . bin2hex(random_bytes(4)) . '.tmp';
+    if (@file_put_contents($tmpCache, $html, LOCK_EX) !== false) {
+        if (!@rename($tmpCache, $cacheFile)) {
+            @copy($tmpCache, $cacheFile);
+            @unlink($tmpCache);
+        }
+    }
 }
 
 echo $html;

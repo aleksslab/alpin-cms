@@ -273,6 +273,16 @@ function _settings_path_set(array &$data, string $path, $value): void {
  * @return string|null Путь к временному файлу или null
  */
 function downloadPluginZip(string $url, string $id): ?string {
+    // ID приходит из запроса и участвует в пути: не даём выйти за data/
+    if (!isValidId($id)) {
+        return null;
+    }
+
+    // Только http(s): file://, php://, ftp:// и прочие схемы недопустимы
+    if (!in_array(strtolower((string)parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+        return null;
+    }
+
     $env = [
         'curl' => function_exists('curl_init'),
         'fopen' => ini_get('allow_url_fopen') == '1'
@@ -382,6 +392,11 @@ function installPluginFromZip(string $zipPath, string $id): array {
  * @return array|null
  */
 function fetch_catalog(string $url): ?array {
+    // Каталог может быть задан в настройках: разрешаем только http(s)
+    if (!in_array(strtolower((string)parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+        return null;
+    }
+
     $env = [
         'curl' => function_exists('curl_init'),
         'fopen' => ini_get('allow_url_fopen') == '1'

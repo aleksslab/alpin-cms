@@ -137,7 +137,70 @@ function sanitizeHtml(string $html): string {
     $html = preg_replace('/\s(on\w+|style|srcdoc|formaction)\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
     $html = preg_replace('/javascript\s*:/i', '', $html);
 
+    // Проверяем URL-атрибуты по декодированному значению: java&#x73;cript:
+    // не ловится сырым поиском, но браузер декодирует сущности и выполняет.
+    $html = preg_replace_callback(
+        '/\s(href|src)\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i',
+        static function (array $m): string {
+            $raw = trim($m[2], "\"'");
+            $val = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            return preg_match('/^\s*(javascript|vbscript|data)\s*:/i', $val) ? '' : $m[0];
+        },
+        $html
+    );
+
     return $html;
+}
+
+/**
+ * Проверяет содержимое SVG перед сохранением.
+ *
+ * SVG — это XML с исполняемыми возможностями: скрипты, обработчики событий
+ * и внешние ссылки превращают файл в stored XSS. Одного MIME `image/svg+xml`
+ * недостаточно, поэтому проверяем разметку.
+ *
+ * @param string $content Содержимое файла
+ * @return string|null Текст ошибки или null, если файл безопасен
+ */
+function validateSvgContent(string $content): ?string {
+    if (trim($content) === '') {
+        return 'Файл SVG пуст.';
+    }
+
+    // Сущности декодируем: браузер раскрывает java&#x73;cript: в атрибутах
+    $decoded = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    $dangerous = [
+        '/<\s*script/i'                 => 'тег <script>',
+        '/<\s*foreignObject/i'          => 'тег <foreignObject>',
+        '/<\s*(iframe|object|embed|frame|frameset|audio|video|canvas)/i' => 'встроенный HTML-элемент',
+        '/<\s*!ENTITY/i'                => 'объявление ENTITY',
+        '/<\?xml-stylesheet/i'          => 'инструкция xml-stylesheet',
+        '/\son[a-z]+\s*=/i'             => 'обработчик события on*',
+        '/(javascript|vbscript)\s*:/i'  => 'javascript:/vbscript:',
+        '/expression\s*\(/i'            => 'CSS expression',
+        '/(href|xlink:href)\s*=\s*["\']?\s*(?:(?:https?:|\/\/)|data:(?!image\/))/i' => 'внешняя ссылка',
+    ];
+
+    foreach ($dangerous as $pattern => $label) {
+        if (preg_match($pattern, $decoded)) {
+            return 'SVG содержит недопустимое содержимое: ' . $label . '.';
+        }
+    }
+
+    // Должен быть корректным XML. LIBXML_NONET запрещает загрузку по сети.
+    if (function_exists('simplexml_load_string')) {
+        $previous = libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($content, 'SimpleXMLElement', LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        if ($xml === false) {
+            return 'Файл SVG не является корректным XML.';
+        }
+    }
+
+    return null;
 }
 
 /**

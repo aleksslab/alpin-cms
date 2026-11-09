@@ -56,13 +56,6 @@ function handle_admin_ajax_actions(): void {
         exit;
     }
     
-    // --- ГЕНЕРАЦИЯ ТОКЕНОВ (AJAX) ---
-    if (isset($_GET['ajax']) && in_array($_GET['ajax'], ['generate_cron_token', 'generate_maintenance_token'])) {
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['success' => true, 'token' => bin2hex(random_bytes(16))]);
-        exit;
-    }
-    
     // --- ПЛАГИНЫ (AJAX-ДЕЙСТВИЯ: УСТАНОВКА ИЗ ZIP) ---
     if (isset($_POST['plugin_action']) && isset($_GET['ajax']) && $_GET['ajax'] === 'upload' && isset($_GET['tab']) && $_GET['tab'] === 'plugins') {
         header('Content-Type: application/json; charset=utf-8');

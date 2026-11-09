@@ -2,7 +2,12 @@
 if (!defined('APP_ROOT') || empty($_SESSION['admin_auth'])) { die('Доступ запрещен'); }
 
 /**
- * ЛОКАЛЬНАЯ АВТОНОМНАЯ ФУНКЦИЯ ПАРСИНГА CSS ШРИФТОВ
+ * Читает `fonts/lucide.css` и возвращает имена иконок без дублей.
+ *
+ * Используется модалкой выбора иконки: список строится локально,
+ * без обращения к внешним источникам.
+ *
+ * @return array Отсортированные имена классов (без ведущей точки)
  */
 function cms_get_parsed_css_icons_local(): array {
     $cssFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fonts' . DIRECTORY_SEPARATOR . 'lucide.css';

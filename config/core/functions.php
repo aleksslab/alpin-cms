@@ -838,7 +838,9 @@ function getUsedModules(array $page): array {
  */
 
 /**
- * Возвращает список всех доступных соцсетей
+ * Возвращает список всех доступных соцсетей.
+ *
+ * @return array Карта `id => ['label' => ...]`
  */
 function getSocialNetworks(): array {
     return [
@@ -859,7 +861,12 @@ function getSocialNetworks(): array {
 }
 
 /**
- * Возвращает сохранённые соцсети из настроек
+ * Возвращает сохранённые соцсети из настроек.
+ *
+ * Подставляет актуальные подписи из `getSocialNetworks()`.
+ *
+ * @param bool $refresh Сбросить кеш настроек перед чтением
+ * @return array Список соцсетей
  */
 function getSavedSocials(bool $refresh = false): array {
     $settings = getSettingsData($refresh);
@@ -878,7 +885,10 @@ function getSavedSocials(bool $refresh = false): array {
 }
 
 /**
- * Возвращает ID сохранённых соцсетей
+ * Возвращает ID сохранённых соцсетей.
+ *
+ * @param bool $refresh Сбросить кеш настроек перед чтением
+ * @return array Список ID
  */
 function getSavedSocialIds(bool $refresh = false): array {
     $socials = getSavedSocials($refresh);
@@ -886,7 +896,10 @@ function getSavedSocialIds(bool $refresh = false): array {
 }
 
 /**
- * Возвращает доступные для добавления соцсети (которые ещё не сохранены)
+ * Возвращает соцсети, которые ещё не сохранены.
+ *
+ * @param bool $refresh Сбросить кеш настроек перед чтением
+ * @return array Карта `id => ['label' => ...]`
  */
 function getAvailableSocials(bool $refresh = false): array {
     $allNetworks = getSocialNetworks();
@@ -955,6 +968,12 @@ function getMenusList(): array {
  * @return array|null Массив с данными меню или null, если не найдено
  */
 function loadMenu(string $id): ?array {
+    // ID участвует в пути к файлу — проверяем до склейки, иначе через ../
+    // можно прочитать произвольный .json из data/
+    if (!preg_match('#^[a-z0-9\-_]+$#i', $id)) {
+        return null;
+    }
+
     $filePath = DATA_DIR . 'menus/' . $id . '.json';
     if (!file_exists($filePath)) {
         return null;
@@ -1241,13 +1260,16 @@ function getModuleAssets($moduleIds, $settings = null, $pageId = 'home') {
 }
 
 /**
- * Собирает все CSS/JS модулей страницы в один файл
- * Файл сохраняется в /cache/assets/{pageId}.css и /cache/assets/{pageId}.js
+ * Возвращает URL одного ассета модуля с версией по времени изменения.
  *
- * @param array $moduleIds Список ID модулей на странице
- * @param array $settings Настройки сайта
- * @param string $pageId ID страницы (для имени файла)
- * @return array ['css' => [url], 'js' => [url]]
+ * Если минификация включена и модуль не в исключениях, сначала ищет
+ * `.min`-файл; иначе — обычный.
+ *
+ * @param string $moduleId ID модуля
+ * @param string $type Тип ассета: css или js
+ * @param bool $minify Включена ли минификация
+ * @param array $exceptions Исключения минификации
+ * @return string|null URL с `?v=` или null, если файла нет
  */
 function getSingleAssetUrl($moduleId, $type, $minify, $exceptions) {
     $ext = $type === 'css' ? 'css' : 'js';
@@ -1272,9 +1294,11 @@ function getSingleAssetUrl($moduleId, $type, $minify, $exceptions) {
 
 /**
  * Собирает все CSS/JS модулей страницы в один файл
- * 
+ * Файл сохраняется в /cache/assets/{pageId}.css и /cache/assets/{pageId}.js
+ *
  * @param array $moduleIds Список ID модулей на странице
  * @param array $settings Настройки сайта
+ * @param string $pageId ID страницы (для имени файла)
  * @return array ['css' => [url], 'js' => [url]]
  */
 function getCombinedAssets($moduleIds, $settings, $pageId = 'home') {

@@ -10,8 +10,11 @@ if (!function_exists('getSettingsData')) {
  * 1. ГЛОБАЛЬНЫЕ ФУНКЦИИ
  */
 /**
- * Транслитерация кириллицы
- **/
+ * Транслитерирует кириллицу в латиницу для slug и имён файлов.
+ *
+ * @param string $text Исходный текст
+ * @return string Латиница; пробелы заменяются на `_`
+ */
 function cms_transliterate(string $text): string {
     $cyr = [
         'а','б','в','г','д','е','ё','ж','з','и','й','к','л','м','н','о','п',
@@ -246,9 +249,10 @@ function renderFlash(): string {
 }
 
 /**
- * Возвращает скрипт и стили для тостов (только один раз)
+ * Возвращает скрипт и стили для тостов (только один раз).
  *
- * @return string
+ * @param bool $force Вывести повторно, даже если уже выводили
+ * @return string HTML/JS или пустая строка при повторном вызове
  */
 function getToastScript(bool $force = false): string {
     static $loaded = false;
@@ -363,6 +367,14 @@ function post_flag(string $name): bool {
     return isset($_POST[$name]) && $_POST[$name] == '1';
 }
 
+/**
+ * Сохраняет настройки сайта из формы «Настройки».
+ *
+ * Валидирует HTML-поля, собирает `settings.json`, применяет фильтры
+ * плагинов и пишет файл через `safeFileWrite()`.
+ *
+ * @return array ['success' => string, 'error' => string]
+ */
 function handleSaveSettings(): array {
     $cleanPhone = preg_replace('/[^0-9+]/', '', $_POST['set_phone'] ?? '');
     // Если остались только символы «+» без цифр — считаем пустым
@@ -589,6 +601,11 @@ function handleSaveSettings(): array {
 /**
  * 3. ОБРАБОТКА ИЗМЕНЕНИЙ БЕЗОПАСНОСТИ, НАСТРОЕК БРУТФОРСА И IP-ЛОГОВ
  */
+/**
+ * Снимает блокировку IP из журнала попыток входа.
+ *
+ * @return array ['success' => string, 'error' => string]
+ */
 function handleActionUnban(): array {
     $unbanIp = trim($_POST['unban_ip'] ?? '');
     if ($unbanIp === '') { return ['success' => '', 'error' => '']; }
@@ -597,13 +614,18 @@ function handleActionUnban(): array {
     
     if (isset($bfData['attempts'][$unbanIp])) {
         unset($bfData['attempts'][$unbanIp]);
-        if (file_put_contents(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false) {
+        if (safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
             return ['success' => "IP-адрес {$unbanIp} успешно разблокирован!", 'error' => ''];
         }
     }
     return ['success' => '', 'error' => 'Ошибка при сохранении лога блокировок.'];
 }
 
+/**
+ * Заносит IP в постоянный чёрный список вручную.
+ *
+ * @return array ['success' => string, 'error' => string]
+ */
 function handleActionManualBan(): array {
     $manualIp = trim($_POST['manual_ban_ip'] ?? '');
     if (!filter_var($manualIp, FILTER_VALIDATE_IP)) {
@@ -625,12 +647,19 @@ function handleActionManualBan(): array {
         'permanent'    => true
     ];
     
-    if (file_put_contents(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false) {
+    if (safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
         return ['success' => "IP-адрес {$manualIp} успешно занесен в вечный черный список!", 'error' => ''];
     }
     return ['success' => '', 'error' => 'Ошибка при записи в черный список.'];
 }
 
+/**
+ * Сохраняет логин, пароль и параметры защиты от брутфорса.
+ *
+ * При смене логина или пароля завершает сессию и уводит на повторный вход.
+ *
+ * @return array ['success' => string, 'error' => string]
+ */
 function handleSaveSecurity(): array {
     $newLogin = trim($_POST['sec_login'] ?? '');
     $newPass  = $_POST['sec_password'] ?? '';
@@ -702,7 +731,12 @@ function handleSaveSecurity(): array {
 }
 
 /**
- * 4. УНИВЕРСАЛЬНАЯ AJAX ЗАГРУЗКА ИЗОБРАЖЕНИЙ С КИРИЛЛИЧЕСКИМ ТРАНСЛИТОМ И КОНТРОЛЕМ НАГРУЗКИ
+ * Принимает изображение из медиа-модалки и сохраняет его в `images/` или корень.
+ *
+ * Проверяет размер, расширение, MIME и содержимое SVG, очищает имя файла.
+ * Отвечает JSON `{success, url}` или `{success, error}`.
+ *
+ * @return void
  */
 function handleAjaxImageUpload(): void {
     header('Content-Type: application/json');
@@ -755,6 +789,16 @@ function handleAjaxImageUpload(): void {
     if (stripos($mime, 'image/') !== 0) {
         echo json_encode(['success' => false, 'error' => 'Файл не является валидным изображением.']);
         exit;
+    }
+
+    // SVG — XML с исполняемыми возможностями: одного MIME недостаточно
+    if ($ext === 'svg') {
+        $svgContent = file_get_contents($file['tmp_name']);
+        $svgError = validateSvgContent($svgContent === false ? '' : $svgContent);
+        if ($svgError !== null) {
+            echo json_encode(['success' => false, 'error' => $svgError]);
+            exit;
+        }
     }
     
     // 5. Генерация имени
@@ -823,7 +867,12 @@ function isPageSchedulingEnabled(): bool {
 }
 
 /**
- * 7. ОБРАБОТКА СОЗДАНИЯ/РЕДАКТИРОВАНИЯ СТРАНИЦЫ
+ * Создаёт или обновляет страницу из формы редактора.
+ *
+ * Санирует ID и slug, собирает данные страницы, вызывает хуки
+ * `page_data_before_save` / `page_before_save` / `page_saved`.
+ *
+ * @return array ['success' => string, 'error' => string]
  */
 function handleSavePage(): array {    
     $action = $_POST['page_action'] ?? 'create';
@@ -1115,7 +1164,9 @@ function getPageStatusBadge(array $page): array {
 }
 
 /**
- * 8. ОБРАБОТКА НАЗНАЧЕНИЯ ГЛАВНОЙ СТРАНИЦЫ
+ * Назначает страницу главной и сбрасывает кеш старой и новой главной.
+ *
+ * @return void
  */
 function handleSetHomePage(): void {
     $pageId = $_POST['id'] ?? '';
@@ -1180,7 +1231,9 @@ function handleSetHomePage(): void {
 }
 
 /**
- * 9. ОБРАБОТКА КЛОНИРОВАНИЯ СТРАНИЦЫ
+ * Клонирует страницу в черновик с новым ID.
+ *
+ * @return void
  */
 function handleClonePage(): void {
     $pageId = $_POST['id'] ?? '';
@@ -1223,10 +1276,7 @@ function handleClonePage(): void {
     do_action('page_before_clone', $pageId);
 
     // Сохраняем новую страницу
-    $filePath = DATA_DIR . 'pages/' . $newId . '.json';
-    $jsonString = json_encode($newPage, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    
-    if (file_put_contents($filePath, $jsonString) !== false) {
+    if (savePageData($newId, $newPage)) {
         // Плагины: страница клонирована
         do_action('page_cloned', $pageId, $newId);
         
@@ -1325,7 +1375,9 @@ function deleteEntityPermanently(string $type, string $id, string $sourceDir): a
 }
 
 /**
- * 10. ОБРАБОТКА УДАЛЕНИЯ СТРАНИЦЫ
+ * Удаляет страницу: в корзину, если плагин активен, иначе окончательно.
+ *
+ * @return void
  */
 function handleDeletePage(): void {
     $pageId = $_POST['id'] ?? '';
@@ -1388,7 +1440,12 @@ function handleDeletePage(): void {
 }
 
 /**
- * 11. Загружает форму настроек модуля для конструктора
+ * Отдаёт HTML-форму настроек модуля для конструктора.
+ *
+ * Проверяет CSRF, валидирует ID модуля и подключает
+ * `config/modules/{id}/module.php`.
+ *
+ * @return void
  */
 function handleGetModuleSettings(): void {
     // Проверяем CSRF-токен (для POST-запросов)
@@ -1472,7 +1529,9 @@ function handleGetModuleSettings(): void {
 }
 
 /**
- * 12. Обработка формы модулей
+ * Обрабатывает действия с модулями: установка, обновление, удаление, очистка.
+ *
+ * @return array ['success' => bool] или результат AJAX-ответа
  */
 function handleModuleAction(): array {
     $action = $_POST['module_action'] ?? '';
@@ -1671,11 +1730,9 @@ function handleModuleAction(): array {
 }
 
 /**
- * 13. ОБРАБОТКА НАСТРОЕК МЕНЮ
- */
-
-/**
- * Сохранение меню
+ * Сохраняет меню: создаёт новое, редактирует или переименовывает ID.
+ *
+ * @return array ['success' => string, 'error' => string]
  */
 function handleSaveMenu(): array {
     $isEdit = isset($_POST['menu_id_original']) && !empty($_POST['menu_name']);
@@ -1756,9 +1813,21 @@ function handleSaveMenu(): array {
     return ['success' => '', 'error' => 'Ошибка при записи файла меню на диск.'];
 }
 
+/**
+ * Назначает меню главным или снимает этот статус.
+ *
+ * @return void
+ */
 function handleSetMainMenu(): void {
     $menuId = $_POST['id'] ?? '';
     if (empty($menuId)) {
+        setFlash('Ошибка: ID меню не указан.', 'error');
+        header('Location: ?tab=menu');
+        exit;
+    }
+    // ID пойдёт в settings.main_menu и в лог — вырезаем всё, кроме разрешённых символов
+    $menuId = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)$menuId);
+    if ($menuId === '') {
         setFlash('Ошибка: ID меню не указан.', 'error');
         header('Location: ?tab=menu');
         exit;
@@ -1790,7 +1859,9 @@ function handleSetMainMenu(): void {
 }
 
 /**
- * Удаление меню
+ * Удаляет меню: в корзину, если плагин активен, иначе окончательно.
+ *
+ * @return void
  */
 function handleDeleteMenu(): void {
     $menuId = $_POST['id'] ?? '';
@@ -1904,9 +1975,15 @@ function logAction(string $action, string $message, string $level = 'INFO', ?str
     $logFile = $logDir . 'admin.log';
     
     $user = $user ?? ($_SESSION['admin_login'] ?? 'system');
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $user = str_replace(["\r", "\n"], ' ', $user);
+    $ip = str_replace(["\r", "\n"], ' ', $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
     $timestamp = date('Y-m-d H:i:s');
     $level = strtoupper($level);
+
+    // CR/LF и управляющие символы подделывают строки журнала (log injection)
+    $action  = str_replace(["\r", "\n"], ' ', $action);
+    $message = str_replace(["\r", "\n"], ' ', $message);
+    $level   = str_replace(["\r", "\n"], ' ', $level);
     
     $line = sprintf(
         "[%s] [%s] [%s] [%s] %s: %s\n",
@@ -1928,7 +2005,10 @@ function logAction(string $action, string $message, string $level = 'INFO', ?str
 }
 
 /**
- * Ротация лог-файла
+ * Ротирует лог-файл и удаляет старые архивы сверх лимита.
+ *
+ * @param string $logDir Папка с `admin.log`
+ * @return void
  */
 function rotateLog(string $logDir): void {
     $logFile = $logDir . 'admin.log';
@@ -1991,7 +2071,12 @@ function ensureLogsDir(): void {
 }
 
 /**
- * Получить настройки логирования
+ * Возвращает настройки логирования с дефолтами.
+ *
+ * Список действий берётся из `get_log_actions()`; сохранённый выбор
+ * приоритетнее. Новые действия включены по умолчанию.
+ *
+ * @return array Настройки `log_enabled`, `log_levels`, `storage_path`, `max_size`, `keep_count`, `log_actions`
  */
 function getLogSettings(): array {
     $settings = getData('settings');
@@ -2031,7 +2116,10 @@ add_action('admin_init', 'ensureLogsDir');
  */
 
 /**
- * Полная минификация CSS
+ * Минифицирует CSS: убирает BOM, комментарии и лишние пробелы.
+ *
+ * @param string $css Исходный CSS
+ * @return string Минифицированный CSS
  */
 function minifyCss($css) {
     // Удаляем BOM
@@ -2066,7 +2154,10 @@ function minifyCss($css) {
 }
 
 /**
- * Полная минификация JS
+ * Минифицирует JS: убирает BOM, комментарии и лишние пробелы.
+ *
+ * @param string $js Исходный JS
+ * @return string Минифицированный JS
  */
 function minifyJs($js) {
     // Удаляем BOM
@@ -2094,7 +2185,10 @@ function minifyJs($js) {
 }
 
 /**
- * Создаёт .min файлы для одного модуля
+ * Создаёт `.min.css` / `.min.js` для одного модуля.
+ *
+ * @param string $moduleId ID модуля
+ * @return array Список созданных файлов относительно корня
  */
 function createMinFilesForModule($moduleId) {
     $baseDir = APP_ROOT;
@@ -2157,9 +2251,10 @@ function createMinFilesForAllModules($settings = null) {
 }
 
 /**
- * Получить статистику минификации
- * 
- * @return array ['css' => ['total' => int, 'minified' => int, 'ratio' => float, 'original_size' => int, 'minified_size' => int], 'js' => ...]
+ * Получить статистику минификации.
+ *
+ * @param array|null $exceptions Исключения; null — взять из настроек
+ * @return array ['css' => [...], 'js' => [...]]
  */
 function getMinifyStats($exceptions = null): array {
     $modules = getModulesData();
@@ -2219,7 +2314,10 @@ function getMinifyStats($exceptions = null): array {
 }
 
 /**
- * Форматирует размер файла в читаемый вид
+ * Форматирует размер файла в читаемый вид.
+ *
+ * @param int $bytes Размер в байтах
+ * @return string Например, `12.4 KB`
  */
 function formatSize($bytes): string {
     if ($bytes === 0) {
@@ -2230,6 +2328,11 @@ function formatSize($bytes): string {
     return round($bytes / pow(1024, $i), 1) . ' ' . $units[$i];
 }
 
+/**
+ * Отдаёт статистику минификации в JSON (AJAX).
+ *
+ * @return void
+ */
 function handleGetMinifyStats(): void {
     $excludeCss = $_GET['minify_exclude_css'] ?? [];
     $excludeJs = $_GET['minify_exclude_js'] ?? [];
@@ -2251,6 +2354,11 @@ function handleGetMinifyStats(): void {
     exit;
 }
 
+/**
+ * Сохраняет исключения минификации из обычной формы и редиректит.
+ *
+ * @return void
+ */
 function handleSaveMinifyExceptions(): void {
     $exceptions = [];
     $excludeCss = $_POST['exclude_css'] ?? [];
@@ -2277,6 +2385,13 @@ function handleSaveMinifyExceptions(): void {
     exit;
 }
 
+/**
+ * Создаёт `.min`-файлы для всех модулей с учётом переданных исключений.
+ *
+ * @param array $settings Настройки сайта
+ * @param array $exceptions Исключения `[moduleId => ['css' => bool, 'js' => bool]]`
+ * @return array Список созданных файлов
+ */
 function createMinFilesForAllModulesWithExceptions($settings, $exceptions) {
     if (empty($settings['assets_minify'])) {
         return [];
@@ -2298,7 +2413,11 @@ function createMinFilesForAllModulesWithExceptions($settings, $exceptions) {
 }
 
 /**
- * Пересборка .min для всех модулей
+ * Пересобирает `.min` для всех модулей (AJAX).
+ *
+ * @param array $excludeCss Модули, исключённые для CSS
+ * @param array $excludeJs Модули, исключённые для JS
+ * @return void
  */
 function handleRebuildAllMin($excludeCss = [], $excludeJs = []): void {
     $settings = getSettingsData();
@@ -2336,7 +2455,10 @@ function handleRebuildAllMin($excludeCss = [], $excludeJs = []): void {
 }
 
 /**
- * Пересборка .min для одного модуля
+ * Пересобирает `.min` для одного модуля (AJAX).
+ *
+ * @param string $moduleId ID модуля
+ * @return void
  */
 function handleRebuildModuleMin($moduleId): void {
     if (empty($moduleId)) {
@@ -2403,7 +2525,9 @@ function handleRebuildModuleMin($moduleId): void {
 }
 
 /**
- * Удаление всех .min файлов
+ * Удаляет все `.min`-файлы (AJAX).
+ *
+ * @return void
  */
 function handleDeleteAllMin(): void {
     $deleted = 0;
@@ -2429,7 +2553,9 @@ function handleDeleteAllMin(): void {
 }
 
 /**
- * Сохранение исключений минификации (AJAX)
+ * Сохраняет исключения минификации через AJAX.
+ *
+ * @return void
  */
 function handleSaveMinifyExceptionsAjax(): void {
     // Проверка CSRF
@@ -2462,7 +2588,9 @@ function handleSaveMinifyExceptionsAjax(): void {
 }
 
 /**
- * Очистка кеша страниц и объединённых ассетов
+ * Очищает кеш страниц и объединённых ассетов.
+ *
+ * @return void
  */
 function clearPageCache(): void {
     // Очищаем кеш страниц

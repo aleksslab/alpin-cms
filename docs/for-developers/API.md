@@ -74,6 +74,28 @@ $clean = sanitizeHtml('<p>OK</p><script>bad</script>');
 
 ---
 
+### `validateSvgContent(string $content): ?string`
+
+**Проверка содержимого SVG** перед сохранением. Возвращает **текст ошибки** или `null`.
+
+```php
+$error = validateSvgContent($svg);
+if ($error !== null) {
+    // файл отклонён
+}
+```
+
+**Проверяет** **после** `html_entity_decode`:
+- `<script>`, `on*="..."`, `<foreignObject>`
+- встроенные HTML-элементы: `iframe`, `object`, `embed`, `frame`, `audio`, `video`, `canvas`
+- `<!ENTITY>`, `<?xml-stylesheet?>`
+- `javascript:`, `vbscript:`, CSS `expression(...)`
+- внешние `href` / `xlink:href`; `data:image/...` разрешён
+
+Дополнительно файл должен быть **корректным XML** (SimpleXML + `LIBXML_NONET`). SVG — XML с исполняемыми возможностями, поэтому одного MIME `image/svg+xml` недостаточно.
+
+---
+
 ### `formatPhone(string $phone): string`
 
 **Форматирует** **номер** **в** **читаемый** **вид**.
@@ -898,76 +920,16 @@ add_filter('preview_enabled', function () {
 
 ## 🚧 Технические работы
 
-### `isMaintenanceEnabled(): bool`
+Режим техработ — плагин `maintenance` (`config/plugins/maintenance/`).
+В ядре остаётся только шаблон `templates/maintenance.php`: плагин подключает
+его при 503, тему можно переопределить.
 
-Проверяет, включён ли режим техработ.
-
-```php
-isMaintenanceEnabled(); // true, если maintenance_enabled = true
-```
-
-**НЕ проверяет автоснятие.** Автоснятие делает **`index.php`** (фронт): если `maintenance_until` истёк — снимает флаг и пишет `settings.json`.
-
----
-
-### `getMaintenanceBypassToken(): string`
-
-Возвращает текущий bypass-токен. Если токена нет — **генерирует** и **сохраняет** в `settings.json`.
-
-```php
-$token = getMaintenanceBypassToken(); // 32 hex
-```
-
-**Аналог `getCronToken()`** — но **отдельный** токен, **не пересекается** с кроном.
-
----
-
-### `regenerateMaintenanceToken(): string`
-
-Принудительно генерирует **новый** токен и **сохраняет** в `settings.json`.
-
-```php
-$newToken = regenerateMaintenanceToken();
-```
-
-**Внимание:** сломает все ранее выданные bypass-ссылки.
-
-**В UI** — вызывается через **AJAX `generate_maintenance_token`**, который **генерирует без сохранения** (запись — только при «Сохранить настройки», как `cron_token`).
-
----
-
-### AJAX-эндпоинт `generate_maintenance_token`
-
-**URL:** `index.php?tab=config_vars&ajax=generate_maintenance_token` (GET).
-
-Генерирует **новый** токен **без сохранения**. Возвращает `{success: true, token: "..."}`.
-
-Запись в `settings.json` — **только при «Сохранить настройки»** (через hidden-поле `maintenance_bypass_token`).
-
----
-
-### Шаблон `templates/maintenance.php`
-
-**Не функция**, а **шаблон**, подключается из `index.php` при `503`.
-
-**Переменные** (из `index.php`):
-- `$maintenanceMessage` — HTML/plain (уже через `sanitizeHtml`).
-- `$maintenanceUntil` — Unix timestamp или `null`.
-- `$maintenanceShowTimer` — bool (показывать таймер).
-- `$maintenanceSettings` — весь `settings.json`.
-
-**Поведение:**
-- Inline-CSS (без Tailwind).
-- Логотип + название.
-- Сообщение (как есть).
-- Таймер (если `$maintenanceShowTimer && $maintenanceUntil > now`).
-- Контакты (email/телефон).
-- Reload через 5 сек после истечения таймера.
-
-**Заголовки** (устанавливаются в `index.php` **до** `include`):
-- `HTTP/1.1 503 Service Unavailable`
-- `Retry-After: 3600`
-- `X-Robots-Tag: noindex, nofollow, noarchive`
+- Настройки (`maintenance_enabled`, `maintenance_message`, `maintenance_until`,
+  `maintenance_bypass_token`, `maintenance_show_timer`) — в `settings.json`.
+- Bypass-токен генерируется в админке на клиенте (`crypto.getRandomValues`)
+  и сохраняется вместе с формой. Отдельного AJAX-эндпоинта в ядре нет.
+- Автоснятие по `maintenance_until` выполняет плагин на `index_start`.
+- Заголовки 503, `Retry-After`, `X-Robots-Tag` и bypass-cookie — в плагине.
 
 ---
 
@@ -1021,74 +983,14 @@ mediaImageSrc('data:image/png;base64,...'); // без изменений
 
 ---
 
-### Утилиты сканирования и WebP
+### Медиа (WebP)
 
-> **Важно:** Функции `getImageFiles()`, `isWebpSupported()`, `convertToWebp()`, `maybeConvertToWebp()`, `getWebpStats()`, `deleteAllWebp()`, `handleDeleteAllWebp()`, `countImagesWithoutWebp()`, `convertExistingImagesStep()`, `handleConvertExistingImagesStep()` **перенесены в плагин** `config/plugins/media-optimization/plugin.php`.
-
-Они доступны, только если плагин «Медиа (WebP)» активен.
-
-### Массовая конвертация существующих
-
-#### `countImagesWithoutWebp(): int`
-
-Считает, сколько `jpg`/`png` **не имеют** парного `.webp`.
-
-```php
-countImagesWithoutWebp(); // 156
-```
-
-**Обход:**
-- `images/` — **рекурсивно** (включая подпапки).
-- корень сайта — **только верхний уровень**.
-
-**Используется в:** `media.php` — чтобы показать «Без .webp: N» и кнопку «Конвертировать N существующих».
-
----
-
-#### `convertExistingImagesStep(int $step, int $perStep = 10): array`
-
-Обрабатывает **одну пачку** существующих изображений без `.webp`.
-
-```php
-$result = convertExistingImagesStep(0, 10);
-// [
-//   'processed'   => 10,
-//   'converted'   => 9,   // 1 могла упасть
-//   'total'       => 156,
-//   'is_finished' => false
-// ]
-```
-
-**Обход:**
-- `images/` — **рекурсивно** (включая подпапки).
-- корень сайта — **только верхний уровень**.
-
-**`$step`** — номер шага (0-based). **`$perStep`** — сколько файлов за шаг (1–50).
-
-**Порядок шагов:** JS начинает с `$step = 0`, увеличивает на 1, пока `is_finished = false`.
-
----
-
-#### `handleConvertExistingImagesStep(): void`
-
-AJAX-обработчик шага конвертации. Вызывается из `config/index.php` при `$_POST['convert_existing_images_step']`.
-
-**Вход (POST):**
-- `step` (int) — номер шага.
-- `per_step` (int, опционально) — размер пачки, по умолчанию 10.
-
-**Возвращает JSON:**
-```json
-{
-    "success": true,
-    "processed": 20,
-    "converted": 19,
-    "total": 156,
-    "is_finished": false
-}
-```
-
-**Если `isWebpSupported() = false`** — возвращает `{success: false, error: '...'}`.
+Конвертация, статистика и массовая переработка изображений — в плагине
+`media-optimization` (`config/plugins/media-optimization/`). Внутренние
+функции плагина (`getImageFiles()`, `isWebpSupported()`, `convertToWebp()`,
+`getWebpStats()`, `deleteAllWebp()`, `countImagesWithoutWebp()`,
+`convertExistingImagesStep()` и обработчики) не входят в публичный API ядра.
+Ядро оставляет только `mediaImageSrc()` и `mediaLazyAttrs()` — см. выше.
 
 ---
 

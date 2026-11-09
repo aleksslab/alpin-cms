@@ -512,6 +512,7 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `safeUrl()` | Whitelist схем URL |
 | `validateHtml()` | Проверка HTML на опасные теги |
 | `sanitizeHtml()` | Очистка HTML (whitelist) |
+| `validateSvgContent()` | Проверка SVG перед сохранением (script, on*, внешние href) |
 | `safeFileWrite()` | Атомарная запись с flock |
 | `detectZipSlip()` | Защита от ZIP Slip |
 | `verifyCsrfToken()` | Сравнение CSRF-токена (`hash_equals`) |
@@ -611,19 +612,11 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `clearPageCache()` | Очистка всего кеша |
 | `clearPageCacheById()` | Очистка кеша одной страницы |
 | `logAction()` | Логирование |
-| `isWebpSupported()` | Проверка доступности WebP (GD/Imagick) |
-| `convertToWebp()` | Конвертация одного изображения в .webp |
-| `maybeConvertToWebp()` | Обёртка: настройки + поддержка → convertToWebp |
-| `getImageFiles()` | Рекурсивный сбор jpg/png (или только верхний уровень) |
-| `getWebpStats()` | Статистика .webp (count, size_bytes) |
-| `deleteAllWebp()` | Удаление всех .webp с парным оригиналом |
-| `handleDeleteAllWebp()` | AJAX-обработчик удаления |
-| `countImagesWithoutWebp()` | Сколько jpg/png без .webp |
-| `convertExistingImagesStep()` | Конвертация пачки (для AJAX-шагов) |
-| `handleConvertExistingImagesStep()` | AJAX-обработчик шага конвертации |
-| `isMaintenanceEnabled()` | Режим техработ включён |
-| `getMaintenanceBypassToken()` | Bypass-токен (генерация при отсутствии) |
-| `regenerateMaintenanceToken()` | Перегенерация bypass-токена |
+
+Конвертация WebP, статистика и массовая переработка изображений — в плагине
+`media-optimization`; режим техработ — в плагине `maintenance`. В ядре
+остаются только `mediaImageSrc()` и `mediaLazyAttrs()`; внутренние функции
+плагинов не входят в публичный API.
 
 ### Проводник (плагин `filemanager`)
 
