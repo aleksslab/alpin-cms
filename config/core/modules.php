@@ -55,25 +55,177 @@ function _moduleRemoveDir(string $dir): void {
  *
  * @param string $source Исходная папка
  * @param string $target Целевая папка
- * @return void
+ * @return bool true, если все файлы скопированы
  */
-function _moduleCopyDir(string $source, string $target): void {
+function _moduleCopyDir(string $source, string $target): bool {
     if (!is_dir($source)) {
-        return;
+        return true;
     }
 
     if (!is_dir($target)) {
         mkdir($target, 0755, true);
     }
 
+    $ok = true;
     $items = array_diff(scandir($source), ['.', '..']);
     foreach ($items as $item) {
         $src = $source . DIRECTORY_SEPARATOR . $item;
         $dst = $target . DIRECTORY_SEPARATOR . $item;
         if (is_dir($src)) {
-            _moduleCopyDir($src, $dst);
-        } else {
-            copy($src, $dst);
+            $ok = _moduleCopyDir($src, $dst) && $ok;
+        } elseif (!copy($src, $dst)) {
+            $ok = false;
+        }
+    }
+
+    return $ok;
+}
+
+/**
+ * Возвращает пути распакованного кода модуля.
+ *
+ * @param string $moduleId Идентификатор модуля
+ * @return array ['admin' => string, 'files' => array]
+ */
+function _moduleCodePaths(string $moduleId): array {
+    return [
+        'admin' => APP_ROOT . '/config/modules/' . $moduleId,
+        'files' => [
+            APP_ROOT . '/modules/' . $moduleId . '.php',
+            APP_ROOT . '/css/' . $moduleId . '.css',
+            APP_ROOT . '/css/' . $moduleId . '.min.css',
+            APP_ROOT . '/js/' . $moduleId . '.js',
+            APP_ROOT . '/js/' . $moduleId . '.min.js'
+        ]
+    ];
+}
+
+/**
+ * Проверяет, есть ли на диске распакованный код модуля.
+ *
+ * @param string $moduleId Идентификатор модуля
+ * @return bool
+ */
+function _moduleHasCode(string $moduleId): bool {
+    $paths = _moduleCodePaths($moduleId);
+
+    if (is_dir($paths['admin'])) {
+        return true;
+    }
+
+    foreach ($paths['files'] as $file) {
+        if (file_exists($file)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Убирает распакованный код модуля в резервную папку.
+ *
+ * Нужно перед распаковкой новой версии: старый код не удаляется сразу,
+ * а возвращается, если распаковка сорвалась.
+ *
+ * @param string $moduleId Идентификатор модуля
+ * @return string|null Путь к резервной папке или null, если кода нет
+ */
+function _moduleStashCode(string $moduleId): ?string {
+    $paths = _moduleCodePaths($moduleId);
+
+    if (!_moduleHasCode($moduleId)) {
+        return null;
+    }
+
+    $backupDir = APP_ROOT . '/config/modules/_backup/'
+        . $moduleId . '-' . date('YmdHis') . '-'
+        . substr(md5(uniqid('', true)), 0, 6);
+
+    if (!is_dir($backupDir) && !mkdir($backupDir, 0755, true)) {
+        return null;
+    }
+
+    if (is_dir($paths['admin'])) {
+        if (!@rename($paths['admin'], $backupDir . '/admin')) {
+            _moduleRemoveDir($backupDir);
+            return null;
+        }
+    }
+
+    foreach ($paths['files'] as $index => $file) {
+        if (!file_exists($file)) {
+            continue;
+        }
+        if (!@rename($file, $backupDir . '/file-' . $index)) {
+            _moduleRestoreCode($moduleId, $backupDir);
+            return null;
+        }
+    }
+
+    return $backupDir;
+}
+
+/**
+ * Возвращает код модуля из резервной папки на место.
+ *
+ * @param string $moduleId  Идентификатор модуля
+ * @param string $backupDir Путь к резервной папке
+ * @return void
+ */
+function _moduleRestoreCode(string $moduleId, string $backupDir): void {
+    $paths = _moduleCodePaths($moduleId);
+
+    if (is_dir($backupDir . '/admin')) {
+        _moduleRemoveDir($paths['admin']);
+        @rename($backupDir . '/admin', $paths['admin']);
+    }
+
+    foreach ($paths['files'] as $index => $file) {
+        $saved = $backupDir . '/file-' . $index;
+        if (!file_exists($saved)) {
+            continue;
+        }
+        if (file_exists($file)) {
+            @unlink($file);
+        }
+        @rename($saved, $file);
+    }
+
+    _moduleRemoveDir($backupDir);
+}
+
+/**
+ * Убирает остатки прерванных распаковок.
+ *
+ * Живые резервные копии и временные папки моложе часа не трогаем:
+ * их может использовать параллельная установка.
+ *
+ * @return void
+ */
+function _moduleCleanupRuntime(): void {
+    $dirs = [
+        APP_ROOT . '/config/modules/_backup',
+        APP_ROOT . '/config/modules/_temp'
+    ];
+    $threshold = time() - 3600;
+
+    foreach ($dirs as $base) {
+        if (!is_dir($base)) {
+            continue;
+        }
+
+        $items = array_diff(scandir($base), ['.', '..']);
+        foreach ($items as $item) {
+            $path = $base . DIRECTORY_SEPARATOR . $item;
+            if (!is_dir($path)) {
+                continue;
+            }
+
+            $mtime = @filemtime($path);
+            if ($mtime !== false && $mtime < $threshold) {
+                _moduleRemoveDir($path);
+            }
         }
     }
 }
@@ -129,6 +281,9 @@ function unpackModuleArchive(string $zipPath, string $moduleId): array {
     }
     // === КОНЕЦ ЗАЩИТЫ ===
 
+    // Подчищаем остатки прерванных установок
+    _moduleCleanupRuntime();
+
     // Создаём временную папку для распаковки
     $tempDir = APP_ROOT . '/config/modules/_temp/' . $moduleId;
     _moduleRemoveDir($tempDir);
@@ -140,31 +295,62 @@ function unpackModuleArchive(string $zipPath, string $moduleId): array {
     $zip->extractTo($tempDir);
     $zip->close();
 
+    // Убираем старый код в резервную папку: если копирование новой версии
+    // сорвётся, вернём старый код, и сайт продолжит работать.
+    $hadCode = _moduleHasCode($moduleId);
+    $backupDir = _moduleStashCode($moduleId);
+    if ($hadCode && $backupDir === null) {
+        _moduleRemoveDir($tempDir);
+        return ['success' => false, 'message' => 'Не удалось сохранить резервную копию старого кода. Установка отменена.'];
+    }
+    $ok = true;
+
     // Копируем файлы из admin/ в config/modules/{id}/
     $adminSource = $tempDir . '/admin';
     if (is_dir($adminSource)) {
-        _moduleCopyDir($adminSource, APP_ROOT . '/config/modules/' . $moduleId);
+        $ok = _moduleCopyDir($adminSource, APP_ROOT . '/config/modules/' . $moduleId) && $ok;
     }
 
     // Копируем файлы из site/ в общие папки
     $siteSource = $tempDir . '/site';
-    if (is_dir($siteSource)) {
+    if ($ok && is_dir($siteSource)) {
         // site/module.php → modules/{id}.php
         if (file_exists($siteSource . '/module.php')) {
-            copy($siteSource . '/module.php', APP_ROOT . '/modules/' . $moduleId . '.php');
+            $ok = copy($siteSource . '/module.php', APP_ROOT . '/modules/' . $moduleId . '.php') && $ok;
         }
         // site/style.css → css/{id}.css
-        if (file_exists($siteSource . '/style.css')) {
-            copy($siteSource . '/style.css', APP_ROOT . '/css/' . $moduleId . '.css');
+        if ($ok && file_exists($siteSource . '/style.css')) {
+            $ok = copy($siteSource . '/style.css', APP_ROOT . '/css/' . $moduleId . '.css') && $ok;
         }
         // site/script.js → js/{id}.js
-        if (file_exists($siteSource . '/script.js')) {
-            copy($siteSource . '/script.js', APP_ROOT . '/js/' . $moduleId . '.js');
+        if ($ok && file_exists($siteSource . '/script.js')) {
+            $ok = copy($siteSource . '/script.js', APP_ROOT . '/js/' . $moduleId . '.js') && $ok;
         }
     }
 
     // Удаляем временную папку
     _moduleRemoveDir($tempDir);
+
+    if (!$ok) {
+        // Убираем недокопированный код и возвращаем старый
+        $paths = _moduleCodePaths($moduleId);
+        _moduleRemoveDir($paths['admin']);
+        foreach ($paths['files'] as $file) {
+            if (file_exists($file)) {
+                @unlink($file);
+            }
+        }
+        if ($backupDir !== null) {
+            _moduleRestoreCode($moduleId, $backupDir);
+        }
+
+        return ['success' => false, 'message' => 'Не удалось распаковать модуль. Старый код восстановлен.'];
+    }
+
+    // Всё скопировалось — резервная копия больше не нужна
+    if ($backupDir !== null) {
+        _moduleRemoveDir($backupDir);
+    }
 
     // ===== СОЗДАЁМ .min ФАЙЛЫ, ЕСЛИ МИНИФИКАЦИЯ ВКЛЮЧЕНА =====
     if (function_exists('getSettingsData') && function_exists('createMinFilesForModule')) {
@@ -314,11 +500,14 @@ function purgeModule(string $moduleId): array {
  * @return array ['success' => bool, 'message' => string]
  */
 function reinstallModule(string $moduleId): array {
-    // Удаляем старые файлы
-    removeModuleFiles($moduleId);
+    $archivePath = getModuleArchivePath($moduleId);
+    if (!file_exists($archivePath)) {
+        return ['success' => false, 'message' => 'Архив модуля не найден'];
+    }
 
-    // Распаковываем заново
-    return unpackModule($moduleId);
+    // Старый код не удаляем: unpackModuleArchive уберёт его в резервную копию
+    // и вернёт, если распаковка сорвётся.
+    return unpackModuleArchive($archivePath, $moduleId);
 }
 
 /**
@@ -449,9 +638,10 @@ function validateModuleArchive(string $zipPath, string $moduleId): array {
  * @param string $zipPath Путь к ZIP-архиву
  * @param string $id      Идентификатор модуля
  * @param bool   $replace true для обновления уже установленного модуля
+ * @param bool   $unpack  true — сразу распаковать код, false — только положить архив
  * @return array ['success' => bool, 'message' => string, 'version' => string]
  */
-function installModuleFromZip(string $zipPath, string $id, bool $replace = false): array {
+function installModuleFromZip(string $zipPath, string $id, bool $replace = false, bool $unpack = true): array {
     if (!isValidId($id)) {
         return ['success' => false, 'message' => 'Невалидный ID модуля.', 'version' => ''];
     }
@@ -461,19 +651,10 @@ function installModuleFromZip(string $zipPath, string $id, bool $replace = false
         return ['success' => false, 'message' => $validation['message'], 'version' => ''];
     }
 
-    if (isModuleInstalled($id) && !$replace) {
+    $wasInstalled = isModuleInstalled($id);
+
+    if ($wasInstalled && !$replace) {
         return ['success' => false, 'message' => 'Модуль уже установлен. Для обновления используйте обновление.', 'version' => ''];
-    }
-
-    // При обновлении сначала убираем старый код, иначе останутся файлы,
-    // которых нет в новой версии (например, удалённый admin/script.js).
-    if (isModuleInstalled($id)) {
-        removeModuleFiles($id);
-    }
-
-    $unpackResult = unpackModuleArchive($zipPath, $id);
-    if (!$unpackResult['success']) {
-        return ['success' => false, 'message' => $unpackResult['message'], 'version' => ''];
     }
 
     // Сохраняем архив в библиотеку
@@ -482,7 +663,7 @@ function installModuleFromZip(string $zipPath, string $id, bool $replace = false
         mkdir($archiveDir, 0755, true);
     }
     if (!copy($zipPath, getModuleArchivePath($id))) {
-        return ['success' => false, 'message' => 'Модуль распакован, но архив не сохранён.', 'version' => ''];
+        return ['success' => false, 'message' => 'Не удалось сохранить архив модуля. Проверьте права на запись.', 'version' => ''];
     }
 
     // Сохраняем превью из архива
@@ -499,20 +680,42 @@ function installModuleFromZip(string $zipPath, string $id, bool $replace = false
         }
     }
 
-    // Обновляем реестр
     $manifest = $validation['manifest'];
+    $version = (string)($manifest['version'] ?? '1.0.0');
+
+    if ($unpack) {
+        // Распаковка сама уберёт старый код в резервную копию и вернёт его при ошибке
+        $unpackResult = unpackModuleArchive(getModuleArchivePath($id), $id);
+        if (!$unpackResult['success']) {
+            return ['success' => false, 'message' => $unpackResult['message'], 'version' => ''];
+        }
+    } elseif ($wasInstalled) {
+        // Обновление неиспользуемого модуля: старый код убираем, чтобы новый
+        // распаковался при добавлении модуля на страницу, а не отдавался старый.
+        removeModuleFiles($id);
+    }
+
+    // Обновляем реестр
     $modules = getModulesData();
     $modules[$id] = _moduleRegistryEntry($manifest, $id);
     saveModulesData($modules);
 
-    $version = (string)($manifest['version'] ?? '1.0.0');
     if (function_exists('logAction')) {
         logAction('module_install', 'Модуль "' . $id . '" установлен/обновлён до версии ' . $version, 'INFO');
     }
 
+    $name = $manifest['name'] ?? $id;
+    if ($unpack) {
+        $message = 'Модуль "' . $name . '" установлен и распакован.';
+    } elseif ($wasInstalled) {
+        $message = 'Модуль "' . $name . '" обновлён. Код распакуется при добавлении на страницу.';
+    } else {
+        $message = 'Модуль "' . $name . '" добавлен в библиотеку. Код распакуется при добавлении на страницу.';
+    }
+
     return [
         'success' => true,
-        'message' => 'Модуль "' . ($manifest['name'] ?? $id) . '" установлен.',
+        'message' => $message,
         'version' => $version
     ];
 }

@@ -1583,7 +1583,8 @@ function handleModuleAction(): array {
 
         if ($isUpdate) {
             // === ОБНОВЛЕНИЕ МОДУЛЯ ===
-            removeModuleFiles($moduleId);
+            // Старый код не удаляем: распаковка уберёт его в резервную копию
+            // и вернёт, если что-то пойдёт не так.
             if (file_exists($archivePath)) {
                 $attempt = 0;
                 while ($attempt < 5 && !@unlink($archivePath)) {
@@ -1629,51 +1630,38 @@ function handleModuleAction(): array {
         ];
         saveModulesData($modules);
 
-        // Если auto_unpack = true — распаковываем сразу
-        if ($autoUnpack) {
-            $unpackResult = unpackModule($moduleId);
+        $usedIn = findModuleUsage($moduleId);
+        $shouldUnpack = $autoUnpack || !empty($usedIn);
+
+        if ($shouldUnpack) {
+            // Старый код уйдёт в резервную копию и вернётся при ошибке
+            $unpackResult = unpackModuleArchive($archivePath, $moduleId);
             if (!$unpackResult['success']) {
-                logAction('module_install', 'Модуль "' . $moduleId . '" загружен, но не распакован', 'ERROR');
+                logAction('module_install', 'Модуль "' . $moduleId . '" загружен, но не распакован: ' . $unpackResult['message'], 'ERROR');
                 echo json_encode([
-                    'success' => false, 
+                    'success' => false,
                     'error' => 'Модуль загружен, но не распакован: ' . $unpackResult['message']
                 ]);
                 exit;
             }
-            logAction('module_install', 'Модуль "' . $moduleId . '" установлен и распакован', 'INFO');
+            logAction('module_install', 'Модуль "' . $moduleId . '" установлен/обновлён и распакован', 'INFO');
             echo json_encode([
-                'success' => true, 
-                'message' => 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" успешно установлен и распакован!'
+                'success' => true,
+                'message' => $isUpdate
+                    ? 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" обновлён и распакован!'
+                    : 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" успешно установлен и распакован!'
             ]);
         } else {
-            // Проверяем, используется ли модуль на страницах
-            $usedIn = findModuleUsage($moduleId);
-            if (!empty($usedIn)) {
-                // Если используется — распаковываем
-                $unpackResult = unpackModule($moduleId);
-                if (!$unpackResult['success']) {
-                    logAction('module_install', 'Модуль "' . $moduleId . '"  загружен, но не распакован: ' . $unpackResult['message'], 'ERROR');
-                    echo json_encode([
-                        'success' => false, 
-                        'error' => 'Модуль загружен, но не распакован: ' . $unpackResult['message']
-                    ]);
-                    exit;
-                }
-                logAction('module_install', 'Модуль "' . $moduleId . '" обновлён и перераспакован', 'INFO');
-                echo json_encode([
-                    'success' => true, 
-                    'message' => 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" обновлён и перераспакован!'
-                ]);
-            } else {
-                $message = $isUpdate 
-                        ? 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" обновлён! (распакуется при добавлении)'
-                        : 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" успешно установлен!';
-                logAction('module_install', $message, 'INFO');
-                echo json_encode([
-                    'success' => true, 
-                    'message' => $message
-                ]);
+            // Не используется и auto_unpack выключен: код не нужен,
+            // он распакуется при добавлении модуля на страницу.
+            if ($isUpdate) {
+                removeModuleFiles($moduleId);
             }
+            $message = $isUpdate
+                ? 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" обновлён! Код распакуется при добавлении на страницу.'
+                : 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" добавлен в библиотеку! Код распакуется при добавлении на страницу.';
+            logAction('module_install', $message, 'INFO');
+            echo json_encode(['success' => true, 'message' => $message]);
         }
         exit;
     }

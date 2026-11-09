@@ -653,7 +653,7 @@
 | `icon` | string | Lucide-класс иконки |
 | `description` | string | Краткое описание |
 | `has_settings` | bool | Есть форма настроек |
-| `auto_unpack` | bool | Распаковывать сразу при установке |
+| `auto_unpack` | bool | Распаковывать сразу при ручной загрузке ZIP (на установку из каталога не влияет) |
 | `version` | string | Версия из `manifest.json` |
 | `author` | string | Автор |
 

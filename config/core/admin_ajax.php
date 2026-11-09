@@ -173,7 +173,14 @@ function handle_admin_ajax_actions(): void {
             exit;
         }
 
-        $result = installModuleFromZip($zipPath, $id, true);
+        // Новый модуль ещё нигде не используется — только кладём архив в библиотеку.
+        // Установленный обновляем: если он есть на страницах — распаковываем сразу,
+        // иначе тоже только архив, код распакуется при добавлении.
+        $isInstalled = isModuleInstalled($id);
+        $inUse = function_exists('findModuleUsage') ? !empty(findModuleUsage($id)) : false;
+        $unpack = $isInstalled && $inUse;
+
+        $result = installModuleFromZip($zipPath, $id, true, $unpack);
         @unlink($zipPath);
 
         if ($result['success']) {

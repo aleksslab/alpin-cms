@@ -527,14 +527,16 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 |---------|-----------|
 | `saveModulesData()` | Запись `config/data/modules.json` |
 | `unpackModule()` | Распаковка из `config/modules/archives/{id}.zip` |
-| `unpackModuleArchive()` | Распаковка произвольного ZIP во временную папку |
+| `unpackModuleArchive()` | Распаковка ZIP с резервной копией старого кода |
 | `removeModuleFiles()` | Удалить только код |
 | `purgeModule()` | Удалить код, архив, превью и запись |
-| `reinstallModule()` | Удалить код и распаковать заново |
+| `reinstallModule()` | Распаковать архив заново, сохранив старый код до успеха |
 | `downloadModuleZip()` | Скачать архив (http(s), 10 МБ) |
 | `validateModuleArchive()` | Проверка манифеста, ID и версии |
-| `installModuleFromZip()` | Установка/обновление из ZIP |
+| `installModuleFromZip()` | Установка/обновление из ZIP (`$unpack` — сразу код или только архив) |
 | `syncModulesData()` | Синхронизация реестра с архивами |
+| `_moduleStashCode()` / `_moduleRestoreCode()` | Убрать код в `config/modules/_backup/` и вернуть при ошибке |
+| `_moduleCleanupRuntime()` | Удалить остатки прерванных распаковок старше часа |
 
 **Почему в `functions.php`:** функция `render_module()` на фронте
 **может** **распаковать** **модуль** **при** **первом** **использовании**, **а**

@@ -586,8 +586,18 @@ $res = handleSaveSettings();
 
 **Внутренняя** **распаковка** **произвольного** **ZIP** **во** **временную**
 **папку** `config/modules/_temp/{id}/`, **затем** **копирование** `admin/` **и**
-`site/` **по** **местам**. **`.min`-файлы** **и** **кеш** **обновляются** **только**
-**в** **админке** (**через** `function_exists()`).
+`site/` **по** **местам**.
+
+**Перед** **копированием** **старый** **код** **переносится** **в**
+`config/modules/_backup/` (`_moduleStashCode()`). **Если** **копирование**
+**сорвалось**, **новые** **файлы** **удаляются**, **старый** **код**
+**возвращается** (`_moduleRestoreCode()`). **При** **успехе** **резервная**
+**копия** **удаляется**.
+
+**`.min`-файлы** **и** **кеш** **обновляются** **только** **в** **админке**
+(**через** `function_exists()`). **Остатки** **прерванных** **распаковок**
+**в** `config/modules/_backup/` **и** `_temp/` **старше** **часа** **удаляются**
+`_moduleCleanupRuntime()`.
 
 ---
 
@@ -632,16 +642,30 @@ $res = handleSaveSettings();
 
 ---
 
-### `installModuleFromZip(string $zipPath, string $id, bool $replace = false): array`
+### `installModuleFromZip(string $zipPath, string $id, bool $replace = false, bool $unpack = true): array`
 
 **Установка** **или** **обновление** **модуля** **из** **ZIP**:
 
 1. `validateModuleArchive()`;
 2. **если** **модуль** **уже** **установлен** **и** `$replace = false` — **отказ**;
-3. `unpackModuleArchive()`;
-4. **копия** **архива** **в** `config/modules/archives/{id}.zip`;
-5. **превью** **из** `preview.png` **в** `config/modules/previews/{id}.png`;
-6. **запись** **в** `modules.json`.
+3. **копия** **архива** **в** `config/modules/archives/{id}.zip`;
+4. **превью** **из** `preview.png` **в** `config/modules/previews/{id}.png`;
+5. **если** `$unpack = true` — `unpackModuleArchive()` **с** **резервной**
+   **копией** **старого** **кода**;
+6. **если** `$unpack = false` **и** **модуль** **был** **установлен** —
+   `removeModuleFiles()`: **старый** **код** **не** **должен** **отдаваться**
+   **вместо** **нового**, **он** **распакуется** **при** **добавлении** **на**
+   **страницу**;
+7. **запись** **в** `modules.json`.
+
+**Порядок** **вызова**:
+
+- **новый** **модуль** **из** **каталога** — `$unpack = false` (**код** **не**
+  **нужен**, **пока** **модуль** **не** **добавлен**);
+- **обновление** **из** **каталога** — `$unpack = isModuleInstalled($id) &&
+  !empty(findModuleUsage($id))`;
+- **ручная** **загрузка** **ZIP** — **решает** `admin_controller.php`:
+  `auto_unpack` **или** **использование** **на** **страницах**.
 
 **Используется** **вкладкой** «Модули», **AJAX**
 `module_install_from_url` **и** **плагином** `updates`.
