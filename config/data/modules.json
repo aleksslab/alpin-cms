@@ -1,13 +1,4 @@
 {
-    "carousel": {
-        "name": "Слайдер",
-        "icon": "icon-image",
-        "description": "Слайдер с изображениями и текстом",
-        "has_settings": true,
-        "auto_unpack": false,
-        "version": "1.0.1",
-        "author": "AlekSSLab"
-    },
     "cards": {
         "name": "Плитка с карточками",
         "icon": "icon-award",
@@ -212,6 +203,15 @@
         "description": "Hero для лендинга: две кнопки, визуал, микро-факты, split-раскладка",
         "has_settings": true,
         "auto_unpack": true,
+        "version": "1.0.1",
+        "author": "AlekSSLab"
+    },
+    "carousel": {
+        "name": "Слайдер",
+        "icon": "icon-image",
+        "description": "Слайдер с изображениями и текстом",
+        "has_settings": true,
+        "auto_unpack": false,
         "version": "1.0.1",
         "author": "AlekSSLab"
     }
