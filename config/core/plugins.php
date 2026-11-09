@@ -292,15 +292,21 @@ function downloadPluginZip(string $url, string $id): ?string {
         return null;
     }
     
+    $maxSize = 10 * 1024 * 1024; // 10 МБ
     $tempFile = DATA_DIR . 'plugin_' . $id . '.zip';
     $success = false;
     
     if ($env['curl']) {
         $fp = fopen($tempFile, 'w');
+        if ($fp === false) {
+            return null;
+        }
+
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_FILE, $fp);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_MAXFILESIZE, $maxSize);
         curl_setopt($ch, CURLOPT_USERAGENT, 'AlPin-CMS-Updater/1.0');
         $success = curl_exec($ch);
         curl_close($ch);
@@ -309,7 +315,7 @@ function downloadPluginZip(string $url, string $id): ?string {
         $success = @copy($url, $tempFile);
     }
     
-    if (!$success || !file_exists($tempFile) || filesize($tempFile) === 0) {
+    if (!$success || !file_exists($tempFile) || filesize($tempFile) === 0 || filesize($tempFile) > $maxSize) {
         @unlink($tempFile);
         return null;
     }
