@@ -254,6 +254,8 @@
 | `maintenance_until` | int \| null | Unix timestamp автоснятия. `null` — без автоснятия. |
 | `maintenance_bypass_token` | string | 32 hex, для `?bypass=`. Генерируется при включении режима. |
 
+> Настройки плагина `maintenance` (`maintenance_*`) хранятся в этом же файле, но управляются плагином.
+
 **Системные привязки:**
 
 | Поле | Тип | Описание |

@@ -114,6 +114,6 @@ define('CMS_LOGS_DIR', CONFIG_DIR . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEP
 
 // URL каталога обновлений по умолчанию
 if (!defined('UPDATES_DEFAULT_CATALOG_URL')) {
-    define('UPDATES_DEFAULT_CATALOG_URL', 'https://raw.githubusercontent.com/AlekSSLab/alpin-cms/v2.0.0-core-refactor/catalog.json');
+    define('UPDATES_DEFAULT_CATALOG_URL', 'https://raw.githubusercontent.com/AlekSSLab/alpin-cms/main/catalog.json');
 }
 

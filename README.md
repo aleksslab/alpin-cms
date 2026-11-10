@@ -137,9 +137,12 @@
 │   │
 │   ├── core/
 │   │   ├── functions.php         # Чтение данных + утилиты (подключает хуки)
+│   │   ├── security.php          # e(), safeUrl(), CSRF, ID, ZIP Slip
 │   │   ├── hooks.php             # Система хуков (actions, filters, routes)
 │   │   ├── cron.php              # Реестр фоновых задач
+│   │   ├── log.php               # Реестр действий логирования
 │   │   ├── plugins.php           # Загрузчик плагинов
+│   │   ├── modules.php           # Установка/обновление/удаление модулей
 │   │   ├── router.php            # Роутинг фронтенда
 │   │   ├── virtual_crons.php     # Виртуальные кроны
 │   │   ├── admin_actions.php     # POST-обработчики админки
@@ -186,6 +189,11 @@
 ├── templates/                    # Шаблоны сайта
 │   ├── base.php
 │   ├── full-width.php
+│   ├── sidebar-left.php
+│   ├── sidebar-right.php
+│   ├── sidebar-both.php
+│   ├── boxed.php
+│   ├── maintenance.php           # Заглушка 503 (плагин maintenance)
 │   ├── headers/{default,centered,minimal,with-cta}/
 │   └── footers/{default,minimal,dark,light}/
 │
@@ -282,7 +290,7 @@
 - 📖 Сохранение лицензии GPL v3
 - 📖 Указание авторства и изменений
 
-**Полный текст:** [LICENSE](LICENSE) · [gnu.org/licenses/gpl-3.0](https://www.gnu.org/licenses/gpl-3.0.html)
+**Полный текст:** [LICENSE.md](LICENSE.md) · [gnu.org/licenses/gpl-3.0](https://www.gnu.org/licenses/gpl-3.0.html)
 
 ---
 

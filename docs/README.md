@@ -88,7 +88,11 @@ docs/
 └── for-developers/                     # Документация для разработчиков
     ├── ARCHITECTURE.md
     ├── API.md
+    ├── PLUGINS.md
     ├── MODULES.md
+    ├── MODULES-SIMPLE.md
+    ├── MODULES-LISTS.md
+    ├── MODULES-DEBUG.md
     ├── TEMPLATES.md
     ├── CONSTRUCTOR.md
     ├── DATA_STRUCTURE.md

@@ -310,7 +310,7 @@ chmod 755 data/ config/data/ config/logs/ cache/
 
 ### WebP в подпапках — работает?
 
-**Да.** Все функции (`getWebpStats`, `deleteAllWebp`, `countImagesWithoutWebp`, `convertExistingImagesStep`) обходят `images/` **рекурсивно**.
+**Да.** Конвертация, статистика и удаление обходят `images/` **рекурсивно**.
 
 - `images/products/photo.jpg` → `images/products/photo.webp` — ✅ создаётся.
 - Учитывается в статистике, удаляется, конвертируется.
