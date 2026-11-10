@@ -18,7 +18,7 @@ $menusList = getMenusList();
 
 // Получаем ID главного меню из настроек
 $mainMenuId = getMainMenuId();
-$trashCountMenus = getTrashCount('menu');
+$trashEnabled = isTrashEnabled();
 ?>
 
 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
@@ -28,15 +28,9 @@ $trashCountMenus = getTrashCount('menu');
     </div>
 
     <div class="flex flex-row gap-2 w-full lg:w-auto">
-        <button type="button" onclick="window.openTrashModal()"
-                class="flex-1 lg:flex-initial lg:w-[140px] px-4 py-3 bg-slate-100 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center justify-center gap-2 text-sm whitespace-nowrap"
-                title="Корзина удалённых меню">
-            <span class="icon-trash-2 text-base"></span>
-            <span>Корзина</span>
-            <?php if ($trashCountMenus > 0): ?>
-                <span class="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-bold rounded-full"><?php echo $trashCountMenus; ?></span>
-            <?php endif; ?>
-        </button>
+        <?php if ($trashEnabled): ?>
+            <?php do_action('trash_button', 'menu', '?tab=menu'); ?>
+        <?php endif; ?>
 
         <a href="?tab=menu&action=create"
            class="flex-1 lg:flex-initial lg:w-[140px] px-4 py-3 bg-[var(--primary-color)] text-white font-bold rounded-xl hover:bg-[var(--primary-dark)] transition-all shadow-lg shadow-[var(--primary-color)]/20 flex items-center justify-center gap-2 text-sm whitespace-nowrap">
@@ -97,7 +91,7 @@ $trashCountMenus = getTrashCount('menu');
                                         <input type="hidden" name="csrf_token" value="<?php echo e($token); ?>">
                                         <input type="hidden" name="id" value="<?php echo e($menu['id']); ?>">
                                         <?php if (!$isMain): ?>
-                                            <button type="submit" name="menu_delete" value="1" class="w-8 h-8 rounded-lg flex items-center justify-center border border-rose-100 text-rose-500 hover:text-rose-800 bg-white hover:bg-rose-50 transition-all" title="Удалить" onclick="return confirm('Удалить меню &quot;<?php echo e($menu['name']); ?>&quot;?')">
+                                            <button type="submit" name="menu_delete" value="1" class="w-8 h-8 rounded-lg flex items-center justify-center border border-rose-100 text-rose-500 hover:text-rose-800 bg-white hover:bg-rose-50 transition-all" title="Удалить" onclick="return confirm('<?php echo e(getDeleteConfirmMessage('menu', $menu['name'])); ?>')">
                                                 <span class="icon-trash-2 text-sm"></span>
                                             </button>
                                         <?php else: ?>
@@ -159,7 +153,7 @@ $trashCountMenus = getTrashCount('menu');
                         <input type="hidden" name="csrf_token" value="<?php echo e($token); ?>">
                         <input type="hidden" name="id" value="<?php echo e($menu['id']); ?>">
                         <?php if (!$isMain): ?>
-                            <button type="submit" name="menu_delete" value="1" class="w-10 h-10 flex-shrink-0 bg-white border border-rose-100 text-rose-500 rounded-lg flex items-center justify-center transition-all cursor-pointer hover:bg-rose-50" title="Удалить" onclick="return confirm('Удалить меню &quot;<?php echo e($menu['name']); ?>&quot;?')">
+                            <button type="submit" name="menu_delete" value="1" class="w-10 h-10 flex-shrink-0 bg-white border border-rose-100 text-rose-500 rounded-lg flex items-center justify-center transition-all cursor-pointer hover:bg-rose-50" title="Удалить" onclick="return confirm('<?php echo e(getDeleteConfirmMessage('menu', $menu['name'])); ?>')">
                                 <span class="icon-trash-2 text-sm"></span>
                             </button>
                         <?php else: ?>
@@ -176,7 +170,7 @@ $trashCountMenus = getTrashCount('menu');
 
 <?php
 // Модалка корзины
-$trashContext   = 'menu';
-$trashReturnUrl = '?tab=menu';
-include APP_ROOT . '/config/core/trash_modal.php';
+if ($trashEnabled) {
+    do_action('trash_modal', 'menu', '?tab=menu');
+}
 ?>

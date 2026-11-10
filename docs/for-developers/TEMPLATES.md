@@ -8,7 +8,9 @@ templates/
 ├── full-width.php          # Обёртка над base.php
 ├── sidebar-left.php
 ├── sidebar-right.php
+├── sidebar-both.php
 ├── boxed.php
+├── maintenance.php         # Заглушка 503 (плагин maintenance)
 │
 ├── headers/
 │   ├── default/

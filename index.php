@@ -1,174 +1,23 @@
 <?php
 require_once 'config/core/functions.php';
 require_once 'config/config.php';
-
-// ===== РЕЖИМ ТЕХНИЧЕСКИХ РАБОТ =====
-// Проверка автоснятия: если maintenance_until истёк — выключаем автоматически.
-$maintenanceSettings = getSettingsData();
-if (!empty($maintenanceSettings['maintenance_enabled'])
-    && !empty($maintenanceSettings['maintenance_until'])
-    && time() > (int)$maintenanceSettings['maintenance_until']
-) {
-    // Автоснятие
-        $maintenanceSettings['maintenance_enabled'] = false;
-    $maintenanceSettings['maintenance_until'] = null;
-
-    // saveData() — в admin_controller.php, на фронте недоступна.
-    // Пишем через safeFileWrite напрямую.
-    $settingsPath = DATA_DIR . 'settings.json';
-    $settingsJson = json_encode($maintenanceSettings, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    safeFileWrite($settingsPath, $settingsJson);
-
-    // Сброс кеша в памяти — чтобы getSettingsData() вернула новое
-    if (function_exists('clearDataCache')) {
-        clearDataCache('settings');
-    }
-
-    // Перечитываем settings
-    $maintenanceSettings = getSettingsData(true);
+// Загружаем активные плагины
+if (function_exists('loadActivePlugins')) {
+    loadActivePlugins();
 }
 
-if (!empty($maintenanceSettings['maintenance_enabled'])) {
-    $maintenanceToken = (string)($maintenanceSettings['maintenance_bypass_token'] ?? '');
-    $isAdmin = !empty($_SESSION['admin_auth']);
-
-    // 1. Bypass по токену (?bypass=xxx)
-    $bypassParam = trim($_GET['bypass'] ?? '');
-    if ($bypassParam !== '' && $maintenanceToken !== ''
-        && preg_match('/^[a-f0-9]{32}$/i', $bypassParam)
-        && hash_equals($maintenanceToken, $bypassParam)
-    ) {
-        // Устанавливаем cookie на 24 часа
-        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
-
-        setcookie('maintenance_bypass', '1', [
-            'expires'  => time() + 86400, // 24 часа
-            'path'     => '/',
-            'secure'   => $isHttps,
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
-
-        // Редирект без ?bypass
-        header('Location: /', true, 302);
-        exit;
-    }
-
-    // 2. Проверка cookie
-    $hasBypassCookie = ($_COOKIE['maintenance_bypass'] ?? '') === '1';
-
-    // 3. Если не админ и нет cookie — отдаём 503
-    if (!$isAdmin && !$hasBypassCookie) {
-        header('HTTP/1.1 503 Service Unavailable');
-        header('Retry-After: 3600');
-        header('X-Robots-Tag: noindex, nofollow, noarchive');
-        header('Content-Type: text/html; charset=utf-8');
-
-        $maintenanceMessage = (string)($maintenanceSettings['maintenance_message'] ?? '');
-        $maintenanceUntil = !empty($maintenanceSettings['maintenance_until'])
-            ? (int)$maintenanceSettings['maintenance_until']
-            : null;
-        $maintenanceShowTimer = !empty($maintenanceSettings['maintenance_show_timer']);
-
-        include __DIR__ . '/templates/maintenance.php';
-        exit;
-    }
-}
-// ===== КОНЕЦ РЕЖИМА ТЕХРАБОТ =====
+// Точка внедрения для плагинов (например, Технические работы)
+do_action('index_start');
 
 // --- РОУТИНГ: Определяем запрошенную страницу ---
+$routeData = resolve_route();
 
-// Получаем путь из URL (например, /about, /contacts)
-$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
-
-// Убираем GET-параметры (всё после ?)
-if (strpos($requestUri, '?') !== false) {
-    $requestUri = substr($requestUri, 0, strpos($requestUri, '?'));
-}
-
-// Убираем ведущий и trailing слеши
-$slug = trim($requestUri, '/');
-
-// --- ИНИЦИАЛИЗАЦИЯ ---
-$isNewPage = false;
-$isPreview = false;
-$usedModules = [];
-$template = null;
-$page = null;
-
-// --- PREVIEW MODE ---
-$previewToken = trim($_GET['preview'] ?? '');
-
-if ($previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
-    // 1. Временный preview (из конструктора)
-    $previewData = loadPreviewById($previewToken);
-
-    // 2. Fallback: постоянный preview-токен страницы
-    if (!$previewData) {
-        $previewData = loadPageByPreviewToken($previewToken);
-    }
-
-    if ($previewData) {
-        // Проверка slug: если он не совпадает с актуальным — 301 на правильный
-        $actualSlug = $previewData['slug'] ?? '';
-        if ($slug !== $actualSlug) {
-            // Главную с пустым slug редиректим на корень без параметра slug
-            $redirectUrl = ($actualSlug !== '' ? '/' . $actualSlug : '/')
-                         . '?preview=' . urlencode($previewToken);
-            header('Location: ' . $redirectUrl, true, 301);
-            exit;
-        }
-
-        $page = $previewData;
-        $isPreview = true;
-        $isNewPage = true;
-        $template = loadTemplate($page['template'] ?? 'full-width');
-        $usedModules = getUsedModules($page);
-
-        header('X-Robots-Tag: noindex, nofollow, noarchive');
-    }
-}
-
-// --- ОБЫЧНЫЙ РОУТИНГ ---
-if (!$isPreview) {
-    $page = loadPage($slug);
-
-    if ($page && $page['status'] === 'published') {
-        // Проверка: страница найдена по старому slug?
-        $actualSlug = $page['slug'] ?? $page['id'] ?? '';
-
-        // Если запрошенный slug непустой и не совпадает с актуальным —
-        // значит, нашли через slug_history. Редирект на актуальный.
-        if ($slug !== '' && $slug !== $actualSlug) {
-            header('Location: /' . $actualSlug, true, 301);
-            exit;
-        }
-
-        $isNewPage = true;
-        $template = loadTemplate($page['template'] ?? 'full-width');
-        $usedModules = getUsedModules($page);
-    }
-}
-
-// --- ЕСЛИ СТРАНИЦА НЕ НАЙДЕНА — РЕДИРЕКТ НА ГЛАВНУЮ ---
-if (!$isNewPage) {
-    if ($slug !== '') {
-        header('Location: /', true, 301);
-        exit;
-    }
-    
-    // Заглушка для главной
-    $page = [
-        'id' => 'home',
-        'title' => 'Главная',
-        'template' => 'full-width',
-        'status' => 'published',
-        'zones' => ['main' => ['rows' => []]]
-    ];
-    $isNewPage = true;
-    $template = loadTemplate('full-width');
-}
+$page        = $routeData['page'];
+$template    = $routeData['template'];
+$isPreview   = $routeData['isPreview'];
+$isNewPage   = $routeData['isNewPage'];
+$slug        = $routeData['slug'];
+$usedModules = $routeData['usedModules'];
 
 // --- Получаем настройки для хедера и футера ---
 $settings = function_exists('getSettingsData') ? getSettingsData() : [];
@@ -210,6 +59,8 @@ $currentUrl = getBaseUrl() . ($slug ? '/' . $slug : '');
 
 // Мета-данные страницы с приоритетом на глобальные настройки
 $pageTitle = !empty(SITE_META_TITLE) ? SITE_META_TITLE : ($page['title'] ?? 'Название компании');
+// Применяем фильтры плагинов к заголовку
+$pageTitle = apply_filters('page_title', $pageTitle, $page);
 $pageDesc = !empty(SITE_META_DESCRIPTION) ? SITE_META_DESCRIPTION : ($page['meta']['description'] ?? '');
 $pageKeywords = !empty(SITE_META_KEYWORDS) ? SITE_META_KEYWORDS : ($page['meta']['keywords'] ?? '');
 
@@ -230,23 +81,7 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <?php
-    // FOUC-защита: ставим data-theme="dark" до рендера body.
-    // Приоритет: localStorage('site-theme') > theme_default из настроек.
-    $themeDefault = $settings['theme_default'] ?? 'light';
-    if (!in_array($themeDefault, ['light', 'dark'], true)) {
-        $themeDefault = 'light';
-    }
-    ?>
-    <script>
-    (function() {
-        var def = '<?php echo e($themeDefault); ?>';
-        var t = localStorage.getItem('site-theme') || def;
-        if (t === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-        }
-    })();
-    </script>
+    <?php do_action('render_head_start'); ?>
     
     <!-- Основные SEO -->
     <title><?php echo e($pageTitle); ?></title>
@@ -288,14 +123,12 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
     
     <link href="css/style.css" rel="stylesheet" type="text/css"/>
     <link href="css/theme.css" rel="stylesheet" type="text/css"/>
-    <link href="css/theme-dark.css" rel="stylesheet" type="text/css"/>
     <link href="fonts/lucide.css" rel="stylesheet" type="text/css"/>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <?php
         // Палитры из настроек. Fallback — если theme.light/theme.dark нет.
         $themeLight = getThemePalette($settings, 'light');
-        $themeDark  = getThemePalette($settings, 'dark');
     ?>
     <style>
         :root {
@@ -307,18 +140,6 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
             --text-main: <?php echo e($themeLight['text_main']); ?>;
             --text-muted: <?php echo e($themeLight['text_muted']); ?>;
             --border-color: <?php echo e($themeLight['border_color']); ?>;
-        }
-        [data-theme="dark"] {
-            --bg-main: <?php echo e($themeDark['bg_main']); ?>;
-            --bg-card: <?php echo e($themeDark['bg_card']); ?>;
-            --bg-section: <?php echo e($themeDark['bg_section']); ?>;
-            --text-main: <?php echo e($themeDark['text_main']); ?>;
-            --text-muted: <?php echo e($themeDark['text_muted']); ?>;
-            --border-color: <?php echo e($themeDark['border_color']); ?>;
-            
-            /* Служебные переменные для тёмной темы */
-            --bg-hover: #334155;
-            --bg-input: #0F172A;
         }
         <?php echo $customCss; ?>
     </style>    
@@ -336,17 +157,11 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
         <link rel="stylesheet" href="<?php echo $cssUrl; ?>">
     <?php endforeach; ?>
 
+    <?php do_action('render_head_end'); ?>
+
 </head>
 <body>
-    <?php if ($isPreview): ?>
-    <div class="fixed top-0 left-0 right-0 z-[9999] bg-amber-400 text-amber-900 text-center py-2.5 px-4 text-sm font-bold shadow-md">
-        <span class="inline-flex items-center gap-2">
-            <span class="icon-eye text-base"></span>
-            Предпросмотр — страница не опубликована
-        </span>
-    </div>
-    <div style="height: 44px;"></div>
-    <?php endif; ?>
+    <?php do_action('site_preview_banner', $isPreview); ?>
     
     <?php 
     // --- Рендерим страницу через шаблон ---
@@ -357,13 +172,6 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
         echo '<div style="padding: 2rem; text-align: center; color: red;">Шаблон ' . ($template['id'] ?? 'full-width') . ' не найден!</div>';
     }
     ?>
-
-    <?php // COOKIE BANNER ?>
-    <div id="cookie-banner" class="fixed bottom-6 left-6 z-50 max-w-xs sm:max-w-sm bg-slate-100 p-5 rounded-xl shadow-lg border border-slate-200">
-        <button id="close-cookie-banner" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 cursor-pointer">
-            <span class="icon-x text-lg"></span></button>
-        <p class="text-sm text-slate-600 pr-4 font-medium">Мы используем cookies. Продолжая использовать сайт, вы соглашаетесь с нашей <button onclick="openPolicy('cookie')" class="underline cursor-pointer">Политикой cookie</button>.</p>
-    </div>
 
     <?php // BACK TO TOP ?>
     <button id="back-to-top" onclick="window.scrollTo({top:0, behavior:'smooth'})" class="fixed bottom-6 right-6 z-50 w-12 h-12 bg-[var(--primary-color)] text-white rounded-full shadow-lg hover:bg-[var(--primary-dark)] hover:-translate-y-1 transition-all hidden items-center justify-center group cursor-pointer">
@@ -391,9 +199,7 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
     <?php endif; ?>
     
     <script src="js/script.js" type="text/javascript"></script>
-    <?php if (!empty($settings['theme_toggle_enabled'])): ?>
-        <script src="js/theme.js" type="text/javascript"></script>
-    <?php endif; ?>
+    <?php do_action('render_body_end'); ?>
     <?php foreach ($assets['js'] as $jsUrl): ?>
         <script src="<?php echo $jsUrl; ?>"></script>
     <?php endforeach; ?>
@@ -409,7 +215,16 @@ if ($cacheEnabled && !$isPreview) {
     if (!is_dir($cacheDir)) {
         mkdir($cacheDir, 0755, true);
     }
-    file_put_contents($cacheFile, $html);
+
+    // Пишем во временный файл и подменяем атомарно: читатель не увидит
+    // недописанный HTML, а два параллельных запроса не переплетут вывод.
+    $tmpCache = $cacheFile . '.' . bin2hex(random_bytes(4)) . '.tmp';
+    if (@file_put_contents($tmpCache, $html, LOCK_EX) !== false) {
+        if (!@rename($tmpCache, $cacheFile)) {
+            @copy($tmpCache, $cacheFile);
+            @unlink($tmpCache);
+        }
+    }
 }
 
 echo $html;

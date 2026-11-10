@@ -4,9 +4,10 @@
 /data/menus/*.json
 /data/logs/*.log
 /data/logs/archive/
-data/trash/*.json
-data/preview/*.json
-data/history/*
+/data/trash/*.json
+/data/preview/*.json
+/data/history/*
+/data/updates_cache.json
 
 # === Системные данные ===
 !.gitkeep
@@ -27,15 +28,6 @@ data/history/*
 # === Загруженные картинки ===
 /images/*
 
-# === IDE ===
-.vscode/
-.idea/
-.netbeans/
-.osp/
-nbproject/
-nbproject/private/
-*.sublime-*
-
 # === OS ===
 Thumbs.db
 .DS_Store
@@ -45,19 +37,7 @@ desktop.ini
 *.log
 
 # === Временные и служебные файлы ===
-/config/css/old_config.css
-/fonts/youtube.svg
-*.tmp
-*.bak
 *.bat
-*.swp
-*~
-*_.php
-*_.js
-*.docx
-/favicon_iсo.zip
-/favicon-512.png
-/generate_test_pages.php
 
 # === Распакованные модули ===
 # Админка
@@ -69,6 +49,7 @@ desktop.ini
 !/config/modules/pages/
 !/config/modules/previews/
 /config/modules/previews/*
+/config/plugins/*/
 
 # Сайт
 /modules/*.php 

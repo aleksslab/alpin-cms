@@ -105,24 +105,6 @@
         document.body.style.overflow = 'auto';
     };
 
-    // Вспомогательные хелперы работы с системными Cookies
-    function setCookie(name, value, days) {
-        const d = new Date();
-        d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-        document.cookie = name + '=' + value + ';expires=' + d.toUTCString() + ';path=/';
-    }
-
-    function getCookie(name) {
-        const cname = name + '=';
-        const decodedCookie = decodeURIComponent(document.cookie);
-        const ca = decodedCookie.split(';');
-        for (let i = 0; i < ca.length; i++) {
-            let c = ca[i].trim();
-            if (c.indexOf(cname) === 0) return c.substring(cname.length, c.length);
-        }
-        return '';
-    }
-
     // === 5. БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ ПО READYSTATE ===
     function initApp() {
         // Кнопка наверх (Скролл-контроль)
@@ -149,19 +131,6 @@
                 }
             }
         });
-
-        // Баннер куки-файлов
-        const cookieBanner = document.getElementById('cookie-banner');
-        const cookieBannerClose = document.getElementById('close-cookie-banner');
-        if (cookieBanner) {
-            cookieBanner.style.display = (getCookie('cookie-accept') === 'accepted') ? 'none' : 'block';
-            if (cookieBannerClose) {
-                cookieBannerClose.addEventListener('click', () => {
-                    setCookie('cookie-accept', 'accepted', 30);
-                    cookieBanner.style.display = 'none';
-                });
-            }
-        }
     }
 
     if (document.readyState === 'loading') {

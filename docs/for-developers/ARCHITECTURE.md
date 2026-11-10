@@ -74,24 +74,31 @@
 config/
 ├── index.php              # Точка входа, роутинг по tab
 ├── config.php             # Константы, сессии, DEBUG
-├── preview.php            # Эндпоинт создания preview (POST)
 ├── login.php              # Форма логина
 ├── .htaccess              # RewriteEngine Off + Options -Indexes
 │
 ├── cron/                  # Эндпоинты для планировщика (хостинг)
-│   ├── backup.php         # Крон бэкапов
-│   └── publish.php        # Крон публикации/архивации страниц
-│   └── seo.php            # Крон генерации sitemap/robots
+│   └── run.php            # Общий запуск задач из реестра (register_cron_task)
 |
 ├── core/
-│   ├── functions.php      # ЧТЕНИЕ данных + утилиты
+│   ├── functions.php      # ЧТЕНИЕ данных + утилиты (подключает хуки и плагины)
+│   ├── security.php       # Чистые помощники: e(), safeUrl(), CSRF, ID, ZIP Slip
+│   ├── hooks.php          # Система хуков (add_action, add_filter, add_route)
+│   ├── cron.php           # Реестр фоновых задач (register_cron_task, состояние)
+│   ├── log.php            # Реестр действий логирования (register_log_action, группы)
+│   ├── plugins.php        # Загрузчик плагинов (syncPluginsData, loadActivePlugins)
+│   ├── modules.php        # Установка/обновление/удаление модулей, syncModulesData
+│   ├── router.php         # Роутинг фронтенда (вынесен из index.php)
+│   ├── virtual_crons.php  # Виртуальные кроны (задачи плагинов, публикация)
+│   ├── admin_actions.php  # Обработка POST-запросов админки
+│   ├── admin_ajax.php     # Обработка GET/AJAX-запросов админки
+│   ├── admin_menu.php     # Формирование вкладок сайдбара (включая плагины)
 │   ├── admin_auth.php     # Авторизация, brute-force
 │   ├── admin_controller.php  # ЗАПИСЬ + логика
-│   ├── filemanager_api.php   # API проводника
 │   ├── media_modal.php       # Медиа-модалка
-│   ├── icon_modal.php        # Модалка иконок
-│   ├── trash_modal.php       # Модалка корзины
-│   └── history_modal.php     # Модалка истории изменений
+│   └── icon_modal.php        # Модалка иконок
+│
+├── plugins/               # Плагины (системные расширения)
 │
 ├── modules/               # Админские модули (вкладки)
 │   ├── config_vars.php
@@ -107,27 +114,26 @@ config/
 │   │   ├── assets.php
 │   │   ├── media.php      
 │   │   ├── cache.php
-│   │   ├── history.php
-│   │   ├── cron.php
 │   │   ├── custom.php
 │   │   └── modals.php
 │   ├── pages/
 │   ├── menu/
+│   ├── plugins.php        # Управление плагинами
 │   ├── modules.php
 │   ├── security.php
-│   ├── backups.php
-│   ├── filemanager.php
-│   ├── logs.php
 │   └── module_upload.php
 │
 ├── css/config.css         # Стили админки
 ├── js/                    # JS админки
+├── logs/                  # Логи действий администратора (защищено .htaccess)
+│
 └── data/                  # Системные данные (защищено)
     ├── credentials.json   # Логин/хеш
     ├── .pepper            # Секрет для пароля
     ├── modules.json       # Список модулей
+    ├── plugins.json       # Список плагинов и их статусов
     ├── templates.json     # Список шаблонов
-    └── backup_config.json # Настройки бэкапов
+    └── cron_state.json    # Время последних запусков фоновых задач
 ```
 
 ---
@@ -146,15 +152,14 @@ $slug = trim($requestUri, '/');
 
 #### Режим технических работ
 
-Перед роутингом — проверка `maintenance_enabled`:
+`index.php` сам режим не проверяет: в начале файла вызывается
+`do_action('index_start')`, а плагин `maintenance` на этом хуке:
 
-1. **Автоснятие:** если `maintenance_until` истёк — `maintenance_enabled = false`, `maintenance_until = null`. Запись через `safeFileWrite` + `clearDataCache('settings')` (в `index.php` нет `saveData` из `admin_controller.php`).
-2. **Bypass:** `?bypass={token}` → сравнение с `maintenance_bypass_token` (`hash_equals`) → cookie `maintenance_bypass=1` на 24 часа → 302 на `/`.
-3. **Cookie:** если `maintenance_bypass=1` — **пропускаем** 503.
-4. **Админ:** если `$_SESSION['admin_auth']` — **пропускаем** 503.
-5. **503:** `HTTP/1.1 503`, `Retry-After: 3600`, `X-Robots-Tag: noindex`. `include templates/maintenance.php`. `exit`.
+1. Снимает истёкший режим (`maintenance_until`), пишет `settings.json` через `safeFileWrite()` и сбрасывает кеш настроек.
+2. Проверяет `?bypass={token}` и cookie `maintenance_bypass`.
+3. Отдаёт 503 с `templates/maintenance.php` или пропускает запрос.
 
-**Важно:** проверка **до** роутинга и **до** кеша. Иначе `loadPage` / кеш **сработают зря**.
+**Важно:** хук срабатывает **до** роутинга и **до** кеша. Иначе `loadPage` / кеш **сработают зря**.
 
 **`config.php`** загружает:
 - **DEBUG_SITE**/**DEBUG_ADMIN**.
@@ -180,7 +185,8 @@ $page = null;
 ```php
 $previewToken = trim($_GET['preview'] ?? '');
 
-if ($previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
+// Предпросмотр включает только активный плагин preview (фильтр preview_enabled)
+if (isPreviewEnabled() && $previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
     // 1. Временный preview (из конструктора)
     $previewData = loadPreviewById($previewToken);
 
@@ -212,6 +218,7 @@ if ($previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i', $previewToken)) {
 ```
 
 **Что делает:**
+- Работает только при включённом плагине `preview` (`isPreviewEnabled()`): без него `?preview=` игнорируется.
 - Ищет preview по токену: **сначала временный, потом постоянный**.
 - Если нашли и slug в URL неактуален — **301** на правильный URL.
 - Устанавливает `$isPreview = true` — это отключает кеш и включает жёлтую плашку.
@@ -406,56 +413,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 ### 4. Idle Timeout
 
-```php
-checkAdminSessionTimeout($bfData);
-```
+Сервер: `checkAdminSessionTimeout($bfData)` в `config/index.php` — при
+превышении `session_timeout` сессия уничтожается, редирект на
+`index.php?msg=timeout`.
+
+Клиент: `renderSessionNotice()` + `initSessionTimer()` в `config/js/main.js`
+показывают sticky-полосу за `min(120, max(10, lifetime / 2))` секунд до конца,
+продлевают сессию от активности и на нуле проверяют её через
+`index.php?ajax=session_ping` (если жива — синхронизируют таймер).
 
 ### 5. Виртуальные кроны
 
-При заходе админа в админку асинхронно дёргаются два виртуальных крона:
+При заходе админа в админку асинхронно дёргаются виртуальные задачи.
 
-**Крон бэкапов** (если включён `cron_virtual` в `backup_config.json`):
+**Задачи плагинов.** Ядро проходит по реестру `get_cron_tasks()` и для
+включённых задач с флагом `virtual` и подошедшим интервалом атомарно ставит
+заявку и запрашивает общий эндпоинт с одноразовым токеном. Ядро не знает, что
+делает задача.
 
 ```php
-$cronSettings = getBackupSettingsData();
-if (!empty($cronSettings['cron_virtual'])) {
-    $lastCronBackup = intval($cronSettings['last_backup_time'] ?? 0);
-    $cronPeriodHours = intval($cronSettings['cron_period'] ?? 24);
-
-    if (time() >= ($lastCronBackup + ($cronPeriodHours * 3600))) {
-        $cronUrl = $protocol . $safeHost . dirname($_SERVER['SCRIPT_NAME'])
-                 . '/cron/backup.php?token=' . urlencode(getCronToken());
-
-        $cronContext = stream_context_create([
-            'http' => ['timeout' => 1.0, 'ignore_errors' => true]
-        ]);
-        @file_get_contents($cronUrl, false, $cronContext);
-    }
+foreach (get_cron_tasks() as $id => $task) {
+    if (empty($task['virtual']) || empty($task['enabled'])) continue;
+    $runToken = mark_cron_pending($id); // pending + pending_token под flock
+    if ($runToken === '') continue;
+    // GET /config/cron/run.php?task={id}&token={getCronToken()}&run={$runToken}
 }
 ```
 
-**Крон публикации** (без отдельной настройки — работает всегда, но не чаще 1 раза в 5 минут):
-
-```php
-$lastPublish = getLastCronPublishTime();
-if (time() >= ($lastPublish + 300)) {
-    setLastCronPublishTime(time());
-
-    $publishUrl = $protocol . $safeHost . dirname($_SERVER['SCRIPT_NAME'])
-                . '/cron/publish.php?token=' . urlencode(getCronToken());
-
-    $publishContext = stream_context_create([
-        'http' => ['timeout' => 1.0, 'ignore_errors' => true]
-    ]);
-    @file_get_contents($publishUrl, false, $publishContext);
-}
-```
+**Крон публикации** — задача `publish` из плагина `publish` (без отдельной настройки, не чаще 1 раза в минуту). Ничем не отличается от прочих задач реестра: помечена `virtual`, поэтому её запускает `run_virtual_cron_tasks()`.
 
 **Особенности:**
 - Запросы асинхронные (`@file_get_contents` с таймаутом 1 секунда) — страница админки открывается мгновенно.
 - Для бэкапа — интервал из настроек (по умолчанию 24 часа).
-- Для публикации — фиксированные 5 минут (`getCronPublishMinInterval()`).
-- Время публикации обновляется **до** запроса — защита от долбёжки при F5.
+- Для публикации — фиксированные 60 секунд (опция `interval` задачи `publish`).
+- `last_run` пишет эндпоинт при захвате запуска, а не виртуальный крон: повторные вкладки и внешний планировщик получают `Status: Skipped`, дублей нет. Если задача вернула `false`, `last_run` откатывается и ставится пауза 5 минут.
 
 ---
 
@@ -504,14 +495,14 @@ config/data/modules.json│    loadPage,          рендер)
 ```
 POST-форма ──► config/index.php ──► admin_controller.php ──► safeFileWrite ──► data/*.json
                        │
-                       └──► logAction ──► data/logs/admin.log
+                       └──► logAction ──► config/logs/admin.log
 ```
 
 ---
 
 ## 🧩 Ядро
 
-### `functions.php` — чтение + утилиты
+### `security.php` — чистые помощники
 
 | Функция | Что делает |
 |---------|-----------|
@@ -520,6 +511,47 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `safeUrl()` | Whitelist схем URL |
 | `validateHtml()` | Проверка HTML на опасные теги |
 | `sanitizeHtml()` | Очистка HTML (whitelist) |
+| `validateSvgContent()` | Проверка SVG перед сохранением (script, on*, внешние href) |
+| `safeFileWrite()` | Атомарная запись с flock |
+| `detectZipSlip()` | Защита от ZIP Slip |
+| `verifyCsrfToken()` | Сравнение CSRF-токена (`hash_equals`) |
+| `isValidId()` | Валидация ID (`[a-z0-9\-_]+`) |
+
+**Правило:** файл **не** **стартует** **сессию**, **не** **ставит** **заголовки** **и**
+**ничего** **не** **пишет**. **Bootstrap** — **в** `config.php`, **авторизация** — **в**
+`admin_auth.php`, **журнал** — **в** `log.php`.
+
+### `modules.php` — установка модулей
+
+| Функция | Что делает |
+|---------|-----------|
+| `saveModulesData()` | Запись `config/data/modules.json` |
+| `unpackModule()` | Распаковка из `config/modules/archives/{id}.zip` |
+| `unpackModuleArchive()` | Распаковка ZIP с резервной копией старого кода |
+| `removeModuleFiles()` | Удалить только код |
+| `purgeModule()` | Удалить код, архив, превью и запись |
+| `reinstallModule()` | Распаковать архив заново, сохранив старый код до успеха |
+| `downloadModuleZip()` | Скачать архив (http(s), 10 МБ) |
+| `validateModuleArchive()` | Проверка манифеста, ID и версии |
+| `installModuleFromZip()` | Установка/обновление из ZIP (`$unpack` — сразу код или только архив) |
+| `syncModulesData()` | Синхронизация реестра с архивами |
+| `_moduleStashCode()` / `_moduleRestoreCode()` | Убрать код в `config/modules/_backup/` и вернуть при ошибке |
+| `_moduleCleanupRuntime()` | Удалить остатки прерванных распаковок старше часа |
+
+**Почему в `functions.php`:** функция `render_module()` на фронте
+**может** **распаковать** **модуль** **при** **первом** **использовании**, **а**
+`admin_controller.php` **на** **фронте** **не** **подключается**. **Поэтому**
+`unpackModule()` **и** **её** **зависимости** **живут** **в** `config/core/modules.php`
+**и** **доступны** **всегда**.
+
+**`logAction()`**, `createMinFilesForModule()` **и** `clearPageCache()` **—**
+**админские**: **в** `modules.php` **они** **вызываются** **только** **через**
+`function_exists()`.
+
+### `functions.php` — чтение + утилиты
+
+| Функция | Что делает |
+|---------|-----------|
 | `getData()` | Чтение JSON с кешем |
 | `getSettingsData()` | Настройки сайта |
 | `loadPage()` | Загрузка опубликованной страницы (проверяет `status` + `unpublish_at`) |
@@ -530,9 +562,9 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `renderMainMenu()`, `renderMobileMenu()` | Рендер меню |
 | `render_module()` | Рендер модуля |
 | `getModuleAssets()`, `getCombinedAssets()` | Ассеты |
-| `safeFileWrite()` | Атомарная запись с flock |
 | `loadPreviewById()` | Чтение временного preview |
 | `loadPageByPreviewToken()` | Поиск страницы по постоянному токену |
+| `isPreviewEnabled()` | Доступен ли предпросмотр (фильтр `preview_enabled`) |
 | `findPageBySlugHistory()` | Поиск страницы по slug_history |
 | `applyPageDefaults()` | Дефолты для страницы |
 | `getBaseUrl()` | Протокол + хост сайта |
@@ -549,6 +581,9 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `handleSuccessfulLogin()` | Успешный вход |
 | `handleFailedLogin()` | Неудачная попытка |
 | `handleLiveHashGeneration()` | Генерация хеша |
+| `getAdminSessionTimeoutSeconds()` | Время жизни сессии в секундах |
+| `getAdminSessionRemaining()` | Остаток текущей сессии |
+| `getAdminSessionWarnSeconds()` | Порог предупреждения |
 | `checkAdminSessionTimeout()` | Idle timeout |
 
 ### `admin_controller.php` — запись + логика
@@ -557,94 +592,37 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 |---------|-----------|
 | `saveData()` | Запись JSON |
 | `savePageData()` | Запись страницы |
-| `saveMenu()`, `saveModulesData()` | Запись меню/модулей |
-| `detectZipSlip()` | Защита от ZIP Slip |
+| `saveMenu()` | Запись меню |
 | `handleSaveSettings()` | Сохранение настроек |
 | `handleSavePage()` | Сохранение страницы |
 | `handleDeletePage()` | Удаление страницы |
+| `deleteEntityPermanently()` | Окончательное удаление без корзины |
+| `isTrashEnabled()` | Доступна ли корзина (фильтр `trash_enabled`) |
+| `getDeleteConfirmMessage()` | Текст подтверждения удаления |
 | `handleClonePage()` | Клонирование |
 | `handleSetHomePage()` | Назначение главной |
 | `handleSaveMenu()`, `handleDeleteMenu()` | Меню |
-| `handleModuleAction()` | Модули (upload/delete) |
-| `unpackModule()` | Распаковка модуля |
+| `handleModuleAction()` | Модули: upload / delete / purge |
 | `handleSaveSecurity()` | Настройки безопасности |
-| `handleSaveBackupSettings()` | Настройки бэкапов |
-| `handleInitBackupProcess()` | Инициализация бэкапа |
-| `handleProcessBackupStep()` | Пошаговая архивация |
-| `handleRestoreBackup()` | Восстановление |
-| `handleDownloadBackup()` | Скачивание |
-| `handleCronBackupAction()` | Системный крон бэкапов |
-| `handleCronPublishAction()` | Системный крон публикации/архивации страниц |
 | `getCronToken()` | Общий токен для кронов (из `settings.json`) |
 | `regenerateCronToken()` | Принудительная перегенерация токена |
-| `getLastCronPublishTime()` | Время последнего запуска виртуального крона |
-| `setLastCronPublishTime()` | Сохранение времени запуска |
 | `getPageStatusBadge()` | Метка/класс/иконка бейджа статуса |
+| `isPageSchedulingEnabled()` | Доступно ли планирование (фильтр `page_scheduling_enabled`) |
 | `clearPageCache()` | Очистка всего кеша |
 | `clearPageCacheById()` | Очистка кеша одной страницы |
 | `logAction()` | Логирование |
-| `createPreview()` | Создание/перезапись временного preview |
-| `cleanupAllPreviews()` | Очистка всех previews |
-| `cleanupSessionPreviews()` | Очистка previews сессии |
-| `cleanupSessionPagePreviews()` | Очистка previews сессии для страницы |
-| `getPagePreviewToken()` | Чтение постоянного токена |
-| `getPagePreviewUrl()` | Формирование URL постоянного preview |
-| `isHistoryEnabled()` | История включена |
-| `getHistoryLimit()` | Лимит версий |
-| `getHistoryDir()` | Путь к папке истории страницы |
-| `ensureHistoryDir()` | Создание папки истории + `.htaccess` |
-| `getOrCreateHistoryKey()` | Ключ истории страницы |
-| `savePageSnapshot()` | Сохранение снапшота (с дедупликацией) |
-| `rotatePageHistory()` | Удаление старых версий |
-| `getHistoryContentFields()` | Список контентных полей |
-| `extractHistoryContent()` | Извлечение контентных полей |
-| `normalizeHistoryContent()` | Нормализация для сравнения |
-| `getPageHistory()` | Список версий страницы |
-| `getHistorySnapshot()` | Чтение конкретного снапшота |
-| `deleteHistoryVersion()` | Удаление одной версии |
-| `clearPageHistory()` | Очистка истории страницы |
-| `getHistoryStats()` | Статистика истории сайта |
-| `restorePageFromHistory()` | Откат страницы к версии |
-| `handleRestorePageVersion()` | POST-обработчик отката |
-| `handleDeleteHistoryVersion()` | POST-обработчик удаления версии |
-| `handleClearPageHistory()` | POST-обработчик очистки страницы |
-| `handleClearAllHistory()` | AJAX-обработчик очистки всей истории |
-| `generateSitemap()` | Генерация sitemap.xml |
-| `generateRobots()` | Генерация robots.txt |
-| `generateSeoFiles()` | Обе генерации + удаление при выключенных галочках |
-| `maybeRegenerateSeoFiles()` | Обёртка с проверкой auto |
-| `isWebpSupported()` | Проверка доступности WebP (GD/Imagick) |
-| `convertToWebp()` | Конвертация одного изображения в .webp |
-| `maybeConvertToWebp()` | Обёртка: настройки + поддержка → convertToWebp |
-| `getImageFiles()` | Рекурсивный сбор jpg/png (или только верхний уровень) |
-| `getWebpStats()` | Статистика .webp (count, size_bytes) |
-| `deleteAllWebp()` | Удаление всех .webp с парным оригиналом |
-| `handleDeleteAllWebp()` | AJAX-обработчик удаления |
-| `countImagesWithoutWebp()` | Сколько jpg/png без .webp |
-| `convertExistingImagesStep()` | Конвертация пачки (для AJAX-шагов) |
-| `handleConvertExistingImagesStep()` | AJAX-обработчик шага конвертации |
-| `isMaintenanceEnabled()` | Режим техработ включён |
-| `getMaintenanceBypassToken()` | Bypass-токен (генерация при отсутствии) |
-| `regenerateMaintenanceToken()` | Перегенерация bypass-токена |
 
-### `filemanager_api.php` — API проводника
+Конвертация WebP, статистика и массовая переработка изображений — в плагине
+`media-optimization`; режим техработ — в плагине `maintenance`. В ядре
+остаются только `mediaImageSrc()` и `mediaLazyAttrs()`; внутренние функции
+плагинов не входят в публичный API.
 
-| Функция | Что делает |
-|---------|-----------|
-| `fmSafePath()` | Whitelist символов в пути |
-| `fmSafeAbsolute()` | `realpath` + проверка префикса |
-| `fmIsBlacklisted()` | Запрещённые пути |
-| `fmIsAllowedExtension()` | Whitelist расширений |
-| `fmIsSensitiveFile()` | Чувствительные файлы |
-| `action=list` | Список файлов |
-| `action=delete` | Удаление |
-| `action=rename` | Переименование |
-| `action=get_code` | Чтение файла |
-| `action=save_code` | Сохранение файла |
-| `action=upload` | Загрузка |
-| `action=chmod` | Права |
-| `action=create_dir`, `action=create_file` | Создание |
-| `action=translit` | Транслитерация |
+### Проводник (плагин `filemanager`)
+
+Файловый менеджер вынесен из ядра. Серверная логика, AJAX-диспетчер
+(`fm_api_action` на `admin_init`), разметка вкладки и ассеты — в
+`config/plugins/filemanager/`. Вкладка регистрируется через `admin_tab`
+в `plugin.json`; в ядре остаются только загрузчик плагинов и хуки.
 
 ---
 

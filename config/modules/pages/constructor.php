@@ -127,9 +127,11 @@ function renderConstructor($pageId, $token, $modules, $rows, $rowsByZone, $zones
                 Применить шаблон
             </button>
             <input type="hidden" name="template" id="template-hidden" value="<?php echo e($currentTemplate); ?>">
+            <?php if (isPreviewEnabled()): ?>
             <button type="button" onclick="window.previewPage()" class="px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all text-sm flex items-center gap-2">
                 <span class="icon-eye text-base"></span> Предпросмотр
             </button>
+            <?php endif; ?>
         </div>
     </div>
 

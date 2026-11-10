@@ -33,10 +33,17 @@ define('CMS_PEPPER_FILE',   $secureDir . DIRECTORY_SEPARATOR . '.pepper');
 define('CMS_CREDS_FILE',    $secureDir . DIRECTORY_SEPARATOR . 'credentials.json');
 define('CMS_ATTEMPTS_FILE', $secureDir . DIRECTORY_SEPARATOR . 'login_attempts.json');
 
-require_once 'core/admin_controller.php';
+require_once __DIR__ . '/admin_controller.php';
 
 /**
- * 0. СИСТЕМНЫЙ СЛОВАРЬ И РЕГИСТРАТОР ОШИБОК (Паттерн Единого Реестра)
+ * Единый реестр ошибок авторизации.
+ *
+ * Вызов с кодом фиксирует ошибку, вызов без кода возвращает её текст.
+ * Так обработчики не разбрасывают строки по коду и не раскрывают детали.
+ *
+ * @param int|null $code Код ошибки (null — получить текст последней)
+ * @param array $params Дополнительные параметры сообщения
+ * @return string Текст ошибки или пустая строка
  */
 function admin_error(int $code = null, array $params = []): string {
     static $currentErrorCode = 0; 
@@ -64,7 +71,9 @@ function admin_error(int $code = null, array $params = []): string {
 }
 
 /**
- * 1. ИНИЦИАЛИЗАЦИЯ И СБОР ДАННЫХ ИЗ ФАЙЛОВОЙ СИСТЕМЫ
+ * Читает журнал попыток входа и настроек брутфорса.
+ *
+ * @return array Данные `login_attempts.json` или пустой массив
  */
 function getLoginAttemptsData(): array {
     if (!file_exists(CMS_ATTEMPTS_FILE)) { return []; }
@@ -72,7 +81,13 @@ function getLoginAttemptsData(): array {
 }
 
 /**
- * 2. РУБЕЖ ОБОРОНЫ А: ПРОВЕРКА НА ТЕКУЩИЕ БЛОКИРОВКИ КЛИЕНТА (IP-Бан)
+ * Проверяет, заблокирован ли IP — постоянный бан или активный локаут.
+ *
+ * При блокировке фиксирует код ошибки через `admin_error()`.
+ *
+ * @param string $userIp IP-адрес клиента
+ * @param array $bfData Данные попыток и настроек брутфорса
+ * @return bool true — доступ разрешён, false — заблокирован
  */
 function checkIpBlockStatus(string $userIp, array $bfData): bool {
     if (!isset($bfData['attempts'][$userIp])) { return true; } // Логов нет — хост чист
@@ -100,7 +115,14 @@ function checkIpBlockStatus(string $userIp, array $bfData): bool {
 }
 
 /**
- * 3. РУБЕЖ ОБОРОНЫ Б: ПРОВЕРКА ПАРОЛЯ, ЛОГИНА И СЕКРЕТНОГО ПЕРЦА
+ * Проверяет логин и пароль с учётом секретной «перчины» (pepper).
+ *
+ * Пароль сравнивается через `password_verify()` от HMAC, поэтому перебор
+ * по времени невозможен. Ошибка фиксируется кодом 101 или 102.
+ *
+ * @param string $login Введённый логин
+ * @param string $password Введённый пароль
+ * @return bool true при совпадении
  */
 function verifyAdminCredentials(string $login, string $password): bool {
     if (!file_exists(CMS_PEPPER_FILE)) {
@@ -131,16 +153,19 @@ function verifyAdminCredentials(string $login, string $password): bool {
 }
 
 /**
- * 4. ОБРАБОТКА УСПЕШНОГО ВХОДА (Очистка логов и старт сессии)
+ * Завершает успешный вход: обновляет сессию, чистит попытки и редиректит.
+ *
+ * @param string $userIp IP-адрес клиента
+ * @param array $bfData Данные попыток и настроек брутфорса
+ * @return void
  */
 function handleSuccessfulLogin(string $userIp, array $bfData): void {
     session_regenerate_id(true); 
     $_SESSION['last_activity'] = time();
     $_SESSION['admin_auth'] = true;    
 
-    // Флаг: при следующем запросе в админку очистить все preview-файлы.
-    // Реальное удаление — в config/index.php (там уже подключён admin_controller.php).
-    $_SESSION['preview_cleanup_all_pending'] = true;
+    // Плагины: успешный вход (например, очистка временных preview-файлов).
+    do_action('admin_login_success', $userIp);
     
     if (isset($bfData['attempts'][$userIp])) {
         unset($bfData['attempts'][$userIp]);
@@ -153,7 +178,14 @@ function handleSuccessfulLogin(string $userIp, array $bfData): void {
 }
 
 /**
- * 5. РУБЕЖ ОБОРОНЫ В: НАКАЗАНИЕ — ИНКРЕМЕНТ ОШИБОК И КАРУСЕЛЬ БАНОВ БРУТФОРСА
+ * Учитывает неудачную попытку входа и обновляет баны.
+ *
+ * Счётчик растёт до `max_attempts`; после локаута серия начинается заново.
+ * Каждый бан пишется в историю, по её частоте включается постоянный бан.
+ *
+ * @param string $userIp IP-адрес клиента
+ * @param array $bfData Данные попыток и настроек брутфорса
+ * @return void
  */
 function handleFailedLogin(string $userIp, array $bfData): void {
     $maxAttempts = intval($bfData['settings']['max_attempts'] ?? 5);
@@ -166,6 +198,10 @@ function handleFailedLogin(string $userIp, array $bfData): void {
         $bfData['attempts'][$userIp] = ['count' => 0, 'last_time' => 0, 'bans_count' => 0, 'bans_history' => [], 'permanent' => false];
     }
     
+    // Запоминаем время прошлой попытки до того, как перезапишем last_time:
+    // без этого в ветке сброса timeDiff всегда равен ~0 и счётчик не обнуляется.
+    $lastTime = (int)($bfData['attempts'][$userIp]['last_time'] ?? 0);
+
     $bfData['attempts'][$userIp]['count']++;
     $bfData['attempts'][$userIp]['last_time'] = time();
     
@@ -182,7 +218,7 @@ function handleFailedLogin(string $userIp, array $bfData): void {
         if ($freshBansCount >= $permCount) { $bfData['attempts'][$userIp]['permanent'] = true; }
     } 
     elseif ($bfData['attempts'][$userIp]['count'] > $maxAttempts) {
-        $timeDiff = time() - $bfData['attempts'][$userIp]['last_time'];
+        $timeDiff = time() - $lastTime;
         if ($timeDiff >= ($lockoutTime * 60)) { $bfData['attempts'][$userIp]['count'] = 1; }
     }
     
@@ -191,7 +227,13 @@ function handleFailedLogin(string $userIp, array $bfData): void {
 }
 
 /**
- * 6. ГЕНЕРАТОР ХЭШЕЙ ПАРОЛЕЙ НА ЛЕТУ
+ * Генерирует хэш нового пароля тем же способом, что и при входе.
+ *
+ * Используется при смене пароля в админке: смешивает пароль с логином
+ * и «перчиной», затем хэширует `password_hash()`.
+ *
+ * @param string $newPassword Новый пароль
+ * @return string Хэш или пустая строка при ошибке
  */
 function handleLiveHashGeneration(string $newPassword): string {
     if (!file_exists(CMS_PEPPER_FILE)) {
@@ -215,13 +257,67 @@ function handleLiveHashGeneration(string $newPassword): string {
 /**
  * 7. КОНТРОЛЬ СЕССИИ ПО ТАЙМАУТУ НЕАКТИВНОСТИ (Idle Timeout)
  */
+
+/**
+ * Возвращает время жизни админ-сессии в секундах по настройкам безопасности.
+ *
+ * @param array $bfData Данные настроек защиты от брутфорса.
+ * @return int Секунды (минимум 60).
+ */
+function getAdminSessionTimeoutSeconds(array $bfData): int {
+    $minutes = intval($bfData['settings']['session_timeout'] ?? 20);
+    if ($minutes < 1) {
+        $minutes = 1;
+    }
+    return $minutes * 60;
+}
+
+/**
+ * Возвращает остаток времени текущей админ-сессии в секундах.
+ *
+ * @param array $bfData Данные настроек защиты от брутфорса.
+ * @return int Секунды (0 — сессия истекла).
+ */
+function getAdminSessionRemaining(array $bfData): int {
+    $lifetime = getAdminSessionTimeoutSeconds($bfData);
+
+    if (!isset($_SESSION['last_activity'])) {
+        return $lifetime;
+    }
+
+    $remaining = $lifetime - (time() - (int)$_SESSION['last_activity']);
+    return max(0, min($lifetime, $remaining));
+}
+
+/**
+ * Возвращает порог предупреждения об истечении сессии в секундах.
+ * Обычно 2 минуты, но не больше половины времени жизни и не меньше 10 секунд.
+ *
+ * @param array $bfData Данные настроек защиты от брутфорса.
+ * @return int Секунды.
+ */
+function getAdminSessionWarnSeconds(array $bfData): int {
+    $lifetime = getAdminSessionTimeoutSeconds($bfData);
+    return min(120, max(10, intdiv($lifetime, 2)));
+}
+
+/**
+ * Проверяет бездействие админа и завершает сессию при превышении таймаута.
+ * При каждом вызове обновляет время последней активности.
+ *
+ * @param array $bfData Данные настроек защиты от брутфорса.
+ * @return void
+ */
 function checkAdminSessionTimeout(array $bfData): void {
-    if (!isset($_SESSION['last_activity'])) { return; }
-    
-    $timeoutMinutes = intval($bfData['settings']['session_timeout'] ?? 20);
-    $inactiveTime = time() - $_SESSION['last_activity'];
-    
-    if ($inactiveTime > ($timeoutMinutes * 60)) {
+    if (!isset($_SESSION['last_activity'])) {
+        $_SESSION['last_activity'] = time();
+        return;
+    }
+
+    $timeoutSeconds = getAdminSessionTimeoutSeconds($bfData);
+    $inactiveTime = time() - (int)$_SESSION['last_activity'];
+
+    if ($inactiveTime > $timeoutSeconds) {
         $_SESSION = [];
         if (ini_get("session.use_cookies")) {
             $params = session_get_cookie_params();
@@ -231,6 +327,6 @@ function checkAdminSessionTimeout(array $bfData): void {
         header("Location: index.php?msg=timeout");
         exit;
     }
-    
+
     $_SESSION['last_activity'] = time(); // Свежий клик — продлеваем серверное время активности
 }

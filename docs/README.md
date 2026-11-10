@@ -50,11 +50,12 @@
 | 1 | [ARCHITECTURE.md](for-developers/ARCHITECTURE.md) | Общая **архитектура**, **поток** **запроса**, **структура** **папок** |
 | 2 | [API.md](for-developers/API.md) | Все **функции** **ядра** (**чтение**, **запись**, **безопасность**) |
 | 3 | [MODULES.md](for-developers/MODULES.md) | Как **писать** **модуль** (**структура** **ZIP**, `manifest.json`) |
-| 4 | [TEMPLATES.md](for-developers/TEMPLATES.md) | Как **добавить** **хедер**/**футер**/**шаблон** |
-| 5 | [CONSTRUCTOR.md](for-developers/CONSTRUCTOR.md) | Как **работает** **конструктор** **внутри** |
-| 6 | [DATA_STRUCTURE.md](for-developers/DATA_STRUCTURE.md) | Все **JSON-структуры** |
-| 7 | [SECURITY.md](for-developers/SECURITY.md) | Меры **безопасности**, **чек-лист** **при** **добавлении** **кода** |
-| 8 | [CHANGELOG.md](for-developers/CHANGELOG.md) | История **версий** |
+| 4 | [PLUGINS.md](for-developers/PLUGINS.md) | Как **писать** **плагин** (**хуки**, **манифест**, `admin-page.php`) |
+| 5 | [TEMPLATES.md](for-developers/TEMPLATES.md) | Как **добавить** **хедер**/**футер**/**шаблон** |
+| 6 | [CONSTRUCTOR.md](for-developers/CONSTRUCTOR.md) | Как **работает** **конструктор** **внутри** |
+| 7 | [DATA_STRUCTURE.md](for-developers/DATA_STRUCTURE.md) | Все **JSON-структуры** |
+| 8 | [SECURITY.md](for-developers/SECURITY.md) | Меры **безопасности**, **чек-лист** **при** **добавлении** **кода** |
+| 9 | [CHANGELOG.md](for-developers/CHANGELOG.md) | История **версий** |
 
 ### С чего начать
 
@@ -87,7 +88,11 @@ docs/
 └── for-developers/                     # Документация для разработчиков
     ├── ARCHITECTURE.md
     ├── API.md
+    ├── PLUGINS.md
     ├── MODULES.md
+    ├── MODULES-SIMPLE.md
+    ├── MODULES-LISTS.md
+    ├── MODULES-DEBUG.md
     ├── TEMPLATES.md
     ├── CONSTRUCTOR.md
     ├── DATA_STRUCTURE.md

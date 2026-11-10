@@ -1,5 +1,160 @@
 Все значимые изменения проекта.
 
+## [Release version 2.0.0] — 2026-11-10
+
+### Добавлено
+
+- **Архитектура плагинов (v2.0.0)**:
+  - Загрузчик плагинов (`config/core/plugins.php`).
+  - Система хуков (`add_action`, `do_action`, `apply_filters`, `add_route`, `add_admin_tab`).
+  - Декларативное добавление вкладок в админку через `plugin.json` (`admin_tab`).
+  - Универсальная функция сохранения настроек плагинов (`save_plugin_settings`), защищающая от затирания данных.
+  - **Установка плагинов**:
+    - Загрузка ZIP-архива через модалку с drag-and-drop.
+    - Установка из каталога GitHub (кнопка «Обновить каталог»).
+    - Проверка на дубликаты ID перед установкой.
+  - **Удаление плагинов**: физическое удаление папки и записи из `plugins.json`.
+  - **Вкладка «Плагины»**: управление, вкл/выкл, удаление, установка.
+  - **Управление секциями**: перемещение (вверх/вниз) и скрытие секций в «Настройках сайта».
+  - **Автоматическая регистрация секций**: плагины могут добавлять свои секции через `register_plugin_section()`.
+  - **Хуки жизненного цикла**: `plugin_before_toggle`, `plugin_after_toggle`, `plugin_before_delete`, `plugin_after_delete`, `plugin_before_update`, `plugin_after_update`, `plugin_after_install`.
+- **Плагин «Тёмная тема»**: вынесен из ядра (палитры, переключатель, FOUC-защита).
+- **Плагин «Медиа (WebP)»**: вынесен из ядра (конвертация, статистика, массовая обработка).
+- **Хук `after_file_upload`**: событие после загрузки файла (используется плагином «Медиа»).
+- **Плагин «Технические работы»**: вынесен из ядра в `config/plugins/maintenance/`.
+- **Плагин «Обновления»**:
+  - Проверка новых версий ядра, модулей и плагинов через GitHub (cURL / file_get_contents).
+  - Скачивание и установка обновлений ZIP (с защитой от ZIP Slip).
+  - Кеширование результатов в `data/updates_cache.json`.
+  - Иконка-уведомление в хедере админки при наличии обновлений.
+  - Настройки: период проверки, URL каталога, выбор проверяемых сущностей.
+  - Автоматическая проверка раз в N дней (виртуальный крон).
+- **Плагин «Логи системы»**: вынесен из ядра (UI, фильтры, настройки ротации, AJAX `get_logs`). Логика записи (`logAction`, `rotateLog`, `getLogSettings`) остаётся в ядре.
+- **Логирование операций с плагинами**: `plugin_install`, `plugin_update`, `plugin_delete`, `plugin_toggle`.
+- **Фикс `plugin_after_install`**: теперь вызывается при установке нового плагина.
+- **Таймер админ-сессии**: sticky-полоса с обратным отсчётом за 2 минуты до истечения (для коротких таймаутов — за половину), кнопка «Продолжить сессию», автопродление от любой активности. На нуле — проверка через `index.php?ajax=session_ping` (учёт других вкладок) и переход на логин с сообщением об истечении.
+- **Ассеты админки для плагинов**: папка `admin/` в ZIP плагина. При установке `admin/style.css` копируется в `config/css/{id}.css`, `admin/script.js` — в `config/js/{id}.js`; при удалении плагина эти файлы (включая `.min`-варианты) удаляются.
+- **Плагин «Резервное копирование»**: вынесен из ядра в `config/plugins/backups/` (создание, скачивание, восстановление и удаление архивов, настройки, крон). Данные (`config/data/backup_config.json`, `config/backups/`) остаются на месте.
+- **Плагин «Проводник (Файлы)»**: вынесен из ядра в `config/plugins/filemanager/` (список файлов, загрузка, правка кода в ACE, CHMOD, создание и удаление). AJAX (`fm_api_action`) перехватывается на `admin_init`; стили — `config/css/filemanager.css` (из `admin/style.css`), скрипт — `config/js/filemanager.js` (из `admin/script.js`).
+- **Мультивыбор файлов в проводнике**: кнопка «Выбрать», Ctrl/Cmd+клик и длительное нажатие на тач-устройствах; массовое удаление через `action=delete_many` (только файлы, папки — по одной).
+- **Плагин «Планировщик задач»**: секция «Интеграция с планировщиком» вынесена из ядра в `config/plugins/scheduler/` (токен крона и список URL крон-задач). Токен, реестр `register_cron_task()` и эндпоинт `config/cron/run.php` остаются в ядре.
+- **Плагин «Автопубликация страниц»**: cron-публикация и архивация страниц (`publish_at` / `unpublish_at`) вынесены из ядра в `config/plugins/publish/` (задача `publish` в общем реестре). Управление статусами в редакторе страницы остаётся в ядре.
+- **Планирование публикации как возможность**: фильтр `page_scheduling_enabled` (по умолчанию `false`) и хелпер `isPageSchedulingEnabled()`. Пока плагин не включил возможность, в редакторе страницы нет статуса «По расписанию» и полей дат, а `handleSavePage()` отклоняет `status = scheduled`. У страниц с сохранённым расписанием редактор показывает предупреждение; при сохранении даты сбрасываются.
+- **Реестр фоновых задач**: `register_cron_task()`, `get_cron_tasks()`, `run_cron_task()`, `get_cron_state()`, `set_cron_last_run()`, `get_cron_last_run()`. Состояние — в `config/data/cron_state.json`.
+- **Общий крон-эндпоинт** `config/cron/run.php?task={id}&token=...` для задач, зарегистрированных плагинами.
+- **Флаг `enabled`** у `register_cron_task()` — URL только включённых задач показываются в разделе «Интеграция с планировщиком».
+- **Реестр действий логирования**: `register_log_action()`, `get_log_actions()`, `get_log_action_groups()`. Ядро и плагины регистрируют свои действия, UI вкладки «Логи» строится из реестра.
+- **Фильтр `sensitive_files`** — плагины добавляют свои файлы в список недоступных через проводник.
+- **Плагин «SEO-инструменты»**: вынесен из ядра в `config/plugins/seo-tools/` (генерация `sitemap.xml` и `robots.txt`, автообновление при изменении страниц, ручная пересборка, cron-задача `seo`). Настройки (`seo_*`) хранятся в `data/settings.json`; файлы — в корне сайта.
+- **Плагин «История изменений»**: вынесен из ядра в `config/plugins/history/` (снапшоты версий, откат только контента, лимит версий, очистка, модалка в редакторе страницы). Данные (`data/history/`) и поле `history_key` остаются на месте.
+- **Плагин «Корзина»**: вынесен из ядра в `config/plugins/trash/` (перемещение в `data/trash/`, список, восстановление, окончательное удаление, очистка, кнопка и модалка). Ядро включает корзину через фильтр `trash_enabled` (по умолчанию `false`); при выключенном плагине удаление выполняется окончательно с отдельным подтверждением. Данные и `.htaccess` остаются на месте.
+- **Плагин «Предпросмотр»**: вынесен из ядра в `config/plugins/preview/` (временные preview-файлы из конструктора, постоянные preview-ссылки для согласования, AJAX, блок в редакторе и баннер). Ядро включает предпросмотр через фильтр `preview_enabled` (по умолчанию `false`); при выключенном плагине `?preview=` игнорируется, блок в редакторе и кнопка конструктора скрыты, AJAX не отвечает. Данные (`data/preview/`, поле `preview_token`) и `.htaccess` остаются на месте.
+- **Плагин «Cookie-баннер»**: вынесен из ядра в `config/plugins/cookie-banner/` (уведомление о cookies, закрытие с сохранением согласия на 30 дней). Плагин выводит разметку на `render_body_end` и подключает `js/cookie-banner.js`; при выключении баннер исчезает, модалка политик остаётся в ядре.
+- **Каталог модулей**: установка и обновление модулей из общего каталога — блок «Доступные для установки», бейдж `vX → vY`, кнопка «Обновить», скачивание `catalog/mod_{id}.zip`. Новый модуль только скачивается в библиотеку и распаковывается при добавлении на страницу; установленный обновляется сразу, только если уже используется, иначе обновляется архив. Удаление — «Удалить код» (только распакованные файлы) и «Удалить полностью» (код, архив, превью и запись). Обе кнопки блокируются, пока модуль используется на страницах.
+- **Хуки изменения контента**: `page_before_save` / `page_saved`, `home_before_change` / `home_changed`, `page_before_clone` / `page_cloned`, `page_before_delete` / `page_deleted`, `page_before_restore` / `page_restored`, `settings_before_save` / `settings_saved`.
+- **Фильтр `page_data_before_save`** — правка данных страницы перед записью (плагин истории назначает `history_key`).
+- **Хук `trash_item_purged`** — элемент корзины удалён окончательно или страница/меню удалены напрямую при выключенной корзине; аргумент — данные страницы/меню с блоком `_trash`.
+- **Хуки формы страницы**: `edit_page_history_block` (блок в настройках) и `edit_page_modals` (модалки после формы).
+- **Хук `backup_restored`** — после успешного восстановления из резервной копии; аргументы — имя архива и список восстановленных корневых элементов. Восстановление также сбрасывает кеш страниц.
+- **Логирование фоновых задач**: действие `cron_run` (группа «Фоновые задачи») — успешный запуск с длительностью и ошибка задачи. Плагин `backups` дополнительно пишет `backup_create` с именем архива. Пропуски (`Skipped`) и выключенные задачи не логируются.
+
+### Изменено
+
+- **Рефакторинг `index.php` (фронт)**: логика роутинга вынесена в `config/core/router.php`.
+- **Рефакторинг `config/index.php` (админка)**:
+  - Виртуальные кроны вынесены в `config/core/virtual_crons.php`.
+  - Обработка POST — в `config/core/admin_actions.php`.
+  - Обработка GET/AJAX — в `config/core/admin_ajax.php`.
+  - Формирование вкладок — в `config/core/admin_menu.php`.
+  - Добавлен хук `admin_init` для инициализации плагинов.
+- **`handleSaveSettings`**: добавлена поддержка AJAX-ответов (для плагинов) и `return_url` (возврат на нужную вкладку после сохранения).
+- **Унифицированы флеш-сообщения**: теперь можно передавать источник (`Настройки сайта` / `Настройки плагина`) через скрытое поле `settings_source`.
+- **Логи переехали**: `data/logs/` → `config/logs/`. Дефолт — `CMS_LOGS_DIR` (константа в `config.php`).
+- **`handleSaveSettings()`**: сохранение из формы плагина больше не затирает настройки сайта. Признак полного сохранения — скрытое поле `settings_full` в форме «Настроек сайта»; без него ядро берёт текущий `settings.json` и применяет только поля из POST. При полном сохранении ключи, которых нет в форме (настройки выключенных плагинов, пользовательские поля), больше не теряются — переносятся из текущего `settings.json`.
+- **Единый механизм сохранения настроек плагинов**: `save_plugin_settings()` теперь возвращает признак отправки формы и поддерживает вложенные пути (`log_settings.storage_path`). Плагины `maintenance`, `dark-theme`, `logs`, `media-optimization` переведены на него.
+- **Плагин `cookie-banner` (v1.1.0)**: добавлены настройки — текст баннера, подписи и URL ссылок на политику и условия cookie, срок хранения согласия. Пустые текст и подписи берутся из дефолтов плагина, пустой URL открывает встроенную модалку ядра; при сохранении настроек сбрасывается HTML-кеш.
+- **Плагин `maintenance` (v0.9.1)**: исправлено затирание настроек техработы при сохранении формы другого плагина (например, «Обновления») — фильтр срабатывает только при отправке своей формы.
+- **Плагины `maintenance` (v0.9.2) и `scheduler` (v1.0.3)**: генерация bypass-токена и токена крона перенесена из ядра в инлайн-скрипты плагинов (`crypto.getRandomValues`); AJAX-эндпоинты `generate_maintenance_token` / `generate_cron_token` удалены. Токен по-прежнему сохраняется формой через hidden-поле.
+- **Документация**: `ARCHITECTURE.md` и `API.md` больше не описывают внутренние функции `media-optimization` и `maintenance` как ядровые; в `PLUGINS.md` добавлена таблица 14 плагинов и лимит 10 МБ при установке из каталога; в `MODULES.md` описаны ограничения распаковки (`admin/` — рекурсивно, `site/` — только три файла, `preview.png` — только в корне); `README.md` разделяет 24 модуля контента и плагины; в `ROADMAP.md` проставлены статусы вынесенных возможностей. `MODULES-SIMPLE.md.md` переименован в `MODULES-SIMPLE.md`.
+- **Каталог**: удалён тестовый плагин `test-tab`, `catalog.json` пересобран.
+- **Виртуальные кроны**: цикл по реестру задач (`run_virtual_cron_tasks()`) вместо жёстких вызовов; автопубликация тоже стала задачей реестра (`publish`).
+- **`config/cron/backup.php`** заменён общим `config/cron/run.php` (задача `backups`).
+- **Раздел «Интеграция с планировщиком»**: URL задач строятся из реестра (`get_cron_tasks()`), показываются только включённые задачи.
+- **`backup_config.json`**: поле `last_backup_time` больше не используется — расписание хранится в `config/data/cron_state.json`.
+- **Плагин `backups` (v1.0.2)**: подсказка про Cron URL обновлена — управление токеном и URL теперь в разделе «Интеграция с планировщиком» (секция плагина `scheduler`).
+- **Плагин `scheduler` (v1.0.1)**: ссылка на автопубликацию больше не дублируется — задача `publish` показывается из общего реестра.
+- **`getLogSettings()`**: список `log_actions` собирается из реестра; новые действия включены по умолчанию, сохранённый выбор пользователя приоритетнее.
+- **Лог-действия удаления**: `page_delete` / `menu_delete` добавлены в ядро для окончательного удаления при выключенной корзине; `trash_restore` / `trash_delete` / `trash_clear` регистрирует плагин `trash`.
+- **Админские хелперы**: `isTrashEnabled()`, `getDeleteConfirmMessage()` и `isPageSchedulingEnabled()` находятся в `admin_controller.php` — они нужны только админке и не загружаются на фронте.
+- **Плагин `logs`**: UI строится из реестра, локальный `getLogActions()` удалён; при удалении плагина сбрасывается только список действий (путь и лимиты сохраняются).
+- **`ensureLogsDir()`** перенесён в ядро — папка логов и `.htaccess` больше не зависят от плагина `logs`.
+- **`fmIsSensitiveFile()`**: перенесён в плагин `filemanager`; плагины добавляют свои файлы через фильтр `sensitive_files`.
+- **`config/cron/seo.php`** удалён; SEO-задача запускается через общий `config/cron/run.php?task=seo`.
+- **Плагин `scheduler` (v1.0.2)**: убран захардкоженный URL SEO-задачи — список строится только из реестра `get_cron_tasks()`.
+- **Секция SEO**: блок «Технический SEO» рендерится плагином через `register_plugin_settings()`; кнопка пересборки — инлайн-скрипт плагина.
+- **Ядро**: из `handleSavePage()`, `handleSetHomePage()`, `handleClonePage()`, `handleDeletePage()`, `restoreFromTrash()`, `restorePageFromHistory()` убраны вызовы `maybeRegenerateSeoFiles()` — плагин подписан на хуки.
+- **`handleSavePage()`**: перед записью загружается `$oldPage` (версия на диске), применяется фильтр `page_data_before_save`, хуки `page_before_save` / `page_saved` получают третьим аргументом прежнюю версию. Генерация `history_key` и снапшот убраны — это делает плагин.
+- **Корзина**: `deleteFromTrash()` и `clearTrash()` больше не вызывают `clearPageHistory()` напрямую — стреляют `trash_item_purged` с данными удалённого элемента.
+- **Секция «История изменений»**: `config/modules/config_vars/history.php` удалён, секция регистрируется плагином через `register_plugin_section('history', ...)` и выводится в конце списка.
+- **Форма страницы**: кнопка истории и модалка подключаются через `edit_page_history_block` и `edit_page_modals`; из `config_vars.js` удалён `clearAllHistory()` (переехал в секцию плагина).
+- **Форма страницы (preview)**: блок «Ссылка для согласования» подключается через `edit_page_preview_block`, скрипт плагина — через `edit_page_scripts`; баннер предпросмотра на фронте — `site_preview_banner`.
+- **`handleSavePage()`**: `preview_token` больше не обрабатывается ядром — плагин `preview` пишет и удаляет его через `page_data_before_save`, а временные preview чистит на `page_saved`.
+- **`log.php`**: из ядра убраны действия `page_restore` и группа «История» — их регистрирует плагин.
+- **Один запуск за интервал**: виртуальный крон и внешний планировщик делят состояние `config/data/cron_state.json`. Виртуальный крон атомарно ставит заявку (`pending` + одноразовый `pending_token`) и передаёт её в `run.php?run=...`; эндпоинт захватывает запуск по токену или по интервалу и на повторный вызов отвечает `200 Status: Skipped`. Ошибка задачи откатывает `last_run` и ставит паузу 5 минут.
+- **`set_cron_last_run()`** меняет только `last_run`, не затирая `pending` и `retry_after`.
+- **`register_cron_task()`**: опция `log` (по умолчанию `true`). При `false` успешный запуск не пишет `cron_run`, ошибки логируются всегда.
+- **Плагин `publish` (v1.0.4)**: минутный крон больше не засоряет журнал — `cron_run` отключён, а `page_publish` / `page_archive` пишутся только при реальной публикации или снятии страницы.
+- **Плагин `backups` (v1.0.4)**: «нечего делать» (крон выключен, пустые `targets`, нет файлов) — успешный запуск, а не ошибка; имена архивов уникальны в пределах секунды.
+
+### Исправлено
+
+- **`logAction`**: уважает `log_enabled` (раньше галочка в UI не работала).
+- **`logAction`**: уважает `log_actions` (раньше снятые чекбоксы не влияли).
+- **`logAction`**: fallback на `CMS_LOGS_DIR` при небезопасном `storage_path`.
+- **Удаление плагина**: имя берётся до `unset` (раньше сообщение теряло название).
+- **Модули (v1.0.1)**: исправлен parse error в `hero`, URL меню и карты — через `safeUrl()`/`e()`, `json_encode` в атрибутах — через `e()`, числовые `data-*` — через `(int)`, ответы форм в JS — через `textContent`, карта `contacts` собирается заново из проверенного `src`, в `quiz` исправлен абсолютный путь к `includes/mailer.php`, в `text` убрано подключение несуществующего редактора, а в его админке добавлено предупреждение, что HTML вставляется без санитизации.
+- **Плагин `publish` (v1.0.3)**: автопубликация и автоснятие больше не пишут страницу молча. Крон применяет `page_data_before_save` и стреляет `page_before_save` / `page_saved`, поэтому SEO-плагин пересобирает `sitemap.xml`, а `history_key` появляется у старых страниц. Лишние снапшоты не создаются — статус не входит в контентные поля.
+- **Плагин `backups` (v1.0.3)**: после восстановления архива очищается кеш страниц (раньше посетители видели старый HTML) и стреляет `backup_restored` с именем архива и списком восстановленных элементов. При ошибке (ZIP slip, неверный пароль, пустой архив) кеш не трогается и хук не срабатывает.
+- **Плагин `seo-tools` (v1.0.1)**: подписан на `backup_restored` — при восстановлении каталога `data` перечитывает `settings.json` (сброс `DATA_CACHE`) и пересобирает `sitemap.xml` / `robots.txt`, если включена авторегенерация. Восстановление только `images` или одиночного `sitemap.xml` файлы не перезаписывает.
+- **Дубли `cron_full_*`**: `run.php` не проверял интервал, виртуальный крон читал и писал состояние без блокировки, а `set_cron_last_run()` затирал запись целиком. Теперь за период создаётся ровно один архив, даже если виртуальный и внешний планировщик включены одновременно.
+- **Брутфорс**: счётчик попыток не сбрасывался после локаута — `timeDiff` считался от уже перезаписанного `last_time`. Теперь время прошлой попытки запоминается до инкремента, серия начинается заново, `bans_count` растёт, постоянный бан срабатывает.
+- **`sanitizeHtml()`**: `href`/`src` проверяются по декодированному значению, поэтому `java&#x73;cript:` и подобные обходы больше не проходят.
+- **Загрузка SVG**: перед сохранением проверяется содержимое (`validateSvgContent()`): script, `on*`, `foreignObject`, встроенные HTML-элементы, ENTITY, `xml-stylesheet`, `javascript:`/`vbscript:`, CSS `expression()` и внешние ссылки. Файл должен быть корректным XML (SimpleXML + `LIBXML_NONET`).
+- **`loadMenu()`**: ID проверяется по regex до склейки пути — `../` больше не читает произвольные `.json` из `data/`.
+- **Запись данных**: разбан, ручной бан и клонирование страницы переведены на `safeFileWrite()` / `savePageData()` (было без `flock`).
+- **`logAction()`**: `\r` и `\n` вырезаются из действия, сообщения, уровня, пользователя и IP — подделка строк журнала (log injection) закрыта.
+- **Загрузка плагина по URL**: `downloadPluginZip()` и `fetch_catalog()` принимают только `http`/`https`; ID плагина валидируется внутри загрузчика. `file://`, `php://` и `ftp://` отклоняются. Размер архива ограничен 10 МБ (`CURLOPT_MAXFILESIZE` и проверка после скачивания) — как у модулей; превышение удаляет файл и отклоняет установку.
+- **HTML-кеш**: страница пишется во временный файл с `LOCK_EX` и подменяется через `rename()` — параллельный запрос не прочитает недописанный HTML.
+- **Плагин `filemanager` (v1.0.1)**: SVG проверяется не только в медиа-модалке ядра. Загрузка, сохранение в редакторе и переименование в `.svg` вызывают `validateSvgContent()` — вредоносный SVG больше не попадает в файлы через проводник. Сохранение кода переведено на `safeFileWrite()`.
+
+### Технические детали
+
+- **Новые файлы**: `config/core/hooks.php`, `plugins.php`, `router.php`, `virtual_crons.php`, `admin_actions.php`, `admin_ajax.php`, `admin_menu.php`, `config/plugins/*`
+- **Новые константы**: `CONFIG_DIR`, `PLUGINS_DIR`, `CMS_LOGS_DIR`, `UPDATES_DEFAULT_CATALOG_URL`.
+- **Новые поля в `settings.json`**: `updates_period`, `updates_check_core`, `updates_check_modules`, `updates_check_plugins`, `updates_catalog_url`.
+- **Новые файлы**: `config/core/cron.php`, `config/core/log.php`, `config/cron/run.php`.
+- **Новые файлы**: `config/core/security.php` — чистые помощники без старта сессии и заголовков: `e()`, `escapeJsString()`, `safeUrl()`, `validateHtml()`, `sanitizeHtml()`, `safeFileWrite()`, `detectZipSlip()`, `verifyCsrfToken()`, `isValidId()`.
+- **Новые файлы**: `config/core/modules.php` — установка, обновление и удаление модулей: `saveModulesData()`, `unpackModule()`, `unpackModuleArchive()`, `removeModuleFiles()`, `purgeModule()`, `reinstallModule()`, `downloadModuleZip()`, `validateModuleArchive()`, `installModuleFromZip()`, `syncModulesData()`.
+- **`config/core/modules.php`** подключается из `functions.php`: `render_module()` может распаковать модуль на фронте, где `admin_controller.php` недоступен. Админские вызовы (`logAction()`, `createMinFilesForModule()`, `clearPageCache()`) — через `function_exists()`.
+- **`installModuleFromZip(..., true)`** распаковывает код с резервной копией: старый код переносится в `config/modules/_backup/` и возвращается, если копирование сорвалось. Неиспользуемый модуль при обновлении остаётся в виде архива — код распакуется при добавлении на страницу.
+- **Перенесено в плагин `filemanager`**: `config/core/filemanager_api.php` → `plugin.php` (рефакторинг: `fm*`-функции и `fmAction*()`), `config/modules/filemanager.php` → `admin-page.php`, `config/js/filemanager.js` → `admin/script.js`, fm-стили из `config/css/config.css` → `admin/style.css`.
+- **Перенесено в плагин `scheduler`**: `config/modules/config_vars/cron.php` → `admin-section.php`; секция регистрируется через `register_plugin_section()`, чтобы скрытое поле `cron_token` осталось в форме «Настроек сайта».
+- **Перенесено в плагин `publish`**: `handleCronPublishAction()` и `config/cron/publish.php`; задача регистрируется через `register_cron_task('publish', ...)`, лог-действия `page_publish` / `page_archive` — в плагине.
+- **Новые файлы**: `config/plugins/seo-tools/{plugin.json,plugin.php,admin-section.php}`.
+- **Перенесено в плагин `seo-tools`**: `generateSitemap()`, `generateRobots()`, `generateSeoFiles()`, `maybeRegenerateSeoFiles()` → `seo_generate_sitemap()`, `seo_generate_robots()`, `seo_generate_files()`, `seo_maybe_regenerate()`; POST `regenerate_seo_files` → `admin_init`; лог-действие `seo_regenerate` — в плагине.
+- **Закрыто**: `seo_regenerate` убран из `_register_core_log_actions()`.
+- **Новые файлы**: `config/plugins/history/{plugin.json,plugin.php,admin-section.php,admin-modal.php}`.
+- **Перенесено в плагин `history`**: `isHistoryEnabled()`, `getHistoryLimit()`, `getHistoryDir()`, `ensureHistoryDir()`, `getOrCreateHistoryKey()`, `rotatePageHistory()`, `savePageSnapshot()`, `getPageHistory()`, `getHistorySnapshot()`, `getHistoryContentFields()`, `extractHistoryContent()`, `normalizeHistoryContent()`, `deleteHistoryVersion()`, `clearPageHistory()`, `getHistoryStats()`, `restorePageFromHistory()` → `history_*`; четыре POST-обработчика → `admin_init`; `config/core/history_modal.php` → `admin-modal.php`; `config/js/history_modal.js` — инлайн в нём; секция настроек → `admin-section.php`.
+- **Новые файлы**: `config/plugins/preview/{plugin.json,plugin.php,admin-preview-block.php,admin/script.js}`; `config/js/preview.js`.
+- **Перенесено в плагин `preview`**: `createPreview()`, `ensurePreviewDir()`, `cleanupAllPreviews()`, `cleanupSessionPreviews()`, `cleanupSessionPagePreviews()`, `getPreviewUrl()`, `getPagePreviewToken()`, `getPagePreviewUrl()` → `preview_*`; `generate_preview_token` и `preview_create` → `admin_init`; preview-JS из `pages.js` и `constructor.js` → `admin/script.js`; блок редактора → `admin-preview-block.php`; баннер фронта → хук `site_preview_banner`.
+- **Удалено**: `config/preview.php`, `cleanupSessionPreviews()` (не использовалась), preview-функции из `admin_controller.php`, `generate_preview_token` из списка токенов `admin_ajax.php`, флаг `preview_cleanup_all_pending` из `admin_auth.php` (заменён хуком `admin_login_success`).
+- **Новые файлы**: `config/plugins/cookie-banner/{plugin.json,plugin.php,admin-section.php,site/script.js}`.
+- **Перенесено в плагин `cookie-banner`**: разметка баннера из `index.php` и клиентская логика из `js/script.js` → `render_body_end` и `site/script.js`; настройки — в секции `cookie-banner` через `register_plugin_section()`; при toggle/update/delete и изменении настроек плагин очищает HTML-кеш, чтобы баннер не оставался в старых страницах.
+- **Удалено**: `config/core/history_modal.php`, `config/js/history_modal.js`, `config/modules/config_vars/history.php`, `HISTORY_DIR` и ~743 строки истории в `admin_controller.php`, 4 POST-ветки в `admin_actions.php`.
+- **`data/history/`** и `.htaccess` остаются на месте; каталог создаёт плагин при первом снапшоте.
+- **Новые функции кронов**: `mark_cron_pending()`, `claim_cron_task_run()`, `release_cron_task_run()`, `confirm_cron_task_run()`, `_cron_update_state()` (flock и read-modify-write); константы `CRON_PENDING_TTL = 900`, `CRON_RETRY_COOLDOWN = 300`.
+- **`config/cron/run.php`**: 404 для неизвестной задачи, `Skipped` для выключенной и неподошедшей по расписанию, запись `cron_run` в лог, release при ошибке.
+
 ## [Release version 1.11.0] — 2026-10-27
 
 ### Добавлено

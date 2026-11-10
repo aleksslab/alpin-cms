@@ -66,18 +66,6 @@
                         </label>
                         <p class="text-[10px] text-slate-400 mt-1">Хедер прилипает к верху при скролле</p>
                     </div>
-                    
-                    <!-- Переключатель темы -->
-                    <div class="editor-field">
-                        <?php $themeToggleEnabled = !empty($settingsData['theme_toggle_enabled']); ?>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="hidden" name="theme_toggle_enabled" value="0">
-                            <input type="checkbox" name="theme_toggle_enabled" value="1" <?php echo $themeToggleEnabled ? 'checked' : ''; ?> 
-                                   class="w-4 h-4 text-[var(--primary-color)] rounded border-slate-300 focus:ring-[var(--primary-color)]">
-                            <span class="text-sm font-medium text-slate-700">Показывать переключатель темы</span>
-                        </label>
-                        <p class="text-[10px] text-slate-400 mt-1">Кнопка переключения светлой/тёмной темы в хедере</p>
-                    </div>
                 </div>
             </div>
 

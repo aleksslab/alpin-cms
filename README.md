@@ -50,6 +50,10 @@
 - 🗝 **Файловый менеджер** — доступ к файлам через админку с whitelist/blacklist
 
 ### Дополнительно
+- 🧩 **14 плагинов** — резервное копирование, логи, техработы, обновления,
+  предпросмотр, cookie-баннер, файловый менеджер, планировщик, публикация,
+  SEO, история, корзина, тёмная тема, медиа (WebP). Управление в админке,
+  установка через манифест и каталог.
 - 🌐 **SEO** — meta, OG, Twitter Card
 - 🔍 **Sitemap и robots** — автогенерация по расписанию
 - 🔗 **301-редиректы** при смене slug — автоматически
@@ -118,8 +122,8 @@
 ```
 /
 ├── index.php                     # Фронтенд — роутинг и рендеринг
-├── sitemap.xml                   # Генерируется автоматически
-├── robots.txt                    # Генерируется автоматически
+├── sitemap.xml                   # Генерируется плагином seo-tools
+├── robots.txt                    # Генерируется плагином seo-tools
 ├── .htaccess                     # ЧПУ + защита
 ├── README.md                     # Этот файл
 │
@@ -127,43 +131,49 @@
 │   ├── index.php                 # Точка входа
 │   ├── login.php                 # Форма логина
 │   ├── config.php                # Константы, сессии, DEBUG
-│   ├── preview.php               # Эндпоинт создания preview
 │   │
-│   ├── cron/                     # Крон-эндпоинты (для планировщика хостинга)
-│   │   ├── backup.php            # Крон бэкапов
-│   │   └── publish.php           # Крон публикации/архивации страниц
-│   │   └── seo.php               # Крон SEO-файлов
+│   ├── cron/                     # Крон-эндпоинты
+│   │   └── run.php               # Общий запуск задач из реестра
 │   │
 │   ├── core/
-│   │   ├── functions.php         # Чтение данных + утилиты
-│   │   ├── admin_auth.php        # Авторизация, безопасность
+│   │   ├── functions.php         # Чтение данных + утилиты (подключает хуки)
+│   │   ├── security.php          # e(), safeUrl(), CSRF, ID, ZIP Slip
+│   │   ├── hooks.php             # Система хуков (actions, filters, routes)
+│   │   ├── cron.php              # Реестр фоновых задач
+│   │   ├── log.php               # Реестр действий логирования
+│   │   ├── plugins.php           # Загрузчик плагинов
+│   │   ├── modules.php           # Установка/обновление/удаление модулей
+│   │   ├── router.php            # Роутинг фронтенда
+│   │   ├── virtual_crons.php     # Виртуальные кроны
+│   │   ├── admin_actions.php     # POST-обработчики админки
+│   │   ├── admin_ajax.php        # GET/AJAX-обработчики админки
+│   │   ├── admin_menu.php        # Формирование вкладок
+│   │   ├── admin_auth.php        # Авторизация
 │   │   ├── admin_controller.php  # Запись + логика
-│   │   ├── filemanager_api.php   # API файлового менеджера
-│   │   ├── media_modal.php       # Медиа-модалка
-│   │   └── icon_modal.php        # Модалка иконок
-│   │   ├── trash_modal.php       # Модалка корзины
-│   │   └── history_modal.php     # Модалка истории изменений
+│   │   ├── media_modal.php       
+│   │   └── icon_modal.php
+│   │
+│   ├── plugins/                  # Плагины (системные расширения)
 │   │
 │   ├── modules/                  # Модули админки
-│   │   ├── pages/                # Страницы + конструктор
-│   │   ├── menu/                 # Меню
-│   │   ├── config_vars.php       # Настройки сайта
-│   │   ├── modules.php           # Управление модулями
-│   │   ├── security.php          # Безопасность
-│   │   ├── backups.php           # Бэкапы
-│   │   ├── filemanager.php       # Проводник
-│   │   └── logs.php              # Логи
+│   │   ├── pages/
+│   │   ├── menu/
+│   │   ├── config_vars.php
+│   │   ├── modules.php
+│   │   ├── plugins.php           # Управление плагинами
+│   │   └── security.php
 │   │
-│   ├── css/config.css            # Стили админки
-│   ├── js/                       # JS админки
-│   └── data/                     # Системные данные
-│       ├── credentials.json      # Логин/пароль
-│       ├── modules.json          # Список модулей
-│       ├── templates.json        # Список шаблонов
-│       └── .pepper               # Секрет для пароля
+│   ├── css/config.css            
+│   ├── js/                           
+│   ├── logs/                  
+│   └── data/                     
+│       ├── credentials.json      
+│       ├── modules.json          
+│       ├── plugins.json          # Список плагинов
+│       ├── templates.json        
+│       └── .pepper               
 │
 ├── data/                         # ПОЛЬЗОВАТЕЛЬСКИЕ ДАННЫЕ
-│   ├── logs/                     # Логи
 │   ├── menus/*.json              # Меню
 │   ├── pages/*.json              # Страницы
 │   ├── preview/                  # Временные preview из конструктора
@@ -179,6 +189,11 @@
 ├── templates/                    # Шаблоны сайта
 │   ├── base.php
 │   ├── full-width.php
+│   ├── sidebar-left.php
+│   ├── sidebar-right.php
+│   ├── sidebar-both.php
+│   ├── boxed.php
+│   ├── maintenance.php           # Заглушка 503 (плагин maintenance)
 │   ├── headers/{default,centered,minimal,with-cta}/
 │   └── footers/{default,minimal,dark,light}/
 │
@@ -249,7 +264,7 @@
 - `.htaccess` защита для `config/`, `data/`, `cache/`, `logs/`
 - Логирование всех действий
 - Шифрование бэкапов AES-256
-- Токен крона (общий для бэкапов и публикации) в `settings.json` — защита крон-эндпоинтов
+- Токен крона (общий для всех крон-задач) в `settings.json` — защита крон-эндпоинтов
 
 **Что настроить на проде:**
 - HTTPS
@@ -275,7 +290,7 @@
 - 📖 Сохранение лицензии GPL v3
 - 📖 Указание авторства и изменений
 
-**Полный текст:** [LICENSE](LICENSE) · [gnu.org/licenses/gpl-3.0](https://www.gnu.org/licenses/gpl-3.0.html)
+**Полный текст:** [LICENSE.md](LICENSE.md) · [gnu.org/licenses/gpl-3.0](https://www.gnu.org/licenses/gpl-3.0.html)
 
 ---
 

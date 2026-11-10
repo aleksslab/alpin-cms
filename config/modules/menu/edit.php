@@ -287,7 +287,7 @@ $token = $_SESSION['csrf_token'] ?? '';
 
 <?php if ($isEdit && $menuId !== $mainMenuId): ?>
 <form id="menu-delete-form" method="POST" action="index.php?tab=menu" 
-      onsubmit="return confirm('Удалить меню &quot;<?php echo e($menuName); ?>&quot;?')" 
+      onsubmit="return confirm('<?php echo e(getDeleteConfirmMessage('menu', $menuName)); ?>')"
       style="display:none">
     <input type="hidden" name="csrf_token" value="<?php echo e($token); ?>">
     <input type="hidden" name="menu_delete" value="1">

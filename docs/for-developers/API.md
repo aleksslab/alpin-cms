@@ -74,6 +74,28 @@ $clean = sanitizeHtml('<p>OK</p><script>bad</script>');
 
 ---
 
+### `validateSvgContent(string $content): ?string`
+
+**Проверка содержимого SVG** перед сохранением. Возвращает **текст ошибки** или `null`.
+
+```php
+$error = validateSvgContent($svg);
+if ($error !== null) {
+    // файл отклонён
+}
+```
+
+**Проверяет** **после** `html_entity_decode`:
+- `<script>`, `on*="..."`, `<foreignObject>`
+- встроенные HTML-элементы: `iframe`, `object`, `embed`, `frame`, `audio`, `video`, `canvas`
+- `<!ENTITY>`, `<?xml-stylesheet?>`
+- `javascript:`, `vbscript:`, CSS `expression(...)`
+- внешние `href` / `xlink:href`; `data:image/...` разрешён
+
+Дополнительно файл должен быть **корректным XML** (SimpleXML + `LIBXML_NONET`). SVG — XML с исполняемыми возможностями, поэтому одного MIME `image/svg+xml` недостаточно.
+
+---
+
 ### `formatPhone(string $phone): string`
 
 **Форматирует** **номер** **в** **читаемый** **вид**.
@@ -95,6 +117,56 @@ safeFileWrite($logFile, $line, true);  // append
 ```
 
 **Защита** **от** **race** **condition**.
+
+---
+
+### `verifyCsrfToken(?string $token): bool`
+
+**Сравнение** **CSRF-токена** **из** **запроса** **с** `$_SESSION['csrf_token']`
+**через** `hash_equals()`. **Пустая** **сессия** **или** **пустой** **токен** →
+`false`.
+
+```php
+if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+    die('CSRF');
+}
+```
+
+---
+
+### `isValidId(string $id): bool`
+
+**Проверка** **ID** (**модуль**, **плагин**, **страница**, **файл**) — **только**
+`[a-z0-9\-_]+`: **нижний** **регистр**, **без** **точек** **и** **слэшей**.
+**Защищает** **от** **path traversal**.
+
+```php
+isValidId('hero');        // true
+isValidId('../etc');      // false
+isValidId('Hero');        // false
+```
+
+---
+
+### `detectZipSlip(ZipArchive $zip): ?string`
+
+**Проверка** **имён** **файлов** **в** **ZIP** **до** `extractTo()`. **Возвращает**
+**имя** **опасной** **записи** **или** `null`.
+
+**Блокирует:** `..`, **абсолютные** **пути** (`/`, `C:\`), **NUL-байты**.
+
+```php
+$entry = detectZipSlip($zip);
+if ($entry !== null) {
+    $zip->close();
+    // установка отменяется
+}
+```
+
+`verifyCsrfToken()`, `isValidId()` и `detectZipSlip()` **живут** **в**
+`config/core/security.php`. **Файл** **подключается** **из** `config.php` **и**
+`functions.php`; **сессию** **и** **заголовки** **он** **не** **трогает**, **только**
+**чистые** **помощники**.
 
 ---
 
@@ -257,6 +329,60 @@ $result = getPagesListPaginated(1, 25);
 
 ---
 
+## 🪝 Хуки и Плагины
+
+### Список доступных хуков
+
+| Хук | Тип | Где срабатывает | Аргументы |
+|-----|-----|-----------------|-----------|
+| `index_start` | action | В начале `index.php` | — |
+| `admin_init` | action | В админке, после авторизации | — |
+| `admin_header_notifications` | action | В хедере админки | — |
+| `admin_settings_sections` | action | В Настройках сайта | — |
+| `render_head_start` | action | В `<head>` (до SEO) | — |
+| `render_head_end` | action | В `<head>` (перед `</head>`) | — |
+| `render_body_end` | action | Перед `</body>` | — |
+| `after_file_upload` | action | После загрузки файла (проводник / медиа) | `$filePath` |
+| `admin_login_success` | action | После успешного входа в админку | `$userIp` |
+| `plugin_before_toggle` | action | Перед вкл/выкл плагина | `$id`, `$active` |
+| `plugin_after_toggle` | action | После вкл/выкл плагина | `$id`, `$active` |
+| `plugin_before_delete` | action | До удаления плагина | `$id` |
+| `plugin_after_delete` | action | После удаления плагина | `$id` |
+| `plugin_before_update` | action | Перед обновлением плагина | `$id`, `$newVersion` |
+| `plugin_after_update` | action | После обновления плагина | `$id`, `$newVersion` |
+| `plugin_after_install` | action | После установки плагина | `$id` |
+| `page_title` | filter | Заголовок страницы | `$title`, `$page` |
+| `preview_enabled` | filter | Доступен ли предпросмотр. По умолчанию `false`: `?preview=` игнорируется, блок в редакторе и кнопка конструктора скрыты | `$enabled` |
+| `edit_page_preview_block` | action | Блок preview в форме редактирования страницы | `$page`, `$pageId` |
+| `edit_page_scripts` | action | Скрипты редактора страницы (create и edit) | `$pageId`, `$isEdit` |
+| `site_preview_banner` | action | Баннер предпросмотра на фронте | `$isPreview` |
+| `save_settings_data` | filter | Массив настроек перед сохранением (при полном сохранении — собранный из POST, при сохранении из плагина — текущий `settings.json`) | `$newSettings` |
+| `page_scheduling_enabled` | filter | Доступно ли планирование публикации. По умолчанию `false`: статус «По расписанию» и поля дат в редакторе не показываются | `$enabled` |
+| `trash_enabled` | filter | Доступна ли корзина. По умолчанию `false`: удаление окончательное, кнопки и модалки нет | `$enabled` |
+| `trash_entity_result` | filter | Результат перемещения страницы/меню в корзину | `$result`, `$type`, `$id` |
+| `trash_button` | action | Кнопка «Корзина» в шапке списка | `$type`, `$returnUrl` |
+| `trash_modal` | action | Модалка корзины | `$type`, `$returnUrl` |
+
+#### `isPageSchedulingEnabled(): bool`
+
+**Возвращает** `true`, если активный плагин включил фильтр `page_scheduling_enabled`. Ядро по умолчанию считает возможность выключенной: без обработчика фильтра страницу со статусом `scheduled` публиковать некому. Функция — в `config/core/admin_controller.php`.
+
+```php
+if (isPageSchedulingEnabled()) {
+    // статус «По расписанию» и даты доступны
+}
+```
+
+Влияет на:
+
+- `config/modules/pages/edit.php` — радиокнопка «По расписанию» и поля `publish_at` / `unpublish_at`;
+- `handleSavePage()` — отклоняет `status = scheduled`, если возможность выключена;
+- `config/js/pages.js` — нет полей дат, подсветка статусов продолжает работать.
+
+`loadPage()` проверяет `unpublish_at` независимо от фильтра: это страховка фронта, а не часть планировщика.
+
+---
+
 ## 🎨 Рендер
 
 ### `renderBreadcrumbs(array $page): string`
@@ -344,7 +470,27 @@ $assets = getModuleAssets(['hero', 'faq'], $settings, 'home');
 
 ### `saveModulesData(array $data): bool`
 
-**Сохраняет** `config/data/modules.json`.
+**Сохраняет** `config/data/modules.json` **через** `safeFileWrite()`.
+
+**Формат** — **объект**, **ключ** — **ID** **модуля**:
+
+```json
+{
+    "hero": {
+        "name": "Герой (Hero)",
+        "icon": "icon-layout-dashboard",
+        "description": "Полноэкранный блок",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.0",
+        "author": "AlekSSLab"
+    }
+}
+```
+
+**Порядок** **ключей** — **порядок** **вывода** **в** **админке**.
+`syncModulesData()` **сохраняет** **его** **и** **добавляет** **новые** **модули**
+**в** **конец**.
 
 ---
 
@@ -360,6 +506,13 @@ $res = handleSaveSettings();
 **Валидация** `name`/`slogan`/`footer_copyright` (**санитайзер**).  
 **Валидация** `email`.  
 **Обновление** **кеша** **при** **изменении** **ассетов**.
+
+**Режим сохранения** определяется скрытым полем `settings_full`:
+
+- `settings_full=1` — форма «Настроек сайта» (`config/modules/config_vars.php`): `$newSettings` **пересобирается с нуля** из POST. Ключи, которых нет в форме (настройки выключенных плагинов, пользовательские поля), при этом **сохраняются** из текущего `settings.json`.
+- поля нет — форма плагина (например, вкладка «Логи»): берётся текущий `settings.json`, поверх которого фильтр `save_settings_data` записывает только присланные плагином поля. Настройки сайта не затираются.
+
+Форма плагина `settings_full` **не добавляет**. Сохранение своих полей плагин оформляет через `save_plugin_settings()` (см. `PLUGINS.md`).
 
 ---
 
@@ -420,27 +573,148 @@ $res = handleSaveSettings();
 
 ### `handleModuleAction(): array`
 
-**Управление** **модулями**:
-- `module_action=upload` — загрузка ZIP.
-- `module_action=delete` — удаление.
+**Управление** **модулями** (POST `module_action`):
+- `upload` — загрузка ZIP из формы.
+- `delete` — удалить **только код** (архив и запись в реестре остаются).
+- `purge` — удалить **полностью**: код, архив, превью и запись в
+  `config/data/modules.json`.
 
-**Валидация** `manifest.id`.  
-**`detectZipSlip`** **перед** **распаковкой**.
+**Распаковка** — отдельный POST `unpack_module=1` (`admin_actions.php` →
+`unpackModule()`).
+
+**Валидация** `manifest.id` и `isValidId()`.  
+**`detectZipSlip`** **перед** **распаковкой**.  
+**Проверка** `findModuleUsage()`: используемый на страницах модуль удалить
+нельзя.  
+**Flash** — через `setFlash()`/`renderFlash()`.
 
 ---
 
 ### `unpackModule(string $moduleId): array`
 
-**Распаковывает** **модуль** **из** **ZIP**.
+**Распаковывает** **модуль** **из** `config/modules/archives/{id}.zip`
+**в** `config/modules/{id}/`, `modules/{id}.php`, `css/{id}.css`,
+`js/{id}.js`.
 
-**Валидация** `$moduleId`.  
+**Валидация** `$moduleId` (**`isValidId`**).  
 **`detectZipSlip`**.
+
+`unpackModule()` **доступна** **на** **фронте**: **определена** **в**
+`config/core/modules.php`, **подключается** **через** `functions.php`.
+
+---
+
+### `unpackModuleArchive(string $zipPath, string $moduleId): array`
+
+**Внутренняя** **распаковка** **произвольного** **ZIP** **во** **временную**
+**папку** `config/modules/_temp/{id}/`, **затем** **копирование** `admin/` **и**
+`site/` **по** **местам**.
+
+**Перед** **копированием** **старый** **код** **переносится** **в**
+`config/modules/_backup/` (`_moduleStashCode()`). **Если** **копирование**
+**сорвалось**, **новые** **файлы** **удаляются**, **старый** **код**
+**возвращается** (`_moduleRestoreCode()`). **При** **успехе** **резервная**
+**копия** **удаляется**.
+
+**`.min`-файлы** **и** **кеш** **обновляются** **только** **в** **админке**
+(**через** `function_exists()`). **Остатки** **прерванных** **распаковок**
+**в** `config/modules/_backup/` **и** `_temp/` **старше** **часа** **удаляются**
+`_moduleCleanupRuntime()`.
 
 ---
 
 ### `removeModuleFiles(string $moduleId): array`
 
-**Удаляет** **файлы** **модуля**.
+**Удаляет** **распакованный** **код** **модуля**: `config/modules/{id}/`,
+`modules/{id}.php`, `css/{id}.css`, `css/{id}.min.css`, `js/{id}.js`,
+`js/{id}.min.js`.
+
+**Возвращает:** `['success' => bool, 'message' => string, 'deleted' => int]`.  
+**Архив** **и** **запись** **в** `modules.json` **остаются** — **для** **этого**
+**есть** `purgeModule()`.
+
+---
+
+### `purgeModule(string $moduleId): array`
+
+**Полное** **удаление**: `removeModuleFiles()` + архив
+`config/modules/archives/{id}.zip` + превью
+`config/modules/previews/{id}.png` + запись в `modules.json`.
+
+---
+
+### `reinstallModule(string $moduleId): array`
+
+**Удаляет** **код** **и** **распаковывает** **архив** **заново**.
+
+---
+
+### `validateModuleArchive(string $zipPath, string $moduleId): array`
+
+**Проверка** **ZIP** **перед** **установкой**:
+
+- `manifest.json` **в** **корне**;
+- `id` **в** **манифесте** **совпадает** **с** `$moduleId`;
+- **нет** `plugin.json` (**это** **не** **плагин**);
+- **есть** `site/module.php`;
+- **версия** **не** **ниже** **установленной** (**запрет** **даунгрейда**);
+- **нет** **ZIP Slip**.
+
+**Возвращает:** `['success' => bool, 'message' => string, 'manifest' => array]`.
+
+---
+
+### `installModuleFromZip(string $zipPath, string $id, bool $replace = false, bool $unpack = true): array`
+
+**Установка** **или** **обновление** **модуля** **из** **ZIP**:
+
+1. `validateModuleArchive()`;
+2. **если** **модуль** **уже** **установлен** **и** `$replace = false` — **отказ**;
+3. **копия** **архива** **в** `config/modules/archives/{id}.zip`;
+4. **превью** **из** `preview.png` **в** `config/modules/previews/{id}.png`;
+5. **если** `$unpack = true` — `unpackModuleArchive()` **с** **резервной**
+   **копией** **старого** **кода**;
+6. **если** `$unpack = false` **и** **модуль** **был** **установлен** —
+   `removeModuleFiles()`: **старый** **код** **не** **должен** **отдаваться**
+   **вместо** **нового**, **он** **распакуется** **при** **добавлении** **на**
+   **страницу**;
+7. **запись** **в** `modules.json`.
+
+**Порядок** **вызова**:
+
+- **новый** **модуль** **из** **каталога** — `$unpack = false` (**код** **не**
+  **нужен**, **пока** **модуль** **не** **добавлен**);
+- **обновление** **из** **каталога** — `$unpack = isModuleInstalled($id) &&
+  !empty(findModuleUsage($id))`;
+- **ручная** **загрузка** **ZIP** — **решает** `admin_controller.php`:
+  `auto_unpack` **или** **использование** **на** **страницах**.
+
+**Используется** **вкладкой** «Модули», **AJAX**
+`module_install_from_url` **и** **плагином** `updates`.
+
+---
+
+### `downloadModuleZip(string $url, string $id): ?string`
+
+**Скачивает** **архив** **модуля** **во** **временный** **файл**
+`data/module_{id}.zip`.
+
+**Ограничения:** **только** `http(s)://`, **не** **более** **10 МБ**, **таймаут**
+**30 с**. **Возвращает** `null` **при** **ошибке** — **файл** **удаляется**.
+
+---
+
+### `syncModulesData(): array`
+
+**Синхронизирует** `config/data/modules.json` **с** **архивами** **в**
+`config/modules/archives/`.
+
+- **существующие** **записи** **обновляются** **на** **месте**, **порядок**
+  **сохраняется**;
+- **новые** **архивы** **добавляются** **в** **конец**;
+- **записи** **без** **архива** **удаляются**.
+
+**Возвращает** **актуальный** **список** **модулей**.
 
 ---
 
@@ -450,44 +724,20 @@ $res = handleSaveSettings();
 
 **Валидация** `From:` (**Host** **Header** **Injection**).
 
----
-
-### `handleSaveBackupSettings(): array`
-
-**Сохраняет** **настройки** **бэкапов**.
-
----
-
-### `handleInitBackupProcess(): array`
-
-**Инициализация** **бэкапа** (**сбор** **файлов**, **разбивка** **на** **пачки**).
+Вызывается диспетчером `handle_admin_post_actions()` по схеме
+Post/Redirect/Get: флеш ставится там же, затем редирект на
+`index.php?tab=security`. Так же обрабатываются `action_unban` и
+`action_manual_ban`. При смене логина или пароля — выход,
+редирект на `index.php?msg=updated`.
 
 ---
 
-### `handleProcessBackupStep(): array`
+### Резервное копирование
 
-**Пошаговая** **архивация** (**50** **файлов** **на** **шаг**).
-
----
-
-### `handleRestoreBackup(): array`
-
-**Восстановление** **из** **бэкапа**.
-
-**`detectZipSlip`** **перед** **распаковкой**.
-
----
-
-### `handleDownloadBackup(): void`
-
-**Отдаёт** **ZIP** **через** `readfile`.
-
----
-
-### `handleCronBackupAction(string $token): void`
-
-**Крон** **бэкапа** (**токен** **из** `$_GET['token']`).  
-**Сравнение с** `getCronToken()` — общий токен для бэкапов и публикации, хранится в `data/settings.json`.
+Функциональность резервного копирования вынесена в плагин `backups` и в ядре
+не документируется. Плагин использует только публичный API ядра:
+`safeFileWrite()`, `detectZipSlip()`, `logAction()`, `setFlash()` и реестр
+фоновых задач (`register_cron_task()`).
 
 ---
 
@@ -515,316 +765,171 @@ clearPageCacheById('about');
 
 handleSavePage() — при сохранении страницы.
 
-handleCronPublishAction() — при автопубликации / архивации.
+Плагин `publish` (cron-задача) — при автопубликации / архивации.
 
 ---
 
 ## 🗑 Корзина
 
-### `trashPage(string $id): array`
+Корзина реализована плагином `trash` (`config/plugins/trash/`). Ядро знает
+только возможность и контракт; функции перемещения, восстановления и очистки
+в ядро не входят. Обе функции ниже — в `config/core/admin_controller.php`:
+корзина относится к админке и на фронте не нужна.
 
-**Перемещает страницу в корзину.** Логин для `_trash.deleted_by` берётся из `$_SESSION['admin_login']`.
+### `isTrashEnabled(): bool`
 
-```php
-$result = trashPage('about');
-// ['success' => true, 'error' => '']
-```
-
-**Валидация:** тип `page`, ID по regex `[a-z0-9\-_]+`.
-
----
-
-### `trashMenu(string $id): array`
-
-**Перемещает меню в корзину.** Аналогично `trashPage`, но для `data/menus/`.
+**Проверяет, доступна ли корзина.** Возвращает результат фильтра
+`trash_enabled` (по умолчанию `false`).
 
 ```php
-$result = trashMenu('footer_help');
-```
-
----
-
-### `trashEntity(string $type, string $id, string $sourceDir): array`
-
-**Общая функция перемещения сущности в корзину.** Используется `trashPage()` и `trashMenu()`. Напрямую обычно не вызывается.
-
-**Что делает:**
-1. Валидирует тип и ID.
-2. Читает исходный JSON.
-3. Добавляет `_trash` с метаданными.
-4. Записывает в `data/trash/{type}_{id}_{timestamp}.json`.
-5. Удаляет оригинал.
-6. **Откат:** если не удалось удалить оригинал — удаляет файл из корзины.
-
----
-
-### `getTrashList(?string $type = null): array`
-
-**Возвращает список файлов в корзине с метаданными.** Отсортировано по `deleted_at` (свежие сверху).
-
-```php
-$list = getTrashList('page');
-// [
-//   ['file' => 'page_home_1735689600.json', 'type' => 'page', 'original_id' => 'home', 'title' => 'Главная', 'deleted_at' => 1735689600, 'deleted_by' => 'admin', 'size_bytes' => 4096],
-//   ...
-// ]
-```
-
-**Фильтр `$type`:** `'page'` / `'menu'` / `null` (все).
-
----
-
-### `getTrashCount(?string $type = null): int`
-
-**Возвращает количество файлов в корзине.**
-
-```php
-$total = getTrashCount();          // все
-$pages = getTrashCount('page');    // только страницы
-$menus = getTrashCount('menu');    // только меню
-```
-
-Для фильтра по типу использует `glob("{$type}_*.json")` — быстро.
-
----
-
-### `restoreFromTrash(string $trashFileName): array`
-
-**Восстанавливает сущность из корзины.**
-
-```php
-$result = restoreFromTrash('page_about_1735689600.json');
-// ['success' => true, 'message' => 'Страница восстановлена как "about-restored" (оригинальный ID был занят).', 'error' => '', 'new_id' => 'about-restored']
-```
-
-**Разрешение конфликта ID:**
-1. Если `original_id` свободен — восстанавливает под ним.
-2. Иначе — `{original_id}-restored`, `{original_id}-restored-2`, ... до 100 попыток.
-
-**Для страниц** slug **всегда пересчитывается** в `{new_id}` — чтобы URL не конфликтовал.
-
----
-
-### `deleteFromTrash(array $fileNames): array`
-
-**Окончательно удаляет указанные файлы из корзины.**
-
-```php
-$result = deleteFromTrash(['page_home_1735689600.json', 'menu_x_1735689601.json']);
-// ['success' => true, 'deleted' => 2, 'error' => '']
-```
-
-**Валидация имён файлов:** regex `^[a-z]+_[a-z0-9\-_]+_\d+\.json$`.
-
----
-
-### `clearTrash(): array`
-
-**Полностью очищает корзину.**
-
-```php
-$result = clearTrash();
-// ['success' => true, 'deleted' => 5, 'error' => '']
-```
-
----
-
-### `handleTrashAction(): void`
-
-**Обработчик POST-действий корзины.** Вызывается из `config/index.php` при `$_POST['trash_action']`.
-
-**Действия:**
-- `restore` — восстановить выбранные.
-- `delete_selected` — удалить выбранные.
-- `clear_all` — очистить всё.
-
-**Дополнительные поля формы:** `trash_context` (`page` / `menu`), `trash_return_url`, `trash_files[]`.
-
-**Редирект** — всегда, в конце. `flash` — success / warning / error.
-
----
-
-### `ensureTrashDir(): bool`
-
-**Гарантирует существование `data/trash/` + `.htaccess` защиту.** Вызывается из `trashEntity()`.
-
-```php
-if (!ensureTrashDir()) {
-    return ['success' => false, 'error' => 'Папка корзины недоступна для записи.'];
+if (isTrashEnabled()) {
+    // плагин активен: удаление идёт в корзину
 }
 ```
+
+Плагин включает возможность в своём `plugin.php`:
+
+```php
+add_filter('trash_enabled', function () {
+    return true;
+});
+```
+
+---
+
+### `getDeleteConfirmMessage(string $type, string $title): string`
+
+**Возвращает текст подтверждения удаления** для `confirm()`.
+
+- корзина доступна — «Переместить страницу/меню «…» в корзину?»;
+- корзина отключена — предупреждение об окончательном удалении.
+
+```php
+$message = getDeleteConfirmMessage('page', $page['title']);
+```
+
+---
+
+### Хуки корзины
+
+| Хук | Тип | Что делает |
+|---|---|---|
+| `trash_enabled` | filter | Включает корзину. По умолчанию `false` |
+| `trash_entity_result` | filter | Ядро передаёт `null, $type, $id`; плагин возвращает результат перемещения в корзину или `null` |
+| `trash_button` | action | Вывод кнопки «Корзина» в шапке списка. Аргументы: `$type`, `$returnUrl` |
+| `trash_modal` | action | Вывод модалки корзины. Аргументы: `$type`, `$returnUrl` |
+
+**Поведение ядра:**
+
+- `handleDeletePage()` / `handleDeleteMenu()` вызывают
+  `apply_filters('trash_entity_result', null, $type, $id)`;
+- плагин вернул массив — ядро пишет `page_trash` / `menu_trash`, сбрасывает
+  кеш страницы и показывает «перемещено в корзину»;
+- вернулся `null` — ядро удаляет файл окончательно, пишет `page_delete` /
+  `menu_delete` и вызывает `trash_item_purged` с блоком `_trash`, чтобы
+  плагины (например, `history`) почистили связанные данные.
+
+---
+
+### Контракт событий
+
+Плагин `trash` вызывает события, на которые подписываются другие плагины:
+
+- `page_before_delete($id)`, `page_deleted($id)`;
+- `page_before_restore($originalId)`, `page_restored($newId)`;
+- `trash_item_purged($trashData)` — данные файла корзины с блоком `_trash`.
+
+`trash_item_purged` также вызывается ядром при окончательном удалении, когда
+корзина отключена.
 
 ---
 
 ## 👁 Предпросмотр
 
-### Временный preview (из конструктора)
+Предпросмотр реализован плагином `preview` (`config/plugins/preview/`). Ядро
+оставляет режим рендера и публичные функции чтения; создание, токены, UI и
+очистка — в плагине.
 
-#### `createPreview(array $pageData, string $sessionId, string $pageId, ?string $existingPreviewId, string $createdBy): array`
+### `isPreviewEnabled(): bool`
 
-Создаёт/перезаписывает preview-файл.
-
-```php
-$result = createPreview($pageData, session_id(), 'about', null, 'admin');
-// ['success' => true, 'preview_id' => 'a1b2...', 'error' => '']
-```
-
-Перезапись — если `$existingPreviewId` задан и совпадает `session_id + page_id`.
-
-#### `loadPreviewById(string $previewId): ?array`
-
-Читает preview-файл, **убирает** служебный блок `_preview`.
+**Проверяет, доступен ли предпросмотр.** Возвращает результат фильтра
+`preview_enabled` (по умолчанию `false`). Функция — в `config/core/functions.php`.
 
 ```php
-$page = loadPreviewById('a1b2c3...');
-```
-
-**Живёт в `functions.php`** — нужна и фронту.
-
-#### `cleanupAllPreviews(): int`
-
-Удаляет **все** preview-файлы. Используется при логине.
-
-#### `cleanupSessionPreviews(string $sessionId): int`
-
-Удаляет previews конкретной сессии.
-
-#### `cleanupSessionPagePreviews(string $sessionId, string $pageId): int`
-
-Удаляет previews сессии **для** конкретной страницы.
-
-#### `ensurePreviewDir(): bool`
-
-Создаёт `data/preview/` + `.htaccess`.
-
-#### `getPreviewUrl(string $previewId, string $slug = ''): string`
-
-Формирует URL вида `/{slug}?preview={id}` или `/?preview={id}`.
-
----
-
-### Постоянный preview-токен (для согласования)
-
-#### `getPagePreviewToken(string $pageId): string`
-
-Читает `preview_token` из JSON страницы. Пустая строка, если не задан.
-
-#### AJAX-эндпоинт `generate_preview_token`
-
-**URL:** `index.php?tab=pages&ajax=generate_preview_token` (GET).
-
-Генерирует **новый** preview-токен **без сохранения** в JSON. Возвращает `{success: true, token: "..."}`.
-
-Запись токена в `data/pages/{id}.json` — **только при сохранении страницы** (через hidden-поле `preview_token` в форме). Удаление — снятие поля при сохранении.
-
-#### `getPagePreviewUrl(string $pageId, string $token): string`
-
-Формирует **полный** URL: `{protocol}://{host}/{slug}?preview={token}`.
-
-#### `loadPageByPreviewToken(string $token): ?array`
-
-Ищет страницу по `preview_token`. Возвращает в **любом** статусе. **Живёт в `functions.php`.**
-
----
-
-### Эндпоинт `config/preview.php`
-
-POST-эндпоинт для создания временного preview.
-
-**Вход (POST):**
-- `csrf_token` — обязательно.
-- `page_id` — ID страницы (пусто для новой).
-- `title`, `slug`, `template`.
-- `show_header`, `show_footer`.
-- `meta_description`, `meta_keywords`.
-- `rows_json` — JSON конструктора.
-- `existing_preview_id` — опционально (перезапись).
-
-**Выход (JSON):**
-```json
-{
-    "success": true,
-    "preview_id": "a1b2c3...",
-    "url": "/about?preview=a1b2c3..."
+if (isPreviewEnabled()) {
+    // ?preview= и блок в редакторе доступны
 }
 ```
 
-**Требует авторизации и CSRF.**
+Плагин включает возможность в `plugin.php`:
+
+```php
+add_filter('preview_enabled', function () {
+    return true;
+});
+```
+
+Пока фильтра нет:
+
+- `?preview={token}` игнорируется, старые ссылки не открывают страницы;
+- блок «Ссылка для согласования» и кнопка «Предпросмотр» не выводятся;
+- AJAX-эндпоинты preview не отвечают.
+
+### `loadPreviewById(string $previewId): ?array`
+
+Читает временный preview-файл `data/preview/{id}.json`, **убирает** служебный
+блок `_preview`. **Живёт в `functions.php`** — нужна фронту.
+
+### `loadPageByPreviewToken(string $token): ?array`
+
+Ищет страницу по `preview_token` в `data/pages/*.json`. Возвращает страницу в
+**любом** статусе. **Живёт в `functions.php`.**
+
+### Создание временного preview
+
+Создание и перезапись временных preview, а также генерация постоянных токенов —
+внутри плагина (обработчики на `admin_init`). Ядро своих preview-эндпоинтов не
+регистрирует. Внешний контракт для других плагинов — только чтение через
+`loadPreviewById()` и `loadPageByPreviewToken()`.
+
+### Запись preview_token
+
+`preview_token` записывается в `data/pages/{id}.json` **только при сохранении
+страницы**: плагин ловит `page_data_before_save` и читает hidden-поле
+`preview_token`. Пустое значение удаляет токен. При создании страницы токен не
+пишется. `handleClonePage()` не копирует `preview_token` — защита от дублей.
+
+### Хуки предпросмотра
+
+| Хук | Где | Что делает |
+|---|---|---|
+| `preview_enabled` (фильтр) | `functions.php` | Включает предпросмотр |
+| `admin_login_success` | `admin_auth.php` | Событие входа (плагин чистит временные preview) |
+| `edit_page_preview_block` | `pages/edit.php` | Блок в форме редактирования страницы |
+| `edit_page_scripts` | `pages/edit.php` | Скрипты редактора (create и edit) |
+| `site_preview_banner` | корневой `index.php` | Баннер предпросмотра |
+
+### Данные
+
+- `data/preview/{preview_id}.json` — временные preview (32 hex), `.htaccess` рядом;
+- `data/pages/{id}.json` → `preview_token` — постоянная ссылка для согласования.
+
+Файлы данных остаются на месте при выключении и удалении плагина.
 
 ---
 
 ## 🚧 Технические работы
 
-### `isMaintenanceEnabled(): bool`
+Режим техработ — плагин `maintenance` (`config/plugins/maintenance/`).
+В ядре остаётся только шаблон `templates/maintenance.php`: плагин подключает
+его при 503, тему можно переопределить.
 
-Проверяет, включён ли режим техработ.
-
-```php
-isMaintenanceEnabled(); // true, если maintenance_enabled = true
-```
-
-**НЕ проверяет автоснятие.** Автоснятие делает **`index.php`** (фронт): если `maintenance_until` истёк — снимает флаг и пишет `settings.json`.
-
----
-
-### `getMaintenanceBypassToken(): string`
-
-Возвращает текущий bypass-токен. Если токена нет — **генерирует** и **сохраняет** в `settings.json`.
-
-```php
-$token = getMaintenanceBypassToken(); // 32 hex
-```
-
-**Аналог `getCronToken()`** — но **отдельный** токен, **не пересекается** с кроном.
-
----
-
-### `regenerateMaintenanceToken(): string`
-
-Принудительно генерирует **новый** токен и **сохраняет** в `settings.json`.
-
-```php
-$newToken = regenerateMaintenanceToken();
-```
-
-**Внимание:** сломает все ранее выданные bypass-ссылки.
-
-**В UI** — вызывается через **AJAX `generate_maintenance_token`**, который **генерирует без сохранения** (запись — только при «Сохранить настройки», как `cron_token`).
-
----
-
-### AJAX-эндпоинт `generate_maintenance_token`
-
-**URL:** `index.php?tab=config_vars&ajax=generate_maintenance_token` (GET).
-
-Генерирует **новый** токен **без сохранения**. Возвращает `{success: true, token: "..."}`.
-
-Запись в `settings.json` — **только при «Сохранить настройки»** (через hidden-поле `maintenance_bypass_token`).
-
----
-
-### Шаблон `templates/maintenance.php`
-
-**Не функция**, а **шаблон**, подключается из `index.php` при `503`.
-
-**Переменные** (из `index.php`):
-- `$maintenanceMessage` — HTML/plain (уже через `sanitizeHtml`).
-- `$maintenanceUntil` — Unix timestamp или `null`.
-- `$maintenanceShowTimer` — bool (показывать таймер).
-- `$maintenanceSettings` — весь `settings.json`.
-
-**Поведение:**
-- Inline-CSS (без Tailwind).
-- Логотип + название.
-- Сообщение (как есть).
-- Таймер (если `$maintenanceShowTimer && $maintenanceUntil > now`).
-- Контакты (email/телефон).
-- Reload через 5 сек после истечения таймера.
-
-**Заголовки** (устанавливаются в `index.php` **до** `include`):
-- `HTTP/1.1 503 Service Unavailable`
-- `Retry-After: 3600`
-- `X-Robots-Tag: noindex, nofollow, noarchive`
+- Настройки (`maintenance_enabled`, `maintenance_message`, `maintenance_until`,
+  `maintenance_bypass_token`, `maintenance_show_timer`) — в `settings.json`.
+- Bypass-токен генерируется в админке на клиенте (`crypto.getRandomValues`)
+  и сохраняется вместе с формой. Отдельного AJAX-эндпоинта в ядре нет.
+- Автоснятие по `maintenance_until` выполняет плагин на `index_start`.
+- Заголовки 503, `Retry-After`, `X-Robots-Tag` и bypass-cookie — в плагине.
 
 ---
 
@@ -867,6 +972,8 @@ mediaImageSrc('data:image/png;base64,...'); // без изменений
 
 **Пропускает:** `data:`, `http(s)://`, `//`, `.webp`, `.svg`, `.avif`, `.ico`.
 
+**Примечание:** Функция только **читает** наличие `.webp`. Сами `.webp` создаются плагином «Медиа (WebP)» (см. `PLUGINS.md`).
+
 **Результат кешируется** в памяти на время запроса (`static $cache`).
 
 **Использование:**
@@ -876,491 +983,26 @@ mediaImageSrc('data:image/png;base64,...'); // без изменений
 
 ---
 
-### Утилиты сканирования (`admin_controller.php`)
-
-#### `getImageFiles(string $rootDir, bool $recursive = true): array`
-
-Собирает абсолютные пути к `jpg`/`jpeg`/`png` в директории.
-
-```php
-$files = getImageFiles('/path/to/images', true);
-// ['/path/to/images/a.jpg', '/path/to/images/sub/b.png', ...]
-```
-
-**`$recursive = true`** — обход **всех подпапок** через `RecursiveIteratorIterator`.
-
-**`$recursive = false`** — только верхний уровень (используется для **корня сайта**, чтобы не лезть в `css/`, `js/`, `modules/`).
-
-**Используется в:** `getWebpStats()`, `deleteAllWebp()`, `countImagesWithoutWebp()`, `convertExistingImagesStep()`.
-
-**Правило проекта:** для `images/` — **рекурсивно** (там подпапки: `products/`, `blog/`, `team/`), для **корня** — **только верхний уровень**.
-
----
-
-### WebP-конвертация (`admin_controller.php`)
-
-#### `isWebpSupported(): bool`
-
-Проверяет доступность WebP на сервере.
-
-```php
-isWebpSupported(); // true — есть GD с imagewebp или Imagick с WebP
-                   // false — нет ни того, ни другого
-```
-
-**Результат кешируется** (`static $cache = null`).
-
-**Используется в:**
-- `handleSaveSettings` — защита от POST-инъекции `media_webp_enabled`.
-- `handleConvertExistingImagesStep` — отказ, если нет поддержки.
-- `media.php` — UI: `disabled` + предупреждения.
-
----
-
-#### `convertToWebp(string $sourcePath, int $quality = 82): ?string`
-
-Конвертирует одно изображение в `.webp`. Создаёт файл **рядом** с оригиналом. Оригинал **не удаляет**.
-
-```php
-$webp = convertToWebp('/path/to/photo.jpg', 82);
-// '/path/to/photo.webp' или null при ошибке
-```
-
-**Что конвертирует:** `jpg`, `jpeg`, `png` (прозрачность PNG сохраняется).
-
-**Что пропускает:** `gif`, `svg`, `ico`, `avif`, `webp` (уже).
-
-**Движки:** GD (приоритет) → Imagick (fallback).
-
-**При ошибке:** возвращает `null`, чистит частичный `.webp` (если создался). **Не бросает исключений.**
-
-**Не проверяет** `isWebpSupported()` — предполагает, что поддержка уже проверена снаружи.
-
----
-
-#### `maybeConvertToWebp(string $sourcePath): ?string`
-
-Обёртка: читает настройки и вызывает `convertToWebp()`, если включено.
-
-```php
-maybeConvertToWebp('/path/to/photo.jpg');
-// → '/path/to/photo.webp' (если media_webp_enabled = true и поддержка есть)
-// → null в остальных случаях
-```
-
-**Проверяет:**
-1. `media_webp_enabled` в `settings.json`.
-2. `isWebpSupported()` — защита от рассинхрона «локалка → прод».
-3. Берёт `media_quality` из настроек.
-
-**Используется в:** `handleAjaxImageUpload`, `filemanager_api.php → action=upload`.
-
----
-
-### Статистика и удаление
-
-#### `getWebpStats(): array`
-
-Собирает статистику по `.webp`-файлам.
-
-```php
-$stats = getWebpStats();
-// ['count' => 42, 'size_bytes' => 1258291]
-```
-
-**Обход:**
-- `images/` — **рекурсивно** (включая подпапки: `products/`, `blog/`, `team/`).
-- корень сайта — **только верхний уровень** (логотипы, OG-картинки).
-
-**Считает только те `.webp`, у которых есть парный** `jpg`/`jpeg`/`png`. Нативные `.webp` (без оригинала) — **не считаются**.
-
----
-
-#### `deleteAllWebp(): array`
-
-Удаляет все `.webp`, у которых есть парный оригинал. Оригиналы **не трогает**.
-
-```php
-$result = deleteAllWebp();
-// ['deleted' => 42, 'kept' => 3, 'error' => '']
-// 'kept' — .webp без оригинала (не удалены)
-```
-
-**Обход:**
-- `images/` — **рекурсивно** (включая подпапки).
-- корень сайта — **только верхний уровень**.
-
-**Защита:** удаляет `.webp` **только если** рядом есть `foo.jpg`/`foo.jpeg`/`foo.png`. Нативные `.webp` (загруженные сами по себе) — **не трогает**, считает в `kept`.
-
-**Используется в:** `handleDeleteAllWebp`.
-
----
-
-#### `handleDeleteAllWebp(): void`
-
-AJAX-обработчик удаления всех `.webp`. Вызывается из `config/index.php` при `$_POST['delete_all_webp']`.
-
-**Возвращает JSON:**
-```json
-{
-    "success": true,
-    "deleted": 42,
-    "kept": 3,
-    "error": "",
-    "message": "Удалено .webp: 42. Оставлено (нет оригинала): 3."
-}
-```
-
-**Логирует** в `logAction` при `deleted > 0`.
-
----
-
-### Массовая конвертация существующих
-
-#### `countImagesWithoutWebp(): int`
-
-Считает, сколько `jpg`/`png` **не имеют** парного `.webp`.
-
-```php
-countImagesWithoutWebp(); // 156
-```
-
-**Обход:**
-- `images/` — **рекурсивно** (включая подпапки).
-- корень сайта — **только верхний уровень**.
-
-**Используется в:** `media.php` — чтобы показать «Без .webp: N» и кнопку «Конвертировать N существующих».
-
----
-
-#### `convertExistingImagesStep(int $step, int $perStep = 10): array`
-
-Обрабатывает **одну пачку** существующих изображений без `.webp`.
-
-```php
-$result = convertExistingImagesStep(0, 10);
-// [
-//   'processed'   => 10,
-//   'converted'   => 9,   // 1 могла упасть
-//   'total'       => 156,
-//   'is_finished' => false
-// ]
-```
-
-**Обход:**
-- `images/` — **рекурсивно** (включая подпапки).
-- корень сайта — **только верхний уровень**.
-
-**`$step`** — номер шага (0-based). **`$perStep`** — сколько файлов за шаг (1–50).
-
-**Порядок шагов:** JS начинает с `$step = 0`, увеличивает на 1, пока `is_finished = false`.
-
----
-
-#### `handleConvertExistingImagesStep(): void`
-
-AJAX-обработчик шага конвертации. Вызывается из `config/index.php` при `$_POST['convert_existing_images_step']`.
-
-**Вход (POST):**
-- `step` (int) — номер шага.
-- `per_step` (int, опционально) — размер пачки, по умолчанию 10.
-
-**Возвращает JSON:**
-```json
-{
-    "success": true,
-    "processed": 20,
-    "converted": 19,
-    "total": 156,
-    "is_finished": false
-}
-```
-
-**Если `isWebpSupported() = false`** — возвращает `{success: false, error: '...'}`.
+### Медиа (WebP)
+
+Конвертация, статистика и массовая переработка изображений — в плагине
+`media-optimization` (`config/plugins/media-optimization/`). Внутренние
+функции плагина (`getImageFiles()`, `isWebpSupported()`, `convertToWebp()`,
+`getWebpStats()`, `deleteAllWebp()`, `countImagesWithoutWebp()`,
+`convertExistingImagesStep()` и обработчики) не входят в публичный API ядра.
+Ядро оставляет только `mediaImageSrc()` и `mediaLazyAttrs()` — см. выше.
 
 ---
 
 ## 🕘 История изменений
 
-### Настройки
-
-#### `isHistoryEnabled(): bool`
-
-Проверяет галочку `history_enabled` в `settings.json`.
-
-```php
-if (!isHistoryEnabled()) {
-    return false;
-}
-```
-
----
-
-#### `getHistoryLimit(): int`
-
-Максимум хранимых версий на страницу. Читает `history_limit`, ограничивает диапазоном **1..100**, по умолчанию **20**.
-
-```php
-$limit = getHistoryLimit(); // 20
-```
-
----
-
-#### `getHistoryDir(string $historyKey): string`
-
-Путь к папке истории конкретной страницы. **Не создаёт** папку — только формирует путь.
-
-```php
-$dir = getHistoryDir('22c915d03008950d');
-// /.../data/history/22c915d03008950d/
-```
-
-Валидация: `historyKey` — 16 hex-символов. Иначе — пустая строка.
-
----
-
-#### `ensureHistoryDir(string $historyKey): bool`
-
-Создаёт `data/history/` + `.htaccess` (`Require all denied`) + вложенную папку страницы. Возвращает `true`, если папка доступна для записи.
-
----
-
-#### `getOrCreateHistoryKey(array &$page): string`
-
-Возвращает `history_key` страницы. Если ключа нет — генерирует, **пишет в JSON страницы** и возвращает. **Модифицирует `$page` по ссылке**.
-
-Используется как fallback для страниц, созданных **до** фичи.
-
-```php
-$key = getOrCreateHistoryKey($page); // 16 hex
-```
-
----
-
-### Запись снапшотов
-
-#### `savePageSnapshot(array $oldPage, array $newPage, string $savedBy = 'system'): bool`
-
-Сохраняет снапшот страницы. Вызывается **перед** перезаписью файла.
-
-**Дедупликация — снапшот НЕ пишется, если:**
-1. История отключена.
-2. `$oldPage` = `$newPage` (пользователь ничего не менял).
-3. Такое же состояние уже есть в **последнем** снапшоте.
-
-```php
-savePageSnapshot($oldPageForHistory, $pageData, $_SESSION['admin_login'] ?? 'system');
-```
-
-**Что делает:**
-1. Проверка `isHistoryEnabled()`.
-2. Сравнение `$oldPage` и `$newPage` по контентным полям (`extractHistoryContent`).
-3. Проверка дедупликации с последним снапшотом.
-4. Запись `data/history/{key}/{timestamp}.json` со служебным блоком `_history`.
-5. Ротация — удаление старых при превышении `getHistoryLimit()`.
-
----
-
-#### `rotatePageHistory(string $historyKey, int $limit): int`
-
-Удаляет самые старые снапшоты, оставляя не больше `$limit`. Возвращает число удалённых файлов.
-
----
-
-#### `getHistoryContentFields(): array`
-
-Список **контентных** полей — единый источник правды для снапшота, сравнения и отката.
-
-```php
-// ['title', 'template', 'meta', 'show_header', 'show_footer', 'rows']
-```
-
-**Не входят:** `status`, `publish_at`, `unpublish_at`, `slug`, `slug_history`, `preview_token`, `id`, `history_key`.
-
----
-
-#### `extractHistoryContent(array $page): array`
-
-Возвращает из страницы **только контентные поля** (список выше). Отсутствующие ключи → `null`.
-
----
-
-#### `normalizeHistoryContent(array $content): array`
-
-Нормализует контент для стабильного сравнения:
-- Вырезает служебное поле `_jsId` в `rows[].columns[].modules[]`.
-- Рекурсивно сортирует ключи через `ksort` (`normalizeHistorySort`).
-
-Используется для `md5(json_encode(...))` перед сравнением.
-
----
-
-#### `normalizeHistorySort($value)`
-
-Рекурсивный `ksort`. Служебная функция для `normalizeHistoryContent`. Напрямую не вызывается.
-
----
-
-### Чтение
-
-#### `getPageHistory(string $historyKey): array`
-
-Возвращает список версий страницы (свежие сверху).
-
-```php
-$list = getPageHistory('22c915d03008950d');
-// [
-//   ['timestamp' => 1735689700, 'snapshot_at' => 1735689700, 'saved_by' => 'admin', 'size_bytes' => 5752, 'page_id' => 'about'],
-//   ...
-// ]
-```
-
-Метаданные — из блока `_history` каждого файла. Битые / пустые файлы игнорируются.
-
----
-
-#### `getHistorySnapshot(string $historyKey, int $timestamp): ?array`
-
-Читает конкретный снапшот. Возвращает данные **без** служебного блока `_history`.
-
----
-
-### Удаление версий
-
-#### `deleteHistoryVersion(string $historyKey, int $timestamp): array`
-
-Удаляет одну версию.
-
-```php
-$result = deleteHistoryVersion('22c915d03008950d', 1735689700);
-// ['success' => true, 'error' => '']
-```
-
----
-
-#### `clearPageHistory(string $historyKey): int`
-
-Удаляет все версии страницы + папку. Возвращает число удалённых файлов.
-
----
-
-#### `getHistoryStats(): array`
-
-Статистика всей истории сайта. Для секции настроек.
-
-```php
-$stats = getHistoryStats();
-// ['pages' => 5, 'versions' => 87, 'size_bytes' => 342000]
-```
-
----
-
-### Откат
-
-#### `restorePageFromHistory(string $pageId, int $timestamp): array`
-
-Восстанавливает страницу из снапшота.
-
-```php
-$result = restorePageFromHistory('about', 1735689700);
-// ['success' => true, 'error' => '', 'message' => 'Страница восстановлена к версии от 05.10.2026 14:32.']
-```
-
-**Порядок работы:**
-1. Загрузка текущей страницы.
-2. Получение `history_key`.
-3. Чтение снапшота.
-4. **Снапшот текущего состояния** — чтобы откат был обратимым.
-5. Применение контентных полей из снапшота (`getHistoryContentFields`).
-6. Служебные поля (`id`, `slug`, `history_key`, `preview_token`) — **из текущей** страницы.
-7. `savePageData`, `clearPageCacheById`, `maybeRegenerateSeoFiles`.
-
----
-
-#### `handleRestorePageVersion(string $pageId, int $timestamp): void`
-
-POST-обработчик отката. Вызывается из `config/index.php`. Делает flash + log + redirect в `edit.php`.
-
----
-
-#### `handleDeleteHistoryVersion(string $pageId, int $timestamp): void`
-
-POST-обработчик удаления одной версии.
-
----
-
-#### `handleClearPageHistory(string $pageId): void`
-
-POST-обработчик очистки всей истории одной страницы.
-
----
-
-#### `handleClearAllHistory(): void`
-
-AJAX-обработчик очистки **всей** истории сайта. Вызывается из секции настроек. Возвращает JSON с количеством удалённых версий и страниц.
-
-```json
-{
-    "success": true,
-    "deleted_pages": 5,
-    "deleted_versions": 87,
-    "message": "Удалено версий: 87 (страниц: 5)."
-}
-```
+Функциональность вынесена в плагин **История изменений** (`history`).
+Ядро оставляет только хуки, через которые плагин получает события
+(см. `PLUGINS.md`); формат файлов `data/history/` — в `DATA_STRUCTURE.md`.
 
 ---
 
 ## 🔍 SEO
-
-### `generateSitemap(): array`
-
-Генерирует `sitemap.xml` в корне сайта.
-
-```php
-$result = generateSitemap();
-// ['success' => true, 'count' => 25, 'error' => '']
-```
-
-Включает только `published`-страницы без истёкшего `unpublish_at`. Главная — `priority 1.0`, остальные — `0.8`.
-
----
-
-### `generateRobots(): array`
-
-Генерирует `robots.txt` в корне.
-
-```php
-$result = generateRobots();
-// ['success' => true, 'error' => '']
-```
-
-Содержит `Disallow` для `/config/`, `/data/`, `/cache/`, `/*?preview=` + `Sitemap:`.
-
----
-
-### `generateSeoFiles(): array`
-
-Генерирует оба файла (с учётом галочек `seo_sitemap_enabled` / `seo_robots_enabled`).
-
-```php
-$result = generateSeoFiles();
-// ['sitemap' => ['success' => true, 'skipped' => false, 'error' => ''],
-//  'robots'  => ['success' => true, 'skipped' => false, 'error' => '']]
-```
-
-При выключенной галочке — **удаляет** соответствующий файл.
-
-Обновляет `last_seo_regenerate` в `settings.json`.
-
----
-
-### `maybeRegenerateSeoFiles(): void`
-
-Обёртка: проверяет `seo_auto_regenerate` и вызывает `generateSeoFiles()`, если включено.
-
-Вызывается из `handleSavePage`, `handleDeletePage`, `restoreFromTrash`, `handleClonePage`, `handleSetHomePage`.
-
----
 
 ### `findPageBySlugHistory(string $slug): ?array`
 
@@ -1392,63 +1034,111 @@ $baseUrl = getBaseUrl();  // 'https://alpincms.ru'
 
 ---
 
-### Крон `config/cron/seo.php`
+## ⏰ Реестр фоновых задач
 
-URL: `/config/cron/seo.php?token=xxx`.
+Ядро хранит список зарегистрированных задач и состояние их запуска
+(`last_run`, заявка виртуального крона, пауза после ошибки). Оно не знает,
+какой плагин какую задачу добавил и что эта задача делает.
 
-Токен — **общий** (`getCronToken()`).
+Виртуальный и внешний планировщик делят состояние `config/data/cron_state.json`,
+поэтому задача выполняется ровно один раз за `interval`, даже если включены оба.
 
-Отдаёт plain-text: `Status: OK, sitemap: ok, robots: skip` — где `ok` (сгенерирован), `skip` (галочка выключена), `error` (ошибка генерации).
+### `register_cron_task(string $id, callable $callback, array $options = []): void`
+
+**Регистрирует** задачу в общем реестре. `$options`:
+
+- `interval` — минимальный интервал между запусками в секундах (`0` — только ручной запуск);
+- `virtual` — участвовать ли в виртуальном кроне (запуск при входе админа);
+- `enabled` — активна ли задача (по умолчанию `true`). Только включённые задачи показываются в разделе «Интеграция с планировщиком» Настроек сайта (секция плагина `scheduler`);
+- `log` — писать `cron_run` при успешном запуске (по умолчанию `true`). Для частых задач, которые сами логируют результат, ставьте `false` — ошибки всё равно попадут в журнал;
+- `label` — человекочитаемое название.
+
+```php
+register_cron_task('my-task', 'my_task_callback', [
+    'interval' => 3600,
+    'virtual'  => true,
+    'enabled'  => true,
+    'label'    => 'Моя задача',
+]);
+```
+
+### `get_cron_tasks(): array`
+
+**Возвращает** все зарегистрированные задачи (ключ — `id`).
+
+### `run_cron_task(string $id): bool`
+
+**Выполняет** задачу по `id`. Возвращает `false`, если задача не найдена или
+вернула `false`/бросила исключение. Задача не должна сама вызывать
+`set_cron_last_run()` и менять состояние крона.
+
+### `get_cron_state(): array`
+
+**Читает** состояние кронов из `config/data/cron_state.json`.
+
+### `set_cron_last_run(string $id, int $timestamp): void`
+
+**Сохраняет** время последнего запуска задачи, не затирая остальные поля
+записи. Для ручных операций, которые должны сдвинуть расписание (например,
+ручной бэкап); из задачи крона не вызывается.
+
+### `get_cron_last_run(string $id): int`
+
+**Возвращает** время последнего запуска задачи (`0` — не запускалась).
+
+### Захват запуска
+
+Эти функции используют `config/cron/run.php` и виртуальный крон; плагинам
+вызывать их не нужно.
+
+- `mark_cron_pending(string $id): string` — атомарно ставит заявку виртуального
+  крона и возвращает одноразовый токен (`''` — запуск не нужен: интервал не
+  подошёл, жива чужая заявка или действует пауза).
+- `claim_cron_task_run(string $id, string $token = ''): bool` — атомарно
+  захватывает запуск: по токену — пока заявка жива (`CRON_PENDING_TTL`, 900 с),
+  без токена — когда подошёл интервал и нет живой заявки.
+- `confirm_cron_task_run(string $id): void` — подтверждает успех и убирает
+  служебные поля захвата.
+- `release_cron_task_run(string $id): void` — при ошибке откатывает `last_run`
+  и ставит паузу `CRON_RETRY_COOLDOWN` (300 с).
+
+### Крон `config/cron/run.php`
+
+URL: `/config/cron/run.php?task={id}&token=xxx[&run=yyy]`.
+
+Единая точка входа для задач плагинов. Ядро проверяет `token` через
+`getCronToken()`, валидирует `id` по regex, проверяет `enabled`, захватывает
+запуск и вызывает `run_cron_task()`.
+
+Ответы plain-text:
+
+- `Status: OK` — задача выполнена (`cron_run` пишется, если у задачи не отключён `log`);
+- `Status: Skipped` (`200`) — задача выключена, интервал не подошёл или запуск
+  уже захвачен; в лог не пишется;
+- `403` — неверный токен, `400` — невалидный `id`, `404` — неизвестная задача,
+  `500` — задача вернула `false` (пишется `cron_run` с уровнем `ERROR`).
+
+Виртуальный крон (`run_virtual_crons()` в `config/core/virtual_crons.php`)
+проходит по включённым задачам с флагом `virtual`, ставит заявку и вызывает
+`run.php` по HTTP с одноразовым `run`-токеном.
 
 ---
 
 ## ⏰ Cron-публикация
 
-### `handleCronPublishAction(string $token): void`
+Логика публикации/архивации вынесена в плагин `publish` (задача `publish`).
+Ядро вызывает её через общий эндпоинт `config/cron/run.php?task=publish&token=...`.
+Расписание задаёт опция `interval` (60 секунд), флаг `virtual` включает запуск
+при заходе админа в админку. Переходы статусов, сброс кеша и логирование
+(`page_publish` / `page_archive`) — внутри плагина.
 
-**Логика крона публикации страниц.** Вызывается из `config/cron/publish.php`.
-
-**Что делает:**
-
-1. Проверяет `token` через `getCronToken()`.
-2. Проходит по всем файлам `data/pages/*.json`.
-3. Применяет переходы:
-   - `scheduled` + `publish_at <= now` → `published`, `publish_at = null`.
-   - Если при этом `unpublish_at` уже в прошлом — сразу `archived` (без промежуточного `published`).
-   - `published` + `unpublish_at <= now` → `archived`, `unpublish_at = null`.
-4. Сбрасывает кеш затронутых страниц через `clearPageCacheById()`.
-5. Логирует переходы (`page_publish`, `page_archive`).
-6. Отдаёт plain-text: `Status: OK, published: N, archived: M`.
-
-**Не использует** `handleSavePage()` — для крона простая прямая запись через `savePageData()` (без POST-валидации).
+Поля страниц `publish_at` / `unpublish_at` и ручное управление статусами
+остаются в ядре (редактор страницы, `handleSavePage()`).
 
 ---
-
-### `getLastCronPublishTime(): int`
-
-**Время последнего запуска виртуального крона публикации** (Unix timestamp).  
-`0` — если ни разу не запускался.
-
-```php
-$last = getLastCronPublishTime();
-setLastCronPublishTime(int $timestamp): void
-```
-**Сохраняет время последнего запуска** виртуального крона публикации в data/settings.json.
-
----
-
-### `setLastCronPublishTime(int $timestamp): void`
-**Сохраняет время последнего запуска** виртуального крона публикации в data/settings.json.
-
-```php
-setLastCronPublishTime(time());
-```
-**Используется в** config/index.php перед асинхронным вызовом крона — ограничивает частоту (не чаще 1 раза в 5 минут).
-
---- 
 
 ### `getCronToken(): string`
-**Возвращает общий токен** для cron/backup.php и cron/publish.php.
+**Возвращает общий токен** для всех крон-эндпоинтов в `config/cron/` (в т.ч. `run.php`).
 Если в settings.json токена нет — генерирует bin2hex(random_bytes(16)) и сохраняет.
 
 ```php
@@ -1458,12 +1148,12 @@ $token = getCronToken();
 
 ### `regenerateCronToken(): string`
 **Принудительно генерирует новый токен** и сохраняет в settings.json.
-**Внимание:** сломает все настроенные крон-задачи (бэкап + публикация).
+**Внимание:** сломает все настроенные внешние крон-задачи.
 
 ```php
 $newToken = regenerateCronToken();
 ```
-**Вызывается** из формы «Интеграция с планировщиком» в Настройках сайта (через AJAX-эндпоинт `generate_cron_token` + сохранение формы).
+**Вызывается** из раздела «Интеграция с планировщиком» в Настройках сайта (секция плагина `scheduler`). Новый токен генерируется в браузере (`crypto.getRandomValues`) и попадает в форму через hidden-поле; в `settings.json` он записывается только при сохранении.
 
 ---
 
@@ -1505,39 +1195,42 @@ if (verifyAdminCredentials($login, $password)) { ... }
 
 ### `checkAdminSessionTimeout(array $bfData): void`
 
-**Idle timeout** — **уничтожение** **сессии** **при** **неактивности**.
+**Idle timeout** — уничтожение сессии при неактивности. При каждом вызове
+обновляет `$_SESSION['last_activity']`.
+
+### `getAdminSessionTimeoutSeconds(array $bfData): int`
+
+Время жизни сессии в секундах (`session_timeout * 60`, минимум 60).
+
+### `getAdminSessionRemaining(array $bfData): int`
+
+Остаток текущей сессии в секундах (`0` — истекла).
+
+### `getAdminSessionWarnSeconds(array $bfData): int`
+
+Порог предупреждения: `min(120, max(10, lifetime / 2))`.
+
+### `renderSessionNotice(int $lifetime): string`
+
+HTML скрытой sticky-полосы предупреждения. Данные для JS —
+`data-lifetime`, `data-warn`, `data-ping-url`, `data-login-url`.
+
+### `index.php?ajax=session_ping`
+
+GET-эндпоинт таймера. Продлевает сессию и отдаёт JSON
+`{ok, remaining, lifetime, warn}`; без авторизации — `401`.
 
 ---
 
 ## 📁 Файловый менеджер
 
-### `fmSafePath(string $path): ?string`
+Проводник вынесен в плагин `filemanager` (`config/plugins/filemanager/`).
+Его функции (`fmSafePath()`, `fmSafeAbsolute()`, `fmIsBlacklisted()`,
+`fmIsAllowedExtension()`, `fmIsSensitiveFile()`) не входят в публичный API
+ядра.
 
-**Валидация** **относительного** **пути** (**whitelist** **символов**).
-
----
-
-### `fmSafeAbsolute(string $relativePath): ?string`
-
-**`realpath`** + **проверка** **префикса** `FM_SITE_ROOT`.
-
----
-
-### `fmIsBlacklisted(string $relativePath): bool`
-
-**Запрещённые** **пути:** `config/data`, `config/backups`, `config/core`, `data/logs`.
-
----
-
-### `fmIsAllowedExtension(string $fileName): bool`
-
-**Whitelist** **расширений**.
-
----
-
-### `fmIsSensitiveFile(string $fileName): bool`
-
-**Чувствительные** **файлы:** `.pepper`, `credentials.json`, `login_attempts.json`, `backup_config.json`.
+Плагины могут запретить доступ к своим служебным файлам через фильтр
+`sensitive_files` (см. `PLUGINS.md`).
 
 ---
 
@@ -1545,7 +1238,7 @@ if (verifyAdminCredentials($login, $password)) { ... }
 
 ### `logAction(string $action, string $message, string $level = 'INFO', ?string $user = null): void`
 
-**Запись** **в** `data/logs/admin.log`.
+**Запись** **в** `config/logs/admin.log` (**по умолчанию**; путь настраивается в плагине `logs`).
 
 ```php
 logAction('page_save', 'Страница сохранена', 'INFO');
@@ -1553,6 +1246,10 @@ logAction('auth_failed', 'Неудачная попытка', 'WARNING');
 ```
 
 **Уровни:** `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+
+**Проверки:** `log_enabled = false` → не пишет; действие отключено в `log_actions` → не пишет (список действий — из реестра, см. `register_log_action()`); небезопасный `storage_path` → fallback на `CMS_LOGS_DIR` (`config/logs/`).
+
+**Константа:** `CMS_LOGS_DIR` определена в `config.php`.
 
 ---
 
@@ -1562,15 +1259,44 @@ logAction('auth_failed', 'Неудачная попытка', 'WARNING');
 
 ---
 
-### `parseLogLine(string $line): ?array`
+### `getLogSettings(): array`
 
-**Парсинг** **строки** **лога**.
+Настройки логирования из `settings.json` (`log_settings`). Список `log_actions`
+собирается из реестра: **новые действия включены по умолчанию**, сохранённый
+выбор пользователя приоритетнее.
 
 ---
 
-### `getLogActions(): array`
+### `register_log_action(string $action, string $label, string $group = 'Прочее', string $icon = 'activity'): void`
 
-**Список** **всех** **возможных** **действий** **для** **логирования**.
+**Регистрирует** действие для системы логирования. Реестр — `config/core/log.php`.
+Ядро регистрирует свои действия, плагины — свои (на верхнем уровне `plugin.php`).
+
+```php
+register_log_action('backup_create', 'Создание бэкапа', 'Бэкапы', 'database-backup');
+```
+
+---
+
+### `get_log_actions(): array`
+
+**Возвращает** плоский список зарегистрированных действий: `[action => label]`.
+
+---
+
+### `get_log_action_groups(): array`
+
+**Возвращает** действия, сгруппированные для UI:
+`[group => ['icon' => ..., 'actions' => [action => label]]]`.
+Порядок групп — порядок регистрации.
+
+---
+
+### `ensureLogsDir(): void`
+
+**Создаёт** папку логов и `.htaccess` (если папка внутри сайта) по пути из
+настроек или `CMS_LOGS_DIR`. Вызывается на `admin_init`. Защита папки не зависит
+от плагина `logs`.
 
 ---
 

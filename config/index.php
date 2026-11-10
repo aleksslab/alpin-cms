@@ -3,6 +3,43 @@ require_once 'config.php';
 require_once 'core/functions.php';
 require_once 'core/admin_auth.php';
 
+// =========================================================================
+// SESSION PING (heartbeat таймера сессии)
+// =========================================================================
+// Обслуживается до синхронизации плагинов и виртуальных кронов: это дешёвый
+// запрос, который лишь продлевает сессию и возвращает остаток времени.
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['ajax']) && $_GET['ajax'] === 'session_ping') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, max-age=0');
+
+    if (empty($_SESSION['admin_auth'])) {
+        http_response_code(401);
+        echo json_encode(['ok' => false]);
+        exit;
+    }
+
+    $bfDataPing = getLoginAttemptsData();
+    checkAdminSessionTimeout($bfDataPing);
+
+    echo json_encode([
+        'ok'        => true,
+        'remaining' => getAdminSessionRemaining($bfDataPing),
+        'lifetime'  => getAdminSessionTimeoutSeconds($bfDataPing),
+        'warn'      => getAdminSessionWarnSeconds($bfDataPing),
+    ]);
+    exit;
+}
+
+// Синхронизируем манифесты плагинов с JSON (подхватываем изменения из plugin.json)
+if (function_exists('syncPluginsData')) {
+    syncPluginsData();
+}
+
+// Загружаем активные плагины
+if (function_exists('loadActivePlugins')) {
+    loadActivePlugins();
+}
+
 $error = '';
 $generatedHash = '';
 $successMessage = '';
@@ -77,10 +114,7 @@ if ($isAuth) {
     
     // --- ЗАЩИТА ОТ CSRF-АТАК ---
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $incomingToken = $_POST['csrf_token'] ?? '';
-        $sessionToken  = $_SESSION['csrf_token'] ?? '';
-        
-        if (empty($sessionToken) || !hash_equals($sessionToken, $incomingToken)) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             header('HTTP/1.1 403 Forbidden');
             exit('Критическая ошибка безопасности: CSRF-токен невалиден или устарел. Обновите страницу.');
         }
@@ -89,243 +123,37 @@ if ($isAuth) {
     // --- КОНТРОЛЬ НЕАКТИВНОСТИ СЕССИИ (Idle Timeout) ---
     $bfData = getLoginAttemptsData();
     checkAdminSessionTimeout($bfData);
+    $sessionLifetime = getAdminSessionTimeoutSeconds($bfData);
     
     require_once 'core/admin_controller.php';    
     
-    // === PREVIEW CLEANUP TRIGGERS ===
-    
-    // Успешный логин — очистка ВСЕГО
-    // Флаг устанавливается в handleSuccessfulLogin, обрабатывается здесь
-    if (!empty($_SESSION['preview_cleanup_all_pending'])) {
-        cleanupAllPreviews();
-        unset($_SESSION['preview_cleanup_all_pending']);
-    }
-    
-    // --- ВИРТУАЛЬНЫЙ КРОН БЭКАПА ---
-    $cronSettings = getBackupSettingsData();
-    // Проверяем, включен ли Виртуальный Крон в сохраненном JSON-конфиге
-    if (!empty($cronSettings['cron_virtual'])) {
-        $lastCronBackup = intval($cronSettings['last_backup_time'] ?? 0);
-        $cronPeriodHours = intval($cronSettings['cron_period'] ?? 24);
-
-        // Если текущее время перешагнуло за установленный интервал периодичности
-        if (time() >= ($lastCronBackup + ($cronPeriodHours * 3600))) {
-
-            // Тихо и асинхронно вызываем наш готовый файл Крона через внутренний поток PHP
-            $cronUrl = getBaseUrl() . dirname($_SERVER['SCRIPT_NAME']) . '/cron/backup.php?token=' . urlencode(getCronToken());
-
-            // Выставляем таймаут ровно в 1 секунду.
-            // Страница админки откроется мгновенно, а сам авто-бэкап продолжит собираться в фоне сервера!
-            $cronContext = stream_context_create([
-                'http' => [
-                    'timeout' => 1.0, 
-                    'ignore_errors' => true
-                ]
-            ]);
-            @file_get_contents($cronUrl, false, $cronContext);
-        }
-    }
-    
-    // --- ВИРТУАЛЬНЫЙ КРОН ПУБЛИКАЦИИ ---
-    // Дёргаемся при заходе админа, но не чаще одного раза в 5 минут.
-    $lastPublish = getLastCronPublishTime();
-    $publishInterval = getCronPublishMinInterval();
-
-    if (time() >= ($lastPublish + $publishInterval)) {
-        // Сразу помечаем, что «мы запустились», до фактического запроса —
-        // чтобы следующий F5 не отправил второй запрос.
-        setLastCronPublishTime(time());
-
-        $publishUrl = getBaseUrl() . dirname($_SERVER['SCRIPT_NAME']) . '/cron/publish.php?token=' . urlencode(getCronToken());
-
-        $publishContext = stream_context_create([
-            'http' => [
-                'timeout' => 1.0,
-                'ignore_errors' => true
-            ]
-        ]);
-        @file_get_contents($publishUrl, false, $publishContext);
-    }
+    // --- ВИРТУАЛЬНЫЕ КРОНЫ (БЭКАП И ПУБЛИКАЦИЯ) ---
+    require_once __DIR__ . '/core/virtual_crons.php';
+    run_virtual_crons();
     
     // =========================================================================
     // ДИСПЕТЧЕРИЗАЦИЯ И ХЕНДЛИНГ ПОСТ-ЗАПРОСОВ (ЯДРО АДМИНИСТРИРОВАНИЯ)
     // =========================================================================
     
-    // Блок А: Обычные GET-запросы
-    // Им токен не нужен, они просто читают данные
-    if (isset($_GET['fm_api_action']) && $_SERVER['REQUEST_METHOD'] === 'GET') {
-        require_once __DIR__ . '/core/filemanager_api.php';
-        exit;
-    }
-    if (isset($_GET['download_file']) && isset($_GET['tab']) && $_GET['tab'] === 'backups') { 
-        handleDownloadBackup();
-    }
-    
-    // --- ОБРАБОТКА ПОЛУЧЕНИЯ НАСТРОЕК МОДУЛЯ ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'module_settings') {
-        require_once __DIR__ . '/core/admin_controller.php';
-        handleGetModuleSettings();
-        exit;
-    }
-    
-    // --- ОБРАБОТКА AJAX-ЗАПРОСОВ КОНСТРУКТОРА ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] == 1 && isset($_GET['tab_edit']) && $_GET['tab_edit'] === 'constructor') {
-        $pageId = $_GET['id'] ?? '';
+    // --- ХУК ДЛЯ ПЛАГИНОВ (ДО ОБРАБОТКИ AJAX) ---
+    do_action('admin_init');
 
-        // Железное правило: если ID пустой, принудительно переключаем бэкенд в режим создания
-        $action = empty($pageId) ? 'create' : ($_GET['action'] ?? 'edit');
-        $templateId = $_GET['template'] ?? 'full-width';
-        require_once __DIR__ . '/modules/pages/constructor.php';
-        exit;
-    }
-    
-    // --- ПРОВЕРКА РАСПАКОВКИ МОДУЛЯ ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'check_module') {
-        $moduleId = $_GET['module'] ?? '';        
-    
-        if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleId)) {
-            echo json_encode(['installed' => false, 'error' => 'Невалидный ID модуля']);
-            exit;
-        }
-        
-        $installed = isModuleInstalled($moduleId);
-        echo json_encode(['installed' => $installed]);
-        exit;
-    }
-    
-    // --- ОБРАБОТКА ЗАПРОСОВ ЛОГОВ (AJAX) ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_logs' && isset($_GET['tab']) && $_GET['tab'] === 'logs') {
-        require_once 'core/admin_controller.php';
-        handleGetLogs();
-        exit;
-    }
-    
-    // --- ПОЛУЧЕНИЕ СТАТИСТИКИ МИНИФИКАЦИИ (AJAX) ---
-    if (isset($_GET['action']) && $_GET['action'] === 'get_minify_stats' && isset($_GET['tab']) && $_GET['tab'] === 'config_vars') {
-        require_once 'core/admin_controller.php';
-        handleGetMinifyStats();
-        exit;
-    }
-    
-    // --- ГЕНЕРАЦИЯ НОВОГО ТОКЕНА КРОНА (AJAX) ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'generate_cron_token') {
-        header('Content-Type: application/json; charset=utf-8');
-        $newToken = bin2hex(random_bytes(16));
-        echo json_encode(['success' => true, 'token' => $newToken]);
-        exit;
-    }
-    
-    // --- ГЕНЕРАЦИЯ НОВОГО PREVIEW-ТОКЕНА (AJAX, без сохранения) ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'generate_preview_token') {
-        header('Content-Type: application/json; charset=utf-8');
-        $newToken = bin2hex(random_bytes(16));
-        echo json_encode(['success' => true, 'token' => $newToken]);
-        exit;
-    }
-    
-    // --- ГЕНЕРАЦИЯ НОВОГО BYPASS-ТОКЕНА ДЛЯ ТЕХРАБОТ (AJAX, без сохранения) ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'generate_maintenance_token') {
-        header('Content-Type: application/json; charset=utf-8');
-        $newToken = bin2hex(random_bytes(16));
-        echo json_encode(['success' => true, 'token' => $newToken]);
-        exit;
-    }
+    // --- ОБРАБОТКА GET/AJAX ЗАПРОСОВ ---
+    require_once __DIR__ . '/core/admin_ajax.php';
+    handle_admin_ajax_actions();
 
-    // Блок Б: Единый барьер для ВСЕХ POST-запросов в системе (и формы, и AJAX Проводника)
+    // --- Единый барьер для ВСЕХ POST-запросов в системе (формы и AJAX) ---
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        
+
         // 1. ЖЕЛЕЗНАЯ ПРОВЕРКА CSRF ТОКЕНА ДЛЯ ЛЮБОГО POST-ДЕЙСТВИЯ
-        if (empty($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             header('HTTP/1.1 403 Forbidden');
             exit('Ошибка безопасности: невалидный CSRF-токен сессии.');
         }
-        
-        // 2. ПЕРЕХВАТ POST-ЗАПРОСОВ ПРОВОДНИКА (Удаление action=delete, сохранение кода и т.д.)
-        // Токен уже проверен строкой выше, операция на 100% легитимна!
-        if (isset($_GET['fm_api_action'])) {
-            require_once __DIR__ . '/core/filemanager_api.php';
-            exit;
-        }
 
-        // 3. СТАНДАРТНЫЙ ОБРАБОТЧИК ФОРМ АДМИНКИ (Бренды, Карусели)
-        $res = ['success' => '', 'error' => ''];
-
-        if (isset($_POST['save_settings']))       { $res = handleSaveSettings(); }
-        elseif (isset($_POST['save_menu']))           { $res = handleSaveMenu(); }
-        elseif (isset($_POST['save_page']))           { $res = handleSavePage(); }
-        
-        elseif (isset($_POST['page_delete']))   { handleDeletePage(); exit; }
-        elseif (isset($_POST['page_clone']))    { handleClonePage(); exit; }
-        elseif (isset($_POST['page_set_home'])) { handleSetHomePage(); exit; }
-        
-        elseif (isset($_POST['menu_delete']))    { handleDeleteMenu(); exit; }
-        elseif (isset($_POST['menu_set_main']))  { handleSetMainMenu(); exit; }
-        
-        elseif (isset($_POST['trash_action'])) { handleTrashAction(); exit; }
-        
-        elseif (isset($_POST['restore_page_version'])) { handleRestorePageVersion($_POST['page_id'] ?? '', intval($_POST['version_ts'] ?? 0)); exit; }
-        elseif (isset($_POST['delete_history_version'])) { handleDeleteHistoryVersion($_POST['page_id'] ?? '', intval($_POST['version_ts'] ?? 0)); exit; }
-        elseif (isset($_POST['clear_page_history'])) { handleClearPageHistory($_POST['page_id'] ?? ''); exit; }
-        elseif (isset($_POST['clear_all_history'])) { handleClearAllHistory(); exit; }        
-        
-        elseif (isset($_POST['delete_all_webp'])) { handleDeleteAllWebp(); exit; }
-        elseif (isset($_POST['convert_existing_images_step'])) { handleConvertExistingImagesStep(); exit; }
-        
-        elseif (isset($_POST['regenerate_seo_files'])) {
-            $result = generateSeoFiles();
-
-            if ($result['sitemap']['success'] || $result['robots']['success']) {
-                logAction('seo_regenerate', 'Пересобраны SEO-файлы', 'INFO');
-                echo json_encode(['success' => true, 'message' => 'Файлы пересобраны']);
-            } else {
-                $error = $result['sitemap']['error'] ?: ($result['robots']['error'] ?? 'Неизвестная ошибка');
-                logAction('seo_regenerate', 'Ошибка: ' . $error, 'ERROR');
-                echo json_encode(['success' => false, 'error' => $error]);
-            }
-            exit;
-        }
-        
-        elseif (isset($_POST['unpack_module']))    { echo json_encode(unpackModule($_POST['module_id'] ?? '')); exit; }
-        elseif (isset($_POST['rebuild_min']))      { handleRebuildModuleMin($_POST['module_id'] ?? ''); exit; }
-        elseif (isset($_POST['rebuild_min_all']))  { handleRebuildAllMin($_POST['minify_exclude_css'] ?? [], $_POST['minify_exclude_js'] ?? []); exit; }
-        elseif (isset($_POST['delete_min_all']))   { handleDeleteAllMin(); exit; }
-        elseif (isset($_POST['clear_cache']))      { clearPageCache(); echo json_encode(['success' => true, 'message' => 'Кеш очищен']); exit; }
-        
-        elseif (isset($_POST['action_unban']))        { $res = handleActionUnban(); }
-        elseif (isset($_POST['action_manual_ban']))   { $res = handleActionManualBan(); }
-        elseif (isset($_POST['save_security']))       { $res = handleSaveSecurity(); }
-        elseif (isset($_POST['ajax_upload_carousel_img'])) { $res = handleAjaxImageUpload(); }
-        elseif (isset($_POST['save_backup_settings'])) { $res = handleSaveBackupSettings(); }
-        elseif (isset($_POST['init_backup_process']))   { 
-            echo json_encode(handleInitBackupProcess());
-            exit;
-        }
-        elseif (isset($_POST['process_backup_step']))  { 
-            echo json_encode(handleProcessBackupStep()); 
-            exit;
-        }
-        elseif (isset($_POST['delete_backup_action'])) {
-            handleDeleteBackup();
-            header('Location: index.php?tab=backups');
-            exit;
-        }
-        elseif (isset($_POST['restore_backup_action'])) {
-            handleRestoreBackup();
-            header('Location: index.php?tab=backups');
-            exit;
-        }
-        elseif (isset($_POST['module_action'])) {
-            $res = handleModuleAction();
-            header('Location: index.php?tab=modules');
-            exit;
-        }
-        elseif (isset($_POST['save_log_settings'])) { $res = handleSaveLogSettings(); }
-        
-        if (!empty($res['success'])) {
-            setFlash($res['success'], 'success');
-        } elseif (!empty($res['error'])) {
-            setFlash($res['error'], 'error');
-        }
+        // 2. ОБРАБОТКА POST-ЗАПРОСОВ (ФОРМЫ И AJAX)
+        require_once __DIR__ . '/core/admin_actions.php';
+        handle_admin_post_actions();
     }
 
     $currentTab = $_GET['tab'] ?? 'config_vars';
@@ -349,24 +177,15 @@ if ($isAuth) {
         <?php include 'login.php'; ?>
     <?php else: ?>
         <?php 
-            // --- ЛОГИКА АВТОМАТИЧЕСКОГО РАЗДЕЛЕНИЯ ТАБОВ ПО ГРУППАМ ---            
-            $modulesTabs = [];
-            $systemTabs  = [];
-
-            // Группа 1: Модули сайта
-            $modulesTabs[] = ['id' => 'config_vars', 'title' => 'Настройки сайта', 'icon' => 'icon-settings', 'visible' => true];
-            $modulesTabs[] = ['id' => 'pages', 'title' => 'Страницы', 'icon' => 'icon-file-text', 'visible' => true];
-            $modulesTabs[] = ['id' => 'modules', 'title' => 'Управление модулями', 'icon' => 'icon-box', 'visible' => true];
-            $modulesTabs[] = ['id' => 'menu', 'title' => 'Меню сайта', 'icon' => 'icon-menu', 'visible' => true];
+            // --- ФОРМИРОВАНИЕ ВКЛАДОК ---
+            require_once __DIR__ . '/core/admin_menu.php';
+            $tabsData = get_admin_tabs();
             
-            // Группа 2: Управление системой
-            $systemTabs[] = ['id' => 'filemanager', 'title' => 'Проводник (Файлы)', 'icon' => 'icon-folder'];
-            $systemTabs[] = ['id' => 'security', 'title' => 'Безопасность', 'icon' => 'icon-shield'];
-            $systemTabs[] = ['id' => 'backups', 'title' => 'Резервное копирование', 'icon' => 'icon-database-backup'];
-            $systemTabs[] = ['id' => 'logs', 'title' => 'Логи системы', 'icon' => 'icon-clipboard-clock'];
+            $modulesTabs = $tabsData['modules'];
+            $systemTabs  = $tabsData['system'];
+            $allTabs     = $tabsData['all'];
 
-            // Сливаем массивы для общей валидации роутинга в CMS
-            $allTabs = array_merge($modulesTabs, $systemTabs);
+            // Валидация текущей вкладки
             $allowedModules = array_column($allTabs, 'id');
             if (!in_array($currentTab, $allowedModules)) {
                 $currentTab = 'config_vars';
@@ -386,6 +205,8 @@ if ($isAuth) {
                 </div>
             </div>
             <div class="flex items-center gap-3">
+                <!-- Уведомление об обновлениях (хук для плагинов) -->
+                <?php do_action('admin_header_notifications'); ?>
                 <!-- Переключатель темы -->
                 <button type="button" id="js-theme-toggle" class="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-all cursor-pointer" title="Переключить тему">
                     <span id="js-theme-icon" class="icon-moon text-lg"></span>
@@ -397,6 +218,8 @@ if ($isAuth) {
                 </a>
             </div>
         </header>
+
+        <?php echo renderSessionNotice($sessionLifetime); ?>
 
         <!-- МОБИЛЬНЫЙ ТЕМНЫЙ ФОН ПРИ ОТКРЫТИИ МЕНЮ -->
         <div id="js-sidebar-backdrop" class="sidebar-backdrop-overlay"></div>
@@ -414,7 +237,7 @@ if ($isAuth) {
                 ?>
                 <div class="sidebar-menu-group <?php echo $isModulesActive ? 'is-active-group' : ''; ?>">
                     <div class="sidebar-group-title js-group-trigger">
-                        <span>Модули сайта</span>
+                        <span>Контент и дизайн</span>
                         <span class="icon-chevron-down sidebar-group-chevron"></span>
                     </div>
                     <div class="sidebar-group-content">
@@ -474,13 +297,27 @@ if ($isAuth) {
                     <?php echo renderFlash(); ?>
 
                     <?php 
+                    // 1. Ищем в стандартных модулях админки
                     $adminModuleFile = __DIR__ . DIRECTORY_SEPARATOR . 'modules' . DIRECTORY_SEPARATOR . "{$currentTab}.php";
                     $adminModuleExists = file_exists($adminModuleFile);
-                    $isSystemTab = in_array($currentTab, ['sections', 'config_vars', 'security', 'filemanager']);
+                    
+                    // 2. Если нет в модулях — ищем в плагинах
+                    $pluginPageFile = null;
+                    if (!$adminModuleExists) {
+                        $pluginPageFile = PLUGINS_DIR . DIRECTORY_SEPARATOR . $currentTab . DIRECTORY_SEPARATOR . 'admin-page.php';
+                    }
+                    
+                    $isSystemTab = in_array($currentTab, ['sections', 'config_vars', 'security']);
                     ?>
 
-                    <?php if ($adminModuleExists || $isSystemTab): ?>
-                        <?php if ($adminModuleExists) { include $adminModuleFile; } ?>
+                    <?php if ($adminModuleExists || $pluginPageFile || $isSystemTab): ?>
+                        <?php 
+                        if ($adminModuleExists) { 
+                            include $adminModuleFile; 
+                        } elseif ($pluginPageFile && file_exists($pluginPageFile)) {
+                            include $pluginPageFile;
+                        }
+                        ?>
                     <?php else: ?>
                         <div class="text-center py-16 max-w-md mx-auto space-y-6 animate-fade-in">
                             <div class="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-400">

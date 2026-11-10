@@ -1,13 +1,4 @@
 {
-    "carousel": {
-        "name": "Слайдер",
-        "icon": "icon-image",
-        "description": "Слайдер с изображениями и текстом",
-        "has_settings": true,
-        "auto_unpack": false,
-        "version": "1.0.0",
-        "author": "AlekSSLab"
-    },
     "cards": {
         "name": "Плитка с карточками",
         "icon": "icon-award",
@@ -32,7 +23,7 @@
         "description": "Блок с текстом и изображением, особенностями и статистикой",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "hero": {
@@ -41,7 +32,7 @@
         "description": "Полноэкранный баннер с заголовком и кнопкой",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "text": {
@@ -50,7 +41,7 @@
         "description": "Блок с произвольным HTML\/текстом",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "calculator": {
@@ -59,7 +50,8 @@
         "description": "Интерактивный калькулятор подбора порции для собак и кошек",
         "has_settings": true,
         "version": "1.0.0",
-        "author": "AlekSSLab"
+        "author": "AlekSSLab",
+        "auto_unpack": false
     },
     "contacts": {
         "name": "Контакты",
@@ -67,7 +59,7 @@
         "description": "Контактная информация, форма обратной связи и карта",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "faq": {
@@ -84,8 +76,9 @@
         "icon": "icon-mail",
         "description": "Готовая форма обратной связи с настройками полей",
         "has_settings": true,
-        "version": "1.0.0",
-        "author": "AlekSSLab"
+        "version": "1.0.1",
+        "author": "AlekSSLab",
+        "auto_unpack": false
     },
     "stats": {
         "name": "Счетчики (Статистика)",
@@ -102,7 +95,8 @@
         "description": "Таймер до указанной даты с визуальным оформлением",
         "has_settings": true,
         "version": "1.0.0",
-        "author": "AlekSSLab"
+        "author": "AlekSSLab",
+        "auto_unpack": false
     },
     "brands-marquee": {
         "name": "Бегущая лента",
@@ -137,7 +131,7 @@
         "description": "Слайдер для сравнения двух изображений",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "slider-advanced": {
@@ -146,7 +140,7 @@
         "description": "Полноэкранный слайдер с эффектами перехода",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "pricing": {
@@ -164,7 +158,7 @@
         "description": "Интерактивная карта с кастомными метками",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "portfolio": {
@@ -173,7 +167,7 @@
         "description": "Сетка портфолио с фильтрацией по категориям",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "quiz": {
@@ -182,7 +176,7 @@
         "description": "Интерактивный квиз для сбора данных и квалификации лидов",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "social-icons": {
@@ -191,7 +185,7 @@
         "description": "Иконки социальных сетей из настроек сайта",
         "has_settings": true,
         "auto_unpack": true,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "site-menu": {
@@ -200,7 +194,7 @@
         "description": "Выводит любое созданное в системе меню в виде списка ссылок",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "author": "AlekSSLab"
     },
     "hero-landing": {
@@ -209,7 +203,16 @@
         "description": "Hero для лендинга: две кнопки, визуал, микро-факты, split-раскладка",
         "has_settings": true,
         "auto_unpack": true,
-        "version": "1.0.0",
+        "version": "1.0.1",
+        "author": "AlekSSLab"
+    },
+    "carousel": {
+        "name": "Слайдер",
+        "icon": "icon-image",
+        "description": "Слайдер с изображениями и текстом",
+        "has_settings": true,
+        "auto_unpack": false,
+        "version": "1.0.1",
         "author": "AlekSSLab"
     }
 }

@@ -6,11 +6,9 @@ if (function_exists('header_remove')) {
 }
 
 // === ОТОБРАЖЕНИЕ ОШИБОК ===
-define('DEBUG_SITE', false);
-define('DEBUG_ADMIN', false);
-
-if (!defined('DEBUG_SITE'))  define('DEBUG_SITE', false);
-if (!defined('DEBUG_ADMIN')) define('DEBUG_ADMIN', false);
+// Значения по умолчанию (если не заданы раньше)
+defined('DEBUG_SITE')  || define('DEBUG_SITE', false);
+defined('DEBUG_ADMIN') || define('DEBUG_ADMIN', false);
 
 // Определяем, это админка или фронт
 $isAdminRequest = (strpos($_SERVER['REQUEST_URI'] ?? '', '/config/') !== false)
@@ -108,3 +106,14 @@ define('SITE_CUSTOM_JS', $settings['custom_js'] ?? '');
 
 // 6. Размер загружаемых файлов
 define('MAX_UPLOAD_SIZE', 2 * 1024 * 1024);
+
+define('CMS_VERSION', '2.0.0'); // Версия ядра
+define('CONFIG_DIR', APP_ROOT . DIRECTORY_SEPARATOR . 'config');
+define('PLUGINS_DIR', CONFIG_DIR . DIRECTORY_SEPARATOR . 'plugins');
+define('CMS_LOGS_DIR', CONFIG_DIR . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR);
+
+// URL каталога обновлений по умолчанию
+if (!defined('UPDATES_DEFAULT_CATALOG_URL')) {
+    define('UPDATES_DEFAULT_CATALOG_URL', 'https://raw.githubusercontent.com/AlekSSLab/alpin-cms/main/catalog.json');
+}
+

@@ -16,11 +16,6 @@ if ($isEdit) {
         header('Location: ?tab=pages');
         exit;
     }
-
-    // Чистим previews этой сессии для этой страницы.
-    if (function_exists('cleanupSessionPagePreviews')) {
-        cleanupSessionPagePreviews(session_id(), $pageId);
-    }
 }
 
 $token = $_SESSION['csrf_token'] ?? '';
@@ -33,6 +28,12 @@ $pageUnpublishAt = $isEdit ? ($editPage['unpublish_at'] ?? null) : null;
 // Конвертируем Unix timestamp в формат datetime-local (Y-m-d\TH:i)
 $publishAtValue   = $pagePublishAt   ? date('Y-m-d\TH:i', (int)$pagePublishAt)   : '';
 $unpublishAtValue = $pageUnpublishAt ? date('Y-m-d\TH:i', (int)$pageUnpublishAt) : '';
+
+// Планирование доступно, только если активен плагин автопубликации.
+$schedulingEnabled = isPageSchedulingEnabled();
+// Запланированную страницу без плагина показываем черновиком: поля «По расписанию»
+// в форме нет, и предпросмотр должен совпадать с тем, что уйдёт в POST.
+$statusForUi = (!$schedulingEnabled && $pageStatus === 'scheduled') ? 'draft' : $pageStatus;
 $pageMetaDesc = $isEdit ? ($editPage['meta']['description'] ?? '') : ($_POST['meta_description'] ?? '');
 $pageMetaKeywords = $isEdit ? ($editPage['meta']['keywords'] ?? '') : ($_POST['meta_keywords'] ?? '');
 
@@ -113,29 +114,54 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
                             <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Статус публикации</label>
 
                             <div class="flex flex-wrap gap-2 mb-4">
-                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'draft' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
-                                    <input type="radio" name="status" value="draft" <?php echo $pageStatus === 'draft' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $statusForUi === 'draft' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="draft" <?php echo $statusForUi === 'draft' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
                                     <span class="text-sm font-medium text-slate-700 whitespace-nowrap">Черновик</span>
                                 </label>
 
-                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'scheduled' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
-                                    <input type="radio" name="status" value="scheduled" <?php echo $pageStatus === 'scheduled' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                <?php if ($schedulingEnabled): ?>
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $statusForUi === 'scheduled' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="scheduled" <?php echo $statusForUi === 'scheduled' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
                                     <span class="text-sm font-medium text-slate-700 whitespace-nowrap">По расписанию</span>
                                 </label>
+                                <?php endif; ?>
 
-                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'published' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
-                                    <input type="radio" name="status" value="published" <?php echo $pageStatus === 'published' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $statusForUi === 'published' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="published" <?php echo $statusForUi === 'published' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
                                     <span class="text-sm font-medium text-slate-700 whitespace-nowrap">Опубликована</span>
                                 </label>
 
-                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $pageStatus === 'archived' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
-                                    <input type="radio" name="status" value="archived" <?php echo $pageStatus === 'archived' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
+                                <label class="js-status-radio inline-flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-[var(--primary-color)] transition-all <?php echo $statusForUi === 'archived' ? 'border-[var(--primary-color)] bg-emerald-50/30' : ''; ?>">
+                                    <input type="radio" name="status" value="archived" <?php echo $statusForUi === 'archived' ? 'checked' : ''; ?> class="w-4 h-4 text-[var(--primary-color)] flex-shrink-0" onchange="toggleStatusFields()">
                                     <span class="text-sm font-medium text-slate-700 whitespace-nowrap">Снята с публикации</span>
                                 </label>
                             </div>
+
+                            <?php if (!$schedulingEnabled && $pageStatus === 'scheduled'): ?>
+                            <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl max-w-xl">
+                                <span class="icon-clock text-amber-600 mt-0.5 flex-shrink-0"></span>
+                                <p class="text-xs text-amber-800 leading-relaxed">
+                                    Плагин «Автопубликация» отключён. Страница была запланирована<?php echo $pagePublishAt ? ' на <strong>' . e(date('d.m.Y H:i', (int)$pagePublishAt)) . '</strong>' : ''; ?>,
+                                    но опубликовать её сейчас некому. При сохранении она станет черновиком.
+                                </p>
+                            </div>
+                            <?php endif; ?>
+
+                            <?php if (!$schedulingEnabled && $pageStatus === 'published' && $pageUnpublishAt && (int)$pageUnpublishAt > time()): ?>
+                            <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl max-w-xl">
+                                <span class="icon-clock text-amber-600 mt-0.5 flex-shrink-0"></span>
+                                <p class="text-xs text-amber-800 leading-relaxed">
+                                    Плагин «Автопубликация» отключён, но у страницы сохранена дата снятия —
+                                    <strong><?php echo e(date('d.m.Y H:i', (int)$pageUnpublishAt)); ?></strong>.
+                                    Сайт скроет страницу в этот момент, изменить дату сейчас нельзя.
+                                    При сохранении дата будет сброшена.
+                                </p>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 
+                    <?php if ($schedulingEnabled): ?>
                     <!-- Даты: отдельная строка, видимость через JS -->
                     <div id="js-dates-row">
                         <div class="editor-row" style="align-items: flex-start !important;">
@@ -162,96 +188,11 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
                             </div>
                         </div>
                     </div>
-                    <?php
-                    // Preview-токен: только для существующих страниц
-                    if ($isEdit) {
-                        $existingToken = getPagePreviewToken($pageId);
-                        $previewUrl = $existingToken !== ''
-                            ? getPagePreviewUrl($pageId, $existingToken)
-                            : '';
-                    }
-                    ?>
-
-                    <?php if ($isEdit): ?>
-                    <div class="editor-row" style="align-items: flex-start !important;">
-                        <div class="editor-field">
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                                Ссылка для согласования (preview)
-                            </label>
-
-                            <div id="js-page-preview-block">
-                                <?php if ($existingToken !== ''): ?>
-                                    <!-- Ссылка есть -->
-                                    <div class="flex flex-col lg:flex-row gap-2 mb-2">
-                                        <input type="text"
-                                               readonly
-                                               id="js-page-preview-url"
-                                               value="<?php echo e($previewUrl); ?>"
-                                               class="flex-1 min-w-0 px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono text-slate-600 select-all focus:outline-none">
-                                        <button type="button"
-                                                onclick="window.copyPagePreviewUrl()"
-                                                class="w-full lg:w-auto lg:flex-initial lg:w-[140px] px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-200 transition-all whitespace-nowrap flex items-center justify-center gap-2">
-                                            <span class="icon-copy text-sm"></span> Копировать
-                                        </button>
-                                        <button type="button"
-                                                onclick="window.deletePagePreviewToken()"
-                                                class="w-full lg:w-auto lg:flex-initial lg:w-[140px] px-4 py-2.5 bg-rose-50 border border-rose-200 text-rose-600 text-sm font-bold rounded-xl hover:bg-rose-100 transition-all whitespace-nowrap flex items-center justify-center gap-2">
-                                            <span class="icon-trash-2 text-sm"></span> Удалить
-                                        </button>
-                                    </div>
-                                    <p class="text-[10px] text-slate-400">
-                                        Ссылка открывает страницу в любом статусе. Не индексируется поисковиками.
-                                        Изменения вступят в силу <strong>после сохранения страницы</strong>.
-                                    </p>
-                                <?php else: ?>
-                                    <!-- Ссылки нет -->
-                                    <button type="button"
-                                            onclick="window.regeneratePagePreviewToken()"
-                                            class="w-full lg:w-auto px-4 py-2.5 bg-[var(--primary-color)] text-white text-sm font-bold rounded-xl hover:bg-[var(--primary-dark)] transition-all whitespace-nowrap flex items-center justify-center gap-2">
-                                        <span class="icon-link text-sm"></span> Создать preview-ссылку
-                                    </button>
-                                    <p class="text-[10px] text-slate-400 mt-2">
-                                        Создаёт постоянную ссылку для согласования с заказчиком.
-                                        Ссылка будет записана <strong>после сохранения страницы</strong>.
-                                    </p>
-                                <?php endif; ?>
-
-                                <!-- Скрытое поле с текущим токеном (уходит в POST при сохранении) -->
-                                <input type="hidden"
-                                       name="preview_token"
-                                       id="js-preview-token-hidden"
-                                       value="<?php echo e($existingToken); ?>">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <?php if (isHistoryEnabled()): ?>
-                    <div class="editor-row" style="align-items: flex-start !important;">
-                        <div class="editor-field">
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                                История изменений
-                            </label>
-                            <?php
-                            $historyKeyForBtn = $editPage['history_key'] ?? '';
-                            $historyCountForBtn = ($historyKeyForBtn !== '' && preg_match('/^[a-f0-9]{16}$/i', $historyKeyForBtn))
-                                ? count(getPageHistory($historyKeyForBtn))
-                                : 0;
-                            ?>
-                            <button type="button"
-                                    onclick="window.openHistoryModal()"
-                                    class="w-full lg:w-auto px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-200 transition-all whitespace-nowrap flex items-center justify-center gap-2">
-                                <span class="icon-history text-sm"></span>
-                                Открыть историю
-                                <?php if ($historyCountForBtn > 0): ?>
-                                    <span class="px-2 py-0.5 bg-slate-700 text-white text-[10px] font-bold rounded-full"><?php echo $historyCountForBtn; ?></span>
-                                <?php endif; ?>
-                            </button>
-                            <p class="text-[10px] text-slate-400 mt-2">
-                                Сохранённые версии страницы. Откат восстанавливает контент, не меняя URL и preview-ссылку.
-                            </p>
-                        </div>
-                    </div>
                     <?php endif; ?>
+                    <?php if ($isEdit): ?>
+                    <?php do_action('edit_page_preview_block', $editPage, $pageId); ?>
+
+                    <?php do_action('edit_page_history_block', $editPage); ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -317,14 +258,14 @@ $formActionUrl = '?tab=pages&action=' . $formAction . ($isEdit ? '&id=' . $pageI
 include __DIR__ . '/modals.php'; 
 ?>
 
-<!-- ===== МОДАЛКА ИСТОРИИ ===== -->
+<!-- ===== МОДАЛКА ИСТОРИИ (плагин history) ===== -->
 <?php
 if ($isEdit) {
-    $historyPageId = $pageId;
-    include APP_ROOT . '/config/core/history_modal.php';
+    do_action('edit_page_modals', $pageId);
 }
 ?>
 
 <!-- ===== ПОДКЛЮЧЕНИЕ СКРИПТОВ ===== -->
+<?php do_action('edit_page_scripts', $pageId, $isEdit); ?>
 <script src="js/main.js?v=<?php echo filemtime('js/main.js'); ?>"></script>
 <script src="js/pages.js?v=<?php echo filemtime('js/pages.js'); ?>"></script>

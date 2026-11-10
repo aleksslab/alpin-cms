@@ -10,8 +10,11 @@ if (!function_exists('getSettingsData')) {
  * 1. ГЛОБАЛЬНЫЕ ФУНКЦИИ
  */
 /**
- * Транслитерация кириллицы
- **/
+ * Транслитерирует кириллицу в латиницу для slug и имён файлов.
+ *
+ * @param string $text Исходный текст
+ * @return string Латиница; пробелы заменяются на `_`
+ */
 function cms_transliterate(string $text): string {
     $cyr = [
         'а','б','в','г','д','е','ё','ж','з','и','й','к','л','м','н','о','п',
@@ -59,69 +62,6 @@ function regenerateCronToken(): string {
 }
 
 /**
- * Возвращает минимальный интервал между запусками виртуального крона публикации.
- * В секундах. Защита от долбёжки при частых перезагрузках админки.
- *
- * @return int
- */
-function getCronPublishMinInterval(): int {
-    return 300; // 5 минут
-}
-
-/**
- * Возвращает время последнего запуска виртуального крона публикации (Unix timestamp).
- * 0 — если ни разу не запускался.
- *
- * @return int
- */
-function getLastCronPublishTime(): int {
-    $settings = getSettingsData();
-    return intval($settings['last_cron_publish'] ?? 0);
-}
-
-/**
- * Сохраняет время последнего запуска виртуального крона публикации.
- *
- * @param int $timestamp
- * @return void
- */
-function setLastCronPublishTime(int $timestamp): void {
-    $settings = getSettingsData();
-    $settings['last_cron_publish'] = $timestamp;
-    saveData('settings', $settings);
-}
-
-/**
- * Проверяет архив на ZIP Slip — небезопасные имена файлов.
- * 
- * Блокирует: .., абсолютные пути (/...), Windows-пути (C:\...), NUL-байты.
- * Возвращает имя первого небезопасного файла или null, если всё чисто.
- * 
- * @param ZipArchive $zip Открытый архив
- * @return string|null Имя небезопасного файла или null
- */
-function detectZipSlip(ZipArchive $zip): ?string {
-    for ($i = 0; $i < $zip->numFiles; $i++) {
-        $stat = $zip->statIndex($i);
-        if ($stat === false) continue;
-
-        $entryName = $stat['name'];
-        $normalized = str_replace('\\', '/', $entryName);
-
-        if (
-            strpos($normalized, '..') !== false ||
-            strpos($normalized, "\0") !== false ||
-            strpos($normalized, '/') === 0 ||
-            preg_match('#^[a-zA-Z]:#', $normalized) === 1
-        ) {
-            return $entryName;
-        }
-    }
-
-    return null;
-}
-
-/**
  * Сохраняет данные в JSON-файл с красивым форматированием
  *
  * @param string $fileName Имя файла без расширения (например, 'settings')
@@ -151,18 +91,6 @@ function savePageData(string $id, array $data): bool {
     $filePath = DATA_DIR . 'pages/' . $id . '.json';
     $jsonString = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     return safeFileWrite($filePath, $jsonString);
-}
-
-/**
- * Сохраняет список модулей в config/data/modules.json
- *
- * @param array $data Массив с данными модулей
- * @return bool true при успешной записи, false при ошибке
- */
-function saveModulesData(array $data): bool {
-    $path = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'modules.json';
-    $jsonString = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    return safeFileWrite($path, $jsonString);
 }
 
 /**
@@ -321,13 +249,14 @@ function renderFlash(): string {
 }
 
 /**
- * Возвращает скрипт и стили для тостов (только один раз)
+ * Возвращает скрипт и стили для тостов (только один раз).
  *
- * @return string
+ * @param bool $force Вывести повторно, даже если уже выводили
+ * @return string HTML/JS или пустая строка при повторном вызове
  */
-function getToastScript(): string {
+function getToastScript(bool $force = false): string {
     static $loaded = false;
-    if ($loaded) {
+    if ($loaded && !$force) {
         return '';
     }
     $loaded = true;
@@ -393,7 +322,58 @@ function getToastScript(): string {
 }
 
 /**
+ * Рендерит скрытую sticky-полосу предупреждения об истечении сессии.
+ * Показывается клиентским таймером (config/js/main.js) за N секунд до конца.
+ *
+ * @param int $lifetime Время жизни сессии в секундах.
+ * @return string HTML-код полосы.
+ */
+function renderSessionNotice(int $lifetime): string {
+    $lifetime = max(60, $lifetime);
+    $warn = min(120, max(10, intdiv($lifetime, 2)));
+
+    $html  = '<div id="js-session-notice" class="hidden sticky top-20 z-30 animate-fade-in" role="status" aria-live="polite"';
+    $html .= ' data-lifetime="' . $lifetime . '"';
+    $html .= ' data-warn="' . $warn . '"';
+    $html .= ' data-ping-url="index.php?ajax=session_ping"';
+    $html .= ' data-login-url="index.php?msg=timeout">';
+    $html .= '<div class="border-b border-amber-200 bg-amber-50 px-4 md:px-6 py-3">';
+    $html .= '<div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">';
+    $html .= '<span class="icon-clock text-lg text-amber-700 flex-shrink-0"></span>';
+    $html .= '<p class="flex-1 text-sm text-amber-900">';
+    $html .= 'Сессия истекает через <span class="font-mono font-bold" data-session-countdown aria-live="off">' . gmdate('i:s', $warn) . '</span>. ';
+    $html .= '<span class="text-amber-700/80">Несохранённые изменения будут потеряны.</span>';
+    $html .= '</p>';
+    $html .= '<button type="button" class="js-session-extend flex-shrink-0 bg-amber-700 hover:bg-amber-800 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer">Продолжить сессию</button>';
+    $html .= '</div>';
+    $html .= '</div>';
+    $html .= '</div>';
+
+    return $html;
+}
+
+/**
  * 2. ОБРАБОТКА СОХРАНЕНИЯ НАСТРОЕК САЙТА
+ */
+
+/**
+ * Значение чекбокса из POST: '1' — включён, отсутствие или '0' — выключен.
+ * Единая замена повторяющемуся isset($_POST[x]) && $_POST[x] == '1'.
+ *
+ * @param string $name Имя поля
+ * @return bool
+ */
+function post_flag(string $name): bool {
+    return isset($_POST[$name]) && $_POST[$name] == '1';
+}
+
+/**
+ * Сохраняет настройки сайта из формы «Настройки».
+ *
+ * Валидирует HTML-поля, собирает `settings.json`, применяет фильтры
+ * плагинов и пишет файл через `safeFileWrite()`.
+ *
+ * @return array ['success' => string, 'error' => string]
  */
 function handleSaveSettings(): array {
     $cleanPhone = preg_replace('/[^0-9+]/', '', $_POST['set_phone'] ?? '');
@@ -460,7 +440,11 @@ function handleSaveSettings(): array {
         ];
     }
     
-    $newSettings = [
+    // Полное сохранение приходит только из формы сайта (settings_full=1).
+    // Форма плагина шлёт лишь свои поля, её POST ядро из нуля не пересобирает.
+    $isFullSave = post_flag('settings_full');
+
+    $siteSettings = [
         // БЛОК 1: Контактная информация
         'name'    => $name,
         'slogan'  => $slogan,
@@ -472,7 +456,7 @@ function handleSaveSettings(): array {
         'logo'    => trim($_POST['set_logo'] ?? ''),
         'favicon' => trim($_POST['set_favicon'] ?? ''),
         
-        // БЛОК 3: Цветовая схема
+        // БЛОК 3: Цветовая схема (ТОЛЬКО СВЕТЛАЯ)
         'theme' => [
             'primary_color' => trim($_POST['theme_primary_color'] ?? '#10B981'),
             'primary_dark' => trim($_POST['theme_primary_dark'] ?? '#059669'),
@@ -484,23 +468,13 @@ function handleSaveSettings(): array {
                 'text_muted' => trim($_POST['theme_light_text_muted'] ?? '#64748B'),
                 'border_color' => trim($_POST['theme_light_border_color'] ?? '#F1F5F9'),
             ],
-            'dark' => [
-                'bg_main' => trim($_POST['theme_dark_bg_main'] ?? '#0F172A'),
-                'bg_card' => trim($_POST['theme_dark_bg_card'] ?? '#1E293B'),
-                'bg_section' => trim($_POST['theme_dark_bg_section'] ?? '#1E293B'),
-                'text_main' => trim($_POST['theme_dark_text_main'] ?? '#F1F5F9'),
-                'text_muted' => trim($_POST['theme_dark_text_muted'] ?? '#94A3B8'),
-                'border_color' => trim($_POST['theme_dark_border_color'] ?? '#334155'),
-            ],
         ],
-        'theme_default' => in_array($_POST['theme_default'] ?? 'light', ['light', 'dark']) ? $_POST['theme_default'] : 'light',
         
-        // БЛОК 4: Настройки хедера
+        // БЛОК 4: Настройки хедера (БЕЗ theme_toggle_enabled)
         'header_variant' => $_POST['header_variant'] ?? 'default',
-        'header_fixed' => isset($_POST['header_fixed']) && $_POST['header_fixed'] == '1',
-        'burger_enabled' => isset($_POST['burger_enabled']) && $_POST['burger_enabled'] == '1',
+        'header_fixed' => post_flag('header_fixed'),
+        'burger_enabled' => post_flag('burger_enabled'),
         'burger_breakpoint' => trim($_POST['burger_breakpoint'] ?? 'md'),
-        'theme_toggle_enabled' => isset($_POST['theme_toggle_enabled']) && $_POST['theme_toggle_enabled'] == '1',
                 
         // БЛОК 5: Настройки футера
         'footer_variant' => $_POST['footer_variant'] ?? 'default',
@@ -519,104 +493,76 @@ function handleSaveSettings(): array {
         'twitter_title'       => trim($_POST['set_twitter_title'] ?? ''),
         'twitter_description' => trim($_POST['set_twitter_description'] ?? ''),
         'twitter_image'       => trim($_POST['set_twitter_image'] ?? ''),
-        // SEO: технические настройки
-        'seo_sitemap_enabled'  => isset($_POST['seo_sitemap_enabled']) && $_POST['seo_sitemap_enabled'] == '1',
-        'seo_robots_enabled'   => isset($_POST['seo_robots_enabled']) && $_POST['seo_robots_enabled'] == '1',
-        'seo_auto_regenerate'  => isset($_POST['seo_auto_regenerate']) && $_POST['seo_auto_regenerate'] == '1',
         
-        // БЛОК 8: История изменений
-        'history_enabled' => isset($_POST['history_enabled']) && $_POST['history_enabled'] == '1',
-        'history_limit'   => max(1, min(100, intval($_POST['history_limit'] ?? 20))),
-        
-        // БЛОК 9: Технические работы
-        'maintenance_enabled' => isset($_POST['maintenance_enabled']) && $_POST['maintenance_enabled'] == '1',
-        'maintenance_message' => sanitizeHtml(trim($_POST['maintenance_message'] ?? '')),
-        'maintenance_show_timer' => isset($_POST['maintenance_show_timer']) && $_POST['maintenance_show_timer'] == '1',
-        'maintenance_bypass_token' => (function() {
-            $posted = trim($_POST['maintenance_bypass_token'] ?? '');
-            if (preg_match('/^[a-f0-9]{32}$/i', $posted)) {
-                return $posted;
-            }
-            $settings = getSettingsData();
-            $existing = (string)($settings['maintenance_bypass_token'] ?? '');
-            if ($existing !== '' && preg_match('/^[a-f0-9]{32}$/i', $existing)) {
-                return $existing;
-            }
-            // При включении техработ — генерируем автоматически
-            $enabled = isset($_POST['maintenance_enabled']) && $_POST['maintenance_enabled'] == '1';
-            if ($enabled) {
-                return bin2hex(random_bytes(16));
-            }
-            return '';
-        })(),
-        'maintenance_until' => (function() {
-            $raw = trim($_POST['maintenance_until'] ?? '');
-            if ($raw === '') return null;
-            $ts = strtotime($raw);
-            return ($ts === false) ? null : $ts;
-        })(),
-        
-        // БЛОК 10: Социальные сети (массив)
+        // БЛОК 8: Социальные сети (массив)
         'socials' => $socials,
         
-        // БЛОК 11: Произвольный код
+        // БЛОК 9: Произвольный код
         'custom_css' => trim($_POST['set_custom_css'] ?? ''),
         'custom_js'  => trim($_POST['set_custom_js'] ?? ''),
     
-        // БЛОК 12: Минификация
-        'assets_minify' => isset($_POST['assets_minify']) && $_POST['assets_minify'] == '1',
-        'assets_combine' => isset($_POST['assets_combine']) && $_POST['assets_combine'] == '1',
+        // БЛОК 10: Минификация
+        'assets_minify' => post_flag('assets_minify'),
+        'assets_combine' => post_flag('assets_combine'),
         'minify_exceptions' => $minifyExceptions,
         
-        // БЛОК 13: Медиа
-        'media_lazy_enabled' => isset($_POST['media_lazy_enabled']) && $_POST['media_lazy_enabled'] == '1',
-        'media_webp_enabled' => isWebpSupported() && isset($_POST['media_webp_enabled']) && $_POST['media_webp_enabled'] == '1',
-        'media_quality'      => max(1, min(100, intval($_POST['media_quality'] ?? 82))),
-
-        // БЛОК 14: Хлебные крошки
-        'breadcrumbs_enabled'         => isset($_POST['breadcrumbs_enabled']) && $_POST['breadcrumbs_enabled'] == '1',
-        'breadcrumbs_show_on_home'    => isset($_POST['breadcrumbs_show_on_home']) && $_POST['breadcrumbs_show_on_home'] == '1',
-        'breadcrumbs_show_home_root'  => isset($_POST['breadcrumbs_show_home_root']) && $_POST['breadcrumbs_show_home_root'] == '1',
-        'breadcrumbs_home_label'      => trim($_POST['breadcrumbs_home_label'] ?? 'Главная'),
-        'breadcrumbs_separator'       => in_array($_POST['breadcrumbs_separator'] ?? '/', ['/', '>', '→', '•', '|']) ? $_POST['breadcrumbs_separator'] : '/',
-        
-        // БЛОК 15: Кеширование страниц
-        'cache_enabled' => isset($_POST['cache_enabled']) && $_POST['cache_enabled'] == '1',
+        // БЛОК 11: Кеширование страниц
+        'cache_enabled' => post_flag('cache_enabled'),
         'cache_ttl' => intval($_POST['cache_ttl'] ?? 86400),
+
+        // БЛОК 12: Порядок и видимость секций
+        'config_sections_order' => json_decode($_POST['config_sections_order_json'] ?? '[]', true) ?: [],
+        'config_sections_hidden' => json_decode($_POST['config_sections_hidden_json'] ?? '[]', true) ?: [],
         
         // === СОХРАНЯЕМ ПОЛЯ, КОТОРЫЕ НЕ В ФОРМЕ ===
         'home_page_id' => getHomePageId(),
         'main_menu'    => getMainMenuId(),
         'cron_token'   => (function() {
-            // Если пришёл новый токен из формы (после «Перегенерировать») — берём его
             $posted = trim($_POST['cron_token'] ?? '');
-            // Валидация: 32 hex-символа
             if (preg_match('/^[a-f0-9]{32}$/i', $posted)) {
                 return $posted;
             }
-            // Иначе — сохраняем текущий
             return getCronToken();
         })(),
-        'last_cron_publish' => getLastCronPublishTime(),
-        'last_seo_regenerate' => getSettingsData()['last_seo_regenerate'] ?? 0,
     ];
+
+    // Форма сайта — пересобираем настройки ядра из POST.
+    // Форма плагина — берём текущие настройки и меняем только присланные поля.
+    $currentSettings = getSettingsData(true);
+    $newSettings = $isFullSave ? $siteSettings : $currentSettings;
+
+    // Ключи, которых нет в форме сайта (настройки выключенных плагинов, кастомные
+    // поля), сохраняем как есть — иначе полное сохранение их удалит.
+    if ($isFullSave) {
+        foreach ($currentSettings as $key => $value) {
+            if (!array_key_exists($key, $newSettings)) {
+                $newSettings[$key] = $value;
+            }
+        }
+    }
+
+    // Даем плагинам возможность добавить/изменить свои настройки
+    $newSettings = apply_filters('save_settings_data', $newSettings);
     
-    $oldSettings = getSettingsData(true);
+    $oldSettings = $currentSettings;
+
+    // Источник сохранения (сайт или плагин) — для флеша и записи в лог, включая ветку ошибки
+    $source = $_POST['settings_source'] ?? 'сайта';
+    // Валидация: только кириллица, пробелы и дефис (защита от инъекций)
+    if (!preg_match('#^[а-яё\s\-]+$#iu', $source)) {
+        $source = 'сайта';
+    }
+    $source = trim($source);
+
+    // Хук «до сохранения настроек» (для будущих плагинов)
+    do_action('settings_before_save', $newSettings);
 
     if (saveData('settings', $newSettings)) {
         logAction('settings_save', 'Настройки сайта обновлены', 'INFO');
 
-        // SEO: если изменились галочки генерации — сразу собираем (или удаляем)
-        $oldSitemapEnabled = $oldSettings['seo_sitemap_enabled'] ?? true;
-        $oldRobotsEnabled  = $oldSettings['seo_robots_enabled'] ?? true;
+        // Плагины: настройки сохранены (SEO, кеш, .min и т.п.)
+        do_action('settings_saved', $oldSettings, $newSettings);
 
-        $newSitemapEnabled = $newSettings['seo_sitemap_enabled'] ?? true;
-        $newRobotsEnabled  = $newSettings['seo_robots_enabled'] ?? true;
-
-        if ($oldSitemapEnabled !== $newSitemapEnabled || $oldRobotsEnabled !== $newRobotsEnabled) {
-            generateSeoFiles();  // не maybeRegenerate — принудительно, потому что галочки менялись
-        }
-        
         // === АВТОМАТИЧЕСКОЕ СОЗДАНИЕ .min ПРИ ВКЛЮЧЕНИИ ===
         $oldMinify = $oldSettings['assets_minify'] ?? false;
         $newMinify = $newSettings['assets_minify'] ?? false;
@@ -636,16 +582,29 @@ function handleSaveSettings(): array {
             clearPageCache();
         }
         
-        setFlash('Настройки сайта успешно сохранены!');
-        header('Location: index.php?tab=config_vars');
+        setFlash('Настройки ' . $source . ' успешно сохранены!');
+        
+        // Проверяем, откуда пришел запрос (для возврата на нужную вкладку)
+        $returnUrl = $_POST['return_url'] ?? 'index.php?tab=config_vars';
+        // Валидация URL (защита от Open Redirect)
+        if (!preg_match('#^index\.php\?tab=[a-z_]+$#', $returnUrl)) {
+            $returnUrl = 'index.php?tab=config_vars';
+        }
+        
+        header('Location: ' . $returnUrl);
         exit;
     }
-    logAction('settings_save', 'Ошибка сохранения настроек сайта', 'ERROR');
+    logAction('settings_save', 'Ошибка сохранения настроек ' . $source, 'ERROR');
     return ['success' => '', 'error' => 'Ошибка записи на диск.'];
 }
 
 /**
  * 3. ОБРАБОТКА ИЗМЕНЕНИЙ БЕЗОПАСНОСТИ, НАСТРОЕК БРУТФОРСА И IP-ЛОГОВ
+ */
+/**
+ * Снимает блокировку IP из журнала попыток входа.
+ *
+ * @return array ['success' => string, 'error' => string]
  */
 function handleActionUnban(): array {
     $unbanIp = trim($_POST['unban_ip'] ?? '');
@@ -655,13 +614,18 @@ function handleActionUnban(): array {
     
     if (isset($bfData['attempts'][$unbanIp])) {
         unset($bfData['attempts'][$unbanIp]);
-        if (file_put_contents(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false) {
+        if (safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
             return ['success' => "IP-адрес {$unbanIp} успешно разблокирован!", 'error' => ''];
         }
     }
     return ['success' => '', 'error' => 'Ошибка при сохранении лога блокировок.'];
 }
 
+/**
+ * Заносит IP в постоянный чёрный список вручную.
+ *
+ * @return array ['success' => string, 'error' => string]
+ */
 function handleActionManualBan(): array {
     $manualIp = trim($_POST['manual_ban_ip'] ?? '');
     if (!filter_var($manualIp, FILTER_VALIDATE_IP)) {
@@ -683,12 +647,19 @@ function handleActionManualBan(): array {
         'permanent'    => true
     ];
     
-    if (file_put_contents(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) !== false) {
+    if (safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
         return ['success' => "IP-адрес {$manualIp} успешно занесен в вечный черный список!", 'error' => ''];
     }
     return ['success' => '', 'error' => 'Ошибка при записи в черный список.'];
 }
 
+/**
+ * Сохраняет логин, пароль и параметры защиты от брутфорса.
+ *
+ * При смене логина или пароля завершает сессию и уводит на повторный вход.
+ *
+ * @return array ['success' => string, 'error' => string]
+ */
 function handleSaveSecurity(): array {
     $newLogin = trim($_POST['sec_login'] ?? '');
     $newPass  = $_POST['sec_password'] ?? '';
@@ -760,15 +731,18 @@ function handleSaveSecurity(): array {
 }
 
 /**
- * 4. УНИВЕРСАЛЬНАЯ AJAX ЗАГРУЗКА ИЗОБРАЖЕНИЙ С КИРИЛЛИЧЕСКИМ ТРАНСЛИТОМ И КОНТРОЛЕМ НАГРУЗКИ
+ * Принимает изображение из медиа-модалки и сохраняет его в `images/` или корень.
+ *
+ * Проверяет размер, расширение, MIME и содержимое SVG, очищает имя файла.
+ * Отвечает JSON `{success, url}` или `{success, error}`.
+ *
+ * @return void
  */
 function handleAjaxImageUpload(): void {
     header('Content-Type: application/json');
     
     // 1. Проверяем CSRF-токен
-    $incomingToken = $_POST['csrf_token'] ?? '';
-    $sessionToken  = $_SESSION['csrf_token'] ?? '';
-    if (empty($sessionToken) || !hash_equals($sessionToken, $incomingToken)) {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
         echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: невалидный CSRF-токен.']);
         exit;
     }
@@ -816,6 +790,16 @@ function handleAjaxImageUpload(): void {
         echo json_encode(['success' => false, 'error' => 'Файл не является валидным изображением.']);
         exit;
     }
+
+    // SVG — XML с исполняемыми возможностями: одного MIME недостаточно
+    if ($ext === 'svg') {
+        $svgContent = file_get_contents($file['tmp_name']);
+        $svgError = validateSvgContent($svgContent === false ? '' : $svgContent);
+        if ($svgError !== null) {
+            echo json_encode(['success' => false, 'error' => $svgError]);
+            exit;
+        }
+    }
     
     // 5. Генерация имени
     $prefix = !empty($subFolder) ? $subFolder : 'img';
@@ -856,8 +840,8 @@ function handleAjaxImageUpload(): void {
     }
     
     if (move_uploaded_file($file['tmp_name'], $targetPath)) {
-        // WebP-конвертация (если включена)
-        maybeConvertToWebp($targetPath);
+        // Сообщаем ядру, что файл загружен
+        do_action('after_file_upload', $targetPath);
         
         echo json_encode(['success' => true, 'url' => $relativeUrl]);
         exit;
@@ -867,874 +851,28 @@ function handleAjaxImageUpload(): void {
     exit;
 }
 
-/**
- * 5. ОБРАБОТКА НАСТРОЕК РЕЗЕРВНОГО КОПИРОВАНИЯ И ХРАНЕНИЯ JSON-БАЗЫ
- */
 
 /**
- * Вспомогательная внутренняя функция: обратимое шифрование пароля бэкапа (OpenSSL)
+ * Проверяет, доступно ли планирование публикации страниц.
+ *
+ * Возможность включается плагином через фильтр `page_scheduling_enabled`:
+ * именно он регистрирует cron-задачу, которая переводит `scheduled` в
+ * `published`. Пока фильтра нет, статус «По расписанию» и поля дат в
+ * редакторе не показываются: опубликовать такую страницу всё равно некому.
+ *
+ * @return bool true, если расписание поддерживается активным плагином.
  */
-function encryptBackupPassword(string $password): string {
-    if (empty($password)) return '';
-    
-    $pepperFile = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . '.pepper';
-    $pepper = file_exists($pepperFile) ? trim(file_get_contents($pepperFile)) : '';
-    $key = hash_hmac('sha256', 'cms_backup_secure_salt', $pepper);
-    
-    $ivLength = openssl_cipher_iv_length('aes-256-cbc');
-    $iv = openssl_random_pseudo_bytes($ivLength);
-    $encrypted = openssl_encrypt($password, 'aes-256-cbc', $key, 0, $iv);
-    
-    return base64_encode($iv . $encrypted);
+function isPageSchedulingEnabled(): bool {
+    return (bool) apply_filters('page_scheduling_enabled', false);
 }
 
 /**
- * Вспомогательная внутренняя функция: обратимая расшифровка пароля бэкапа
- */
-function decryptBackupPassword(string $encryptedBase64): string {
-    if (empty($encryptedBase64)) return '';
-    
-    $pepperFilePath = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . '.pepper';
-    $pepper = file_exists($pepperFilePath) ? trim(file_get_contents($pepperFilePath)) : '';
-    $key = hash_hmac('sha256', 'cms_backup_secure_salt', $pepper);
-    
-    $data = base64_decode($encryptedBase64);
-    $ivLength = openssl_cipher_iv_length('aes-256-cbc');
-    $iv = substr($data, 0, $ivLength);
-    $encryptedText = substr($data, $ivLength);
-    
-    return openssl_decrypt($encryptedText, 'aes-256-cbc', $key, 0, $iv) ?: '';
-}
-
-/**
- * Вспомогательная внутренняя функция: чтение текущего JSON-конфига бэкапов на сервере
- */
-function getBackupSettingsData(): array {
-    $configFile = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'backup_config.json';
-    if (!file_exists($configFile)) {
-        return [
-            'backup_type' => 'full',
-            'targets' => ['data', 'images'],
-            'storage_path' => 'config/backups/',
-            'encrypt_archive' => false,
-            'archive_password' => '',
-            'cron_enabled' => false,
-            'cron_virtual' => false,
-            'cron_period' => 24,
-            'last_backup_time' => 0
-        ];
-    }
-    return json_decode(file_get_contents($configFile), true) ?? [];
-}
-
-/**
- * Внутренняя служебная функция: расчет абсолютного пути к папке бэкапов
- */
-function getCmsBackupStorageDir(): string {
-    // Если есть временные настройки — используем их
-    if (isset($GLOBALS['_temp_backup_settings'])) {
-        $settings = $GLOBALS['_temp_backup_settings'];
-    } else {
-        $settings = getBackupSettingsData();
-    }
-    $storagePath = trim($settings['storage_path'] ?? 'config/backups/');
-    
-    // Стандартизируем разделители под текущую ОС
-    $storagePath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $storagePath);
-
-    $isAbsoluteWindows = (preg_match('/^[a-zA-Z]:[\\\\\/]/', $storagePath) === 1);
-    $isAbsoluteLinux = (strpos($storagePath, DIRECTORY_SEPARATOR) === 0);
-
-    if (DIRECTORY_SEPARATOR === '\\' && $isAbsoluteLinux && !$isAbsoluteWindows) {
-        $isAbsoluteLinux = false; 
-    }
-
-    if ($isAbsoluteWindows || $isAbsoluteLinux) {
-        $realStorageDir = $storagePath;
-    } else {
-        $cleanPath = trim($storagePath, DIRECTORY_SEPARATOR . '.');
-        $rawPath = APP_ROOT . DIRECTORY_SEPARATOR . $cleanPath;
-        
-        if (strpos($storagePath, '..') !== false) {
-            $parts = explode(DIRECTORY_SEPARATOR, $rawPath);
-            $absolutes = [];
-            foreach ($parts as $part) {
-                if ('.' == $part || '' == $part) continue;
-                if ('..' == $part) {
-                    array_pop($absolutes);
-                } else {
-                    $absolutes[] = $part;
-                }
-            }
-            $assembledPath = implode('/', $absolutes);
-            
-            if (preg_match('/^[a-zA-Z]:/', $assembledPath) === 1) {
-                $realStorageDir = $assembledPath;
-            } else {
-                $realStorageDir = '/' . $assembledPath;
-            }
-        } else {
-            $realStorageDir = APP_ROOT . DIRECTORY_SEPARATOR . $cleanPath;
-        }
-    }
-
-    return rtrim($realStorageDir, DIRECTORY_SEPARATOR);
-}
-
-/**
- * Вспомогательная функция: рекурсивный сбор всех файлов в папке
- */
-function getCmsFilesRecursive(string $dir): array {
-    $files = [];
-    if (!is_dir($dir)) return $files;
-    
-    $items = scandir($dir);
-    foreach ($items as $item) {
-        if ($item === '.' || $item === '..') continue;
-        
-        $path = $dir . DIRECTORY_SEPARATOR . $item;
-        if (is_dir($path)) {
-            $files = array_merge($files, getCmsFilesRecursive($path));
-        } else {
-            // Сохраняем относительный путь от корня сайта, чтобы архив распаковывался красиво
-            $relativePath = str_replace(APP_ROOT . DIRECTORY_SEPARATOR, '', $path);
-            $files[] = str_replace('\\', '/', $relativePath);
-        }
-    }
-    return $files;
-}
-
-/**
- * Вспомогательная внутренняя функция: рекурсивное и чистое удаление папки с диска
- * Не стирает папку с архивами бэкапов при полном откате!
- */
-function deleteCmsDirRecursive(string $dir): bool {
-    if (!is_dir($dir)) return false;
-
-    // Узнаем, где лежит папка бэкапов
-    $storageDir = getCmsBackupStorageDir();
-    
-    // Если текущая удаляемая папка — это и есть наша папка бэкапов, МЫ ЕЁ НЕ ТРОГАЕМ!
-    if (realpath($dir) === realpath($storageDir)) {
-        return true; 
-    }
-
-    $items = scandir($dir);
-    foreach ($items as $item) {
-        if ($item === '.' || $item === '..') continue;
-        $path = $dir . DIRECTORY_SEPARATOR . $item;
-        
-        // Дополнительная проверка для вложенных файлов папки бэкапов
-        if (strpos(realpath($path), realpath($storageDir)) === 0) {
-            continue;
-        }
-
-        if (is_dir($path)) {
-            deleteCmsDirRecursive($path);
-        } else {
-            @unlink($path);
-        }
-    }
-    
-    // Не удаляем саму родительскую папку, если она содержит внутри себя защищенную папку бэкапов
-    if (strpos(realpath($storageDir), realpath($dir)) === 0) {
-        return true;
-    }
-
-    return @rmdir($dir);
-}
-
-
-/**
- * ЕДИНЫЙ СИСТЕМНЫЙ ДВИЖОК АРХИВАЦИИ
- */
-function executeCmsBackupEngine(string $archivePath, array $filesList, bool $encrypt, string $encryptedPassword, bool $overwrite = true): bool {
-    $zip = new ZipArchive();
-    $mode = $overwrite ? ZipArchive::CREATE | ZipArchive::OVERWRITE : 0;
-
-    $opened = false;
-    for ($retry = 0; $retry < 5; $retry++) {
-        if ($zip->open($archivePath, $mode) === true) {
-            $opened = true;
-            break;
-        }
-        usleep(50000);
-    }
-
-    if (!$opened) {
-        return false;
-    }
-
-    $clearPassword = '';
-    if ($encrypt && !empty($encryptedPassword)) {
-        $clearPassword = decryptBackupPassword($encryptedPassword);
-    }
-
-    if ($clearPassword !== '') {
-        $zip->setPassword($clearPassword);
-    }
-
-    foreach ($filesList as $relativePath) {
-        $absolutePath = APP_ROOT . DIRECTORY_SEPARATOR . $relativePath;
-        if (file_exists($absolutePath) && is_file($absolutePath)) {
-            $zip->addFile($absolutePath, $relativePath);
-            
-            if ($clearPassword !== '') {
-                $zip->setEncryptionName($relativePath, ZipArchive::EM_AES_256, $clearPassword);
-            }
-        }
-    }
-
-    $zip->close();
-    clearstatcache(true, $archivePath);
-    return true;
-}
-
-/**
- * ХЭНДЛЕР А: СОХРАНЕНИЕ НАСТРОЕК КОНФИГУРАЦИИ БЭКАПОВ (С ОЧИСТКОЙ ПАРОЛЕЙ И ПРОБЕЛОВ)
- */
-function handleSaveBackupSettings(): array {
-    $clientToken = $_POST['csrf_token'] ?? '';
-    if (empty($_SESSION['csrf_token']) || $clientToken !== $_SESSION['csrf_token']) {
-        return ['success' => '', 'error' => 'Критическая ошибка безопасности: невалидный токен сессии.'];
-    }
-
-    $configFile = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'backup_config.json';
-    
-    // Считываем текущую конфигурацию из JSON до перезаписи, чтобы сохранить неизменяемые параметры
-    $current = getBackupSettingsData();
-
-    // Определяем режим бэкапа и типы объектов
-    $backupType = $_POST['backup_type'] ?? 'full';
-    if ($backupType === 'full') {
-        // РЕЖИМ FULL: Папки в конфиг не пишем, ядро само заберет весь корень монолитом
-        $targets = [];
-    } else {
-        // РЕЖИМ CUSTOM: Берем строго то, что админ накликал на экране в матрице
-        $targets = !empty($_POST['targets']) && is_array($_POST['targets']) ? $_POST['targets'] : [];
-        
-        // Защита от дурака: если переключили в выборочный режим, но сняли вообще все галочки
-        if (empty($targets)) {
-            setFlash('Ошибка конфигурации: необходимо отметить хотя бы один объект для архивации!', 'error');
-            header('Location: index.php?tab=backups');
-            exit;
-        }
-        
-        // Фильтруем прилетевшие имена папок от возможных инъекций путей
-        $targets = array_map(function($v) {
-            $v = trim($v);
-            // Блокируем опасные символы (path traversal)
-            if (strpos($v, '..') !== false || strpos($v, '/') !== false || strpos($v, '\\') !== false) {
-                return '';
-            }
-            return $v;
-        }, $targets);
-        $targets = array_values(array_filter($targets));
-    }
-
-    
-    // Проверяем флаг шифрования из нативной POST-формы
-    $encryptArchive = isset($_POST['encrypt_archive']);
-
-    // СБОР И КОРРЕКЦИЯ ПАРОЛЯ СВЕРХУ-ВНИЗ
-    $rawPassword = $_POST['archive_password'] ?? '';
-    $cleanPassword = trim($rawPassword); // 1. Очищаем от случайных пробелов на входе
-
-    if (!$encryptArchive) {
-        // 2. Если шифрование снято — намертво забываем и стираем пароль
-        $finalEncryptedPassword = '';
-    } else {
-        // Если шифрование ВКЛЮЧЕНО
-        if ($cleanPassword !== '' && $cleanPassword !== '........') {
-            // Пользователь ввёл новый чистый пароль — шифруем его в OpenSSL
-            $finalEncryptedPassword = encryptBackupPassword($cleanPassword);
-        } else {
-            // В поле пустые точки (пароль не менялся) — подтягиваем ранее сохранённый ключ из переменной $current
-            $finalEncryptedPassword = $current['archive_password'] ?? '';
-        }
-    }
-
-    // === СОХРАНЯЕМ ПУТЬ ===
-    $storagePath = trim($_POST['storage_path'] ?? 'config/backups/');
-
-    // === ПРОВЕРКА: используем getCmsBackupStorageDir() для нормализации ===
-    // Сначала сохраняем временно, чтобы получить реальный путь
-    $tempSettings = [
-        'storage_path' => $storagePath
-    ];
-    // Временно сохраняем в глобальную переменную для getCmsBackupStorageDir()
-    $GLOBALS['_temp_backup_settings'] = $tempSettings;
-    
-    // Получаем нормализованный путь
-    $realPath = getCmsBackupStorageDir();
-    
-    // Проверяем, можно ли создать папку
-    if (!is_dir($realPath)) {
-        if (!@mkdir($realPath, 0755, true)) {
-            setFlash('Ошибка: не удалось создать папку для хранения бэкапов по указанному пути. Проверьте права на запись.', 'error', 5);
-            header('Location: index.php?tab=backups');
-            exit;
-        }
-    }
-    
-    // Проверяем, можно ли записать файл
-    $testFile = $realPath . DIRECTORY_SEPARATOR . '.test_write';
-    if (!safeFileWrite($testFile, 'test')) {
-        setFlash('Ошибка: нет прав на запись в указанную папку. Проверьте права доступа CHMOD.', 'error', 5);
-        header('Location: index.php?tab=backups');
-        exit;
-    }
-    @unlink($testFile);
-    
-    // Убираем временную переменную
-    unset($GLOBALS['_temp_backup_settings']);
-    
-    $settings = [
-        'backup_type'      => $backupType, 
-        'targets'          => $targets,             
-        'storage_path'     => trim($_POST['storage_path'] ?? 'config/backups/'),
-        'encrypt_archive'  => $encryptArchive, // Записываем честный булев флаг true/false
-        'archive_password' => $finalEncryptedPassword, // Записываем выверенный очищенный хэш
-        'cron_enabled'     => isset($_POST['cron_enabled']),
-        'cron_virtual'     => isset($_POST['cron_virtual']),
-        'cron_period'      => intval($_POST['cron_period'] ?? 24), 
-        'last_backup_time' => intval($current['last_backup_time'] ?? 0) // Бережно сохраняем время прошлого бэкапа
-    ];
-
-    $dir = dirname($configFile);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
-
-    safeFileWrite($configFile, json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-
-    setFlash('Конфигурация резервного копирования успешно сохранена!');
-    header('Location: index.php?tab=backups');
-    exit;
-}
-
-/**
- * ХЭНДЛЕР Б: ИНИЦИАЛИЗАЦИЯ И СБОР МАССИВА ФАЙЛОВ ДЛЯ АРХИВАЦИИ
- */
-function handleInitBackupProcess(): array {
-    $clientToken = $_POST['csrf_token'] ?? '';
-    if (empty($_SESSION['csrf_token']) || $clientToken !== $_SESSION['csrf_token']) {
-        return ['success' => '', 'error' => 'Критическая ошибка безопасности: невалидный токен сессии.'];
-    }
-
-    // 1. Загружаем текущие параметры бэкапа и единый путь хранения
-    $settings = getBackupSettingsData();
-    $realStorageDir = getCmsBackupStorageDir();
-
-    // Гарантируем существование папки хранения
-    if (!is_dir($realStorageDir)) {
-        if (!@mkdir($realStorageDir, 0755, true)) {
-            return ['success' => '', 'error' => 'Не удалось создать директорию для хранения архивов. Проверьте системные права.'];
-        }
-    }
-
-    // Всегда проверяем .htaccess в папке бэкапов (если она внутри APP_ROOT)
-    if (strpos($realStorageDir, APP_ROOT) === 0) {
-        $htaccessFile = $realStorageDir . DIRECTORY_SEPARATOR . '.htaccess';
-        $htaccessData = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n";
-
-        $needWrite = false;
-        if (!file_exists($htaccessFile)) {
-            $needWrite = true;
-        } else {
-            $currentContent = @file_get_contents($htaccessFile);
-            if ($currentContent === false || strpos($currentContent, 'Require all denied') === false) {
-                $needWrite = true;
-            }
-        }
-
-        if ($needWrite) {
-            @file_put_contents($htaccessFile, $htaccessData);
-        }
-    }
-
-    $filesToArchive = [];
-    $backupType = $settings['backup_type'] ?? 'full';
-
-    // Вычисляем относительный путь папки бэкапов для гарантированного отсечения рекурсий
-    $canonicalRoot = realpath(APP_ROOT);
-    $canonicalStorage = realpath($realStorageDir);
-    $relativeStorageDir = '';
-    if ($canonicalRoot && $canonicalStorage && strpos($canonicalStorage, $canonicalRoot) === 0) {
-        $relativeStorageDir = trim(str_replace($canonicalRoot, '', $canonicalStorage), DIRECTORY_SEPARATOR . '/');
-        $relativeStorageDir = str_replace('\\', '/', $relativeStorageDir);
-    }
-
-    // 2. ОПРЕДЕЛЯЕМ ОБЪЕКТЫ НА ОСНОВЕ ВЫБРАННОГО РЕЖИМА
-    if ($backupType === 'full') {
-        // Сценарий А: ПОЛНЫЙ БЭКАП — Берем весь корень сайта целиком как монолит
-        $allRootItems = getCmsFilesRecursive(APP_ROOT);
-        
-        foreach ($allRootItems as $file) {
-            // Исключаем только саму папку с архивами бэкапов
-            if ($relativeStorageDir !== '' && strpos($file, $relativeStorageDir) === 0) {
-                continue;
-            }
-            $filesToArchive[] = $file;
-        }
-    } else {
-        // Сценарий Б: ВЫБОРOЧНЫЙ БЭКАП — Бежим по полноценному списку папок из матрицы чекбоксов
-        $targets = $settings['targets'] ?? [];
-        
-        if (empty($targets)) {
-            return ['success' => '', 'error' => 'Вы выбрали режим «Выборочно», но сняли все галочки объектов. Нечего архивировать!'];
-        }
-
-        foreach ($targets as $target) {
-            $targetPath = APP_ROOT . DIRECTORY_SEPARATOR . $target;
-
-            if (is_dir($targetPath)) {
-                // Папка — рекурсивно
-                $dirFiles = getCmsFilesRecursive($targetPath);
-                foreach ($dirFiles as $file) {
-                    if ($relativeStorageDir !== '' && strpos($file, $relativeStorageDir) === 0) {
-                        continue;
-                    }
-                    $filesToArchive[] = $file;
-                }
-            } elseif (is_file($targetPath)) {
-                // Файл — добавляем напрямую
-                $filesToArchive[] = $target;
-            }
-        }
-    }
-
-    if (empty($filesToArchive)) {
-        return ['success' => '', 'error' => 'Структура выбранных директорий пуста или заблокирована.'];
-    }
-
-    // 3. Генерируем уникальное имя файла архива
-    $encMarker = !empty($settings['encrypt_archive']) ? '_enc_' : '_';
-    $archiveName = 'backup_' . $backupType . $encMarker . date('Ymd_His') . '.zip';
-    $absoluteArchivePath = $realStorageDir . DIRECTORY_SEPARATOR . $archiveName;
-
-    // 4. Разбиваем массив файлов на пачки для AJAX ProgressBar
-    $chunkSize = 50; 
-    $fileChunks = array_chunk($filesToArchive, $chunkSize);
-
-    // 5. Записываем состояние сессии для пошагового выполнения
-    $_SESSION['backup_task'] = [
-        'archive_name' => $archiveName,
-        'archive_path' => $absoluteArchivePath,
-        'chunks'       => $fileChunks,
-        'total_steps'  => count($fileChunks),
-        'encrypt'      => !empty($settings['encrypt_archive']),
-        'password'     => $settings['archive_password'] ?? ''
-    ];
-
-    return [
-        'success'      => 'Сканирование завершено! Структура готова к пошаговой архивации.',
-        'error'        => '',
-        'total_steps'  => count($fileChunks),
-        'archive_name' => $archiveName
-    ];
-}
-
-/**
- * ХЭНДЛЕР В: ПОШАГОВАЯ АРХИВАЦИЯ ОЧЕРЕДИ ФАЙЛОВ (0% НАГРУЗКИ НА ПАМЯТЬ)
- */
-function handleProcessBackupStep(): array {
-    $clientToken = $_POST['csrf_token'] ?? '';
-    if (empty($_SESSION['csrf_token']) || $clientToken !== $_SESSION['csrf_token']) {
-        return ['success' => '', 'error' => 'Критическая ошибка безопасности: невалидный токен сессии.'];
-    }
-
-    if (empty($_SESSION['backup_task'])) {
-        logAction('backup_create', 'Системная ошибка: сессионная задача бэкапа не найдена', 'ERROR');
-        return ['success' => '', 'error' => 'Системная ошибка: сессионная задача бэкапа не найдена.'];
-    }
-
-    $task = &$_SESSION['backup_task'];
-    $currentStep = intval($_POST['step'] ?? 0);
-
-    if ($currentStep < 0 || $currentStep >= $task['total_steps']) {
-        logAction('backup_create', 'Некорректный номер шага архивации', 'ERROR');
-        return ['success' => '', 'error' => 'Некорректный номер шага архивации.'];
-    }
-
-    $fileChunk = $task['chunks'][$currentStep] ?? [];
-    
-    if (!empty($fileChunk)) {
-        $isFirstStep = ($currentStep === 0);
-        
-        $success = executeCmsBackupEngine(
-            $task['archive_path'], 
-            $fileChunk, 
-            $task['encrypt'], 
-            $task['password'],
-            $isFirstStep
-        );
-
-        if (!$success) {
-            logAction('backup_create', 'Ошибка записи в ZIP-архив на шаге ' . $currentStep, 'ERROR');
-            return ['success' => '', 'error' => 'Файловая система занята. Ошибка записи в ZIP-архив на шаге ' . $currentStep];
-        }
-    }
-    
-    $nextStep = $currentStep + 1;
-    $isFinished = ($nextStep >= $task['total_steps']);
-
-    // Если это был финальный шаг — очищаем временную задачу и фиксируем время
-    if ($isFinished) {
-        unset($_SESSION['backup_task']);
-        logAction('backup_create', 'Создан бэкап: ' . $task['archive_name'], 'INFO');
-        $settings = getBackupSettingsData();
-        $settings['last_backup_time'] = time();
-        $configFile = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'backup_config.json';
-        safeFileWrite($configFile, json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    }
-
-    return [
-        'success'     => $isFinished ? 'Резервная копия успешно создана и сохранена в архив!' : 'Пачка файлов успешно упакована.',
-        'error'       => '',
-        'current_percent' => round(($nextStep / $task['total_steps']) * 100),
-        'is_finished' => $isFinished,
-        'next_step'   => $nextStep
-    ];
-}
-
-/**
- * ХЭНДЛЕР Г: БЕЗОПАСНОЕ УДАЛЕНИЕ ФИЗИЧЕСКОГО ZIP-АРХИВА С СЕРВЕРА
- */
-function handleDeleteBackup(): array {
-    $clientToken = $_POST['csrf_token'] ?? '';
-    if (empty($_SESSION['csrf_token']) || $clientToken !== $_SESSION['csrf_token']) {
-        setFlash('Критическая ошибка безопасности: невалидный токен сессии.', 'error');
-        return ['success' => '', 'error' => 'CSRF error'];
-    }
-
-    $fileName = trim($_POST['delete_file'] ?? '');
-    if (empty($fileName) || strpos($fileName, '/') !== false || strpos($fileName, '\\') !== false) {
-        setFlash('Некорректное или опасное имя файла архива.', 'error');
-        return ['success' => '', 'error' => 'Invalid file'];
-    }
-
-    $storageDir = getCmsBackupStorageDir();
-    $absoluteFilePath = $storageDir . DIRECTORY_SEPARATOR . $fileName;
-
-    if (file_exists($absoluteFilePath) && is_file($absoluteFilePath)) {
-        if (@unlink($absoluteFilePath)) {
-            logAction('backup_delete', 'Удалён бэкап: ' . $fileName, 'INFO');
-            setFlash('Резервная копия успешно и безвозвратно удалена с сервера!');
-            return ['success' => 'Deleted', 'error' => ''];
-        }
-        logAction('backup_delete', 'Ошибка удаления бэкапа: ' . $fileName . '. Проверьте системные права доступа CHMOD.', 'ERROR');
-        setFlash('Не удалось удалить файл. Проверьте системные права доступа CHMOD.', 'error');
-        return ['success' => '', 'error' => 'CHMOD error'];
-    }
-
-    // ИСПРАВЛЕНО: Если файла уже нет на диске, мы пишем ошибку во ФЛЭШ-СЕССИЮ, чтобы страница обновилась и красиво вывела тост!
-    logAction('backup_delete', 'Ошибка удаления бэкапа: ' . $fileName . '. Указанный архив не найден на сервере.', 'ERROR');
-    setFlash('Указанный архив не найден на сервере. Возможно, он уже удален.', 'error');
-    return ['success' => '', 'error' => 'Not found'];
-}
-
-/**
- * ХЭНДЛЕР Д: БЕЗОПАСНОЕ СКАЧИВАНИЕ ZIP-АРХИВА ЧЕРЕЗ БИНАРНЫЙ ПОТОК PHP
- */
-function handleDownloadBackup(): void {
-    if (empty($_SESSION['admin_auth'])) {
-        die('Доступ запрещен');
-    }
-
-    $fileName = trim($_GET['download_file'] ?? '');
-    
-    // Защита: отсекаем любые попытки хакинга путей (../)
-    if (empty($fileName) || strpos($fileName, '/') !== false || strpos($fileName, '\\') !== false) {
-        die('Некорректное имя файла архива.');
-    }
-
-    // Вызываем единую служебную функцию расчета путей
-    $storageDir = getCmsBackupStorageDir();
-    $absoluteFilePath = $storageDir . DIRECTORY_SEPARATOR . $fileName;
-
-    if (file_exists($absoluteFilePath) && is_file($absoluteFilePath)) {
-        // КРИТИЧЕСКИЙ ФИКС: Жестко чистим все буферы PHP, чтобы убрать случайные пробелы из кода
-        while (ob_get_level()) {
-            ob_end_clean();
-        }
-
-        // HTTP-заголовки для отдачи бинарного ZIP-потока
-        header('Content-Description: File Transfer');
-        header('Content-Type: application/zip');
-        header('Content-Disposition: attachment; filename="' . basename($fileName) . '"');
-        header('Content-Transfer-Encoding: binary');
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
-        header('Pragma: public');
-        header('Content-Length: ' . filesize($absoluteFilePath));
-        
-        // Транслируем файл напрямую с диска в браузер
-        readfile($absoluteFilePath);
-        exit; // Железно глушим скрипт, чтобы к архиву не приклеился HTML-код каркаса!
-    }
-
-    die('Запрошенный файл резервной копии не найден на сервере.');
-}
-
-/**
- * ХЭНДЛЕР Е: ИСПОЛНЕНИЕ СИСТЕМНОГО КРОНА АВТОМАТИЧЕСКОГО БЭКАПА (ВЫЗЫВАЕТСЯ ИЗ CRON_BACKUP.PHP)
- */
-function handleCronBackupAction(string $clientToken): void {
-    $settings = getBackupSettingsData();
-
-    if (empty($settings['cron_enabled'])) {
-        header('HTTP/1.1 403 Forbidden');
-        die('Error: Feature disabled');
-    }
-
-    if ($clientToken === '' || $clientToken !== getCronToken()) {
-        header('HTTP/1.1 403 Forbidden');
-        die('Error: Access denied');
-    }
-
-    $realStorageDir = getCmsBackupStorageDir();
-    if (!is_dir($realStorageDir)) {
-        @mkdir($realStorageDir, 0755, true);
-    }
-
-    $filesToArchive = [];
-    $backupType = $settings['backup_type'] ?? 'full';
-
-    // Вычисляем относительный путь папки бэкапов для гарантированного отсечения рекурсий
-    $canonicalRoot = realpath(APP_ROOT);
-    $canonicalStorage = realpath($realStorageDir);
-    $relativeStorageDir = '';
-    if ($canonicalRoot && $canonicalStorage && strpos($canonicalStorage, $canonicalRoot) === 0) {
-        $relativeStorageDir = trim(str_replace($canonicalRoot, '', $canonicalStorage), DIRECTORY_SEPARATOR . '/');
-        $relativeStorageDir = str_replace('\\', '/', $relativeStorageDir);
-    }
-
-    if ($backupType === 'full') {
-        // Сценарий А: ПОЛНЫЙ БЭКАП КРОНА — Сканируем весь корень сайта монолитом
-        $allRootItems = getCmsFilesRecursive(APP_ROOT);
-        foreach ($allRootItems as $file) {
-            // Железно исключаем только саму папку с архивами бэкапов
-            if ($relativeStorageDir !== '' && strpos($file, $relativeStorageDir) === 0) {
-                continue;
-            }
-            $filesToArchive[] = $file;
-        }
-    } else {
-        // Сценарий Б: ВЫБОРOЧНЫЙ БЭКАП КРОНА — Берем список папок из сохраненного массива targets
-        $targets = $settings['targets'] ?? [];
-        if (empty($targets)) {
-            die('Error: Empty targets configuration');
-        }
-
-        foreach ($targets as $target) {
-            $targetPath = APP_ROOT . DIRECTORY_SEPARATOR . $target;
-
-            if (is_dir($targetPath)) {
-                $dirFiles = getCmsFilesRecursive($targetPath);
-                foreach ($dirFiles as $file) {
-                    if ($relativeStorageDir !== '' && strpos($file, $relativeStorageDir) === 0) {
-                        continue;
-                    }
-                    $filesToArchive[] = $file;
-                }
-            } elseif (is_file($targetPath)) {
-                $filesToArchive[] = $target;
-            }
-        }
-    }
-
-    if (empty($filesToArchive)) {
-        die('Error: No files found');
-    }
-
-    $encMarker = !empty($settings['encrypt_archive']) ? 'enc_' : '';
-    $archiveName = 'cron_' . $backupType . '_' . $encMarker . date('Ymd_His') . '.zip';
-    $absoluteArchivePath = $realStorageDir . DIRECTORY_SEPARATOR . $archiveName;
-
-    $success = executeCmsBackupEngine(
-        $absoluteArchivePath, 
-        $filesToArchive, 
-        !empty($settings['encrypt_archive']), 
-        $settings['archive_password'] ?? '',
-        true
-    );
-
-    if (!$success) {
-        header('HTTP/1.1 500 Internal Server Error');
-        die('Error: Write failure');
-    }
-
-    $settings['last_backup_time'] = time();
-    $configFile = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'backup_config.json';
-    safeFileWrite($configFile, json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "Status: OK";
-    exit;
-}
-
-/**
- * ХЭНДЛЕР Ж: БЕЗОПАСНОЕ ПОЛНОЕ ВОССТАНОВЛЕНИЕ (ОТКАТ) СИСТЕМЫ ИЗ ZIP-АРХИВА
- * Пофайловое извлечение через стримы (для обхода ограничений extractTo при AES-256)
- */
-function handleRestoreBackup(): array {
-    $clientToken = $_POST['csrf_token'] ?? '';
-    if (empty($_SESSION['csrf_token']) || $clientToken !== $_SESSION['csrf_token']) {
-        setFlash('Критическая ошибка безопасности: невалидный токен сессии.', 'error');
-        return ['success' => '', 'error' => 'CSRF error'];
-    }
-
-    $fileName = trim($_POST['restore_file'] ?? '');
-    if (empty($fileName) || strpos($fileName, '/') !== false || strpos($fileName, '\\') !== false) {
-        setFlash('Некорректное имя файла архива.', 'error');
-        return ['success' => '', 'error' => 'Invalid file'];
-    }
-
-    $storageDir = getCmsBackupStorageDir();
-    $absoluteArchivePath = $storageDir . DIRECTORY_SEPARATOR . $fileName;
-
-    if (!file_exists($absoluteArchivePath) || !is_file($absoluteArchivePath)) {
-        setFlash('Указанный файл архива не найден на сервере.', 'error');
-        return ['success' => '', 'error' => 'Not found'];
-    }
-
-    $inputPassword = trim($_POST['restore_password'] ?? '');
-
-    // ИСПРАВЛЕНО: Открываем архив строго в режиме чтения READONLY для стабильной работы криптоконтура Windows
-    $zip = new ZipArchive();
-    if ($zip->open($absoluteArchivePath, ZipArchive::RDONLY) !== true) {
-        setFlash('Не удалось открыть ZIP-архив. Возможно, файл поврежден.', 'error');
-        return ['success' => '', 'error' => 'Zip open error'];
-    }
-
-    // Устанавливаем глобальный пароль архива
-    if ($inputPassword !== '') {
-        $zip->setPassword($inputPassword);
-    }
-    
-    // === ЗАЩИТА ОТ ZIP SLIP ===
-    $zipSlipEntry = detectZipSlip($zip);
-    if ($zipSlipEntry !== null) {
-        $zip->close();
-        logAction('backup_restore', 'ZIP Slip в бэкапе: ' . $zipSlipEntry, 'ERROR');
-        setFlash('Архив содержит небезопасные имена файлов. Восстановление отменено.', 'error');
-        return ['success' => '', 'error' => 'Zip slip'];
-    }
-    // === КОНЕЦ ЗАЩИТЫ ===
-
-    // Создаем скрытый бункер для распаковки
-    $stagingDir = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . '.restore_staging';
-    if (is_dir($stagingDir)) {
-        deleteCmsDirRecursive($stagingDir);
-    }
-    @mkdir($stagingDir, 0755, true);
-
-    // --- СТАДИЯ А: ПОФАЙЛОВОЕ ИЗВЛЕЧЕНИЕ ЧЕРЕЗ СТАБИЛЬНЫЙ EXTRACTTO (AES-256) ---
-    $extractSuccess = true;
-    $extractedFilesCount = 0;
-
-    for ($i = 0; $i < $zip->numFiles; $i++) {
-        $stat = $zip->statIndex($i);
-        $relativePath = $stat['name'];
-
-        // Пропускаем директории, мы воссоздадим их по путям файлов
-        if (substr($relativePath, -1) === '/' || substr($relativePath, -1) === '\\') {
-            continue;
-        }
-
-        // ИСПРАВЛЕНО: Перед извлечением принудительно привязываем пароль к конкретному индексу файла
-        if ($inputPassword !== '') {
-            $zip->setEncryptionIndex($i, ZipArchive::EM_AES_256, $inputPassword);
-        }
-
-        // Извлекаем файл встроенным методом extractTo, передавая имя файла поштучно
-        if (@$zip->extractTo($stagingDir, $relativePath)) {
-            $extractedFilesCount++;
-        } else {
-            $extractSuccess = false;
-            break;
-        }
-    }
-    $zip->close();
-
-    // Жесткая проверка: если пароль не подошел или файлы извлеклись пустыми (0 байт)
-    if (!$extractSuccess || $extractedFilesCount === 0) {
-        deleteCmsDirRecursive($stagingDir);
-        setFlash('Ошибка расшифровки архива. Введен неверный пароль!', 'error');
-        return ['success' => '', 'error' => 'Decrypt error'];
-    }
-
-    // --- СТАДИЯ Б: РОТАЦИЯ ПАПОК (ЗАЩИТА ЯДРА И АРХИВОВ) ---
-    $stagedItems = scandir($stagingDir);
-    $itemsToRestore = [];
-    foreach ($stagedItems as $item) {
-        if ($item === '.' || $item === '..') continue;
-        $itemsToRestore[] = $item;
-    }
-
-    if (empty($itemsToRestore)) {
-        deleteCmsDirRecursive($stagingDir);
-        setFlash('Структура архива пуста или повреждена.', 'error');
-        return ['success' => '', 'error' => 'Empty archive'];
-    }
-
-    foreach ($itemsToRestore as $item) {
-        $livePath = APP_ROOT . DIRECTORY_SEPARATOR . $item;
-        $stagedPath = $stagingDir . DIRECTORY_SEPARATOR . $item;
-
-        if (is_dir($stagedPath)) {
-            $volatileDirs = ['data', 'images'];
-
-            if (in_array($item, $volatileDirs)) {
-                if (is_dir($livePath)) {
-                    deleteCmsDirRecursive($livePath);
-                }
-            }
-            
-            if (!is_dir($livePath)) {
-                @mkdir($livePath, 0755, true);
-            }
-            
-            $storageDir = realpath(getCmsBackupStorageDir());
-
-            $directoryIterator = new RecursiveDirectoryIterator($stagedPath, RecursiveDirectoryIterator::SKIP_DOTS);
-            $iterator = new RecursiveIteratorIterator($directoryIterator, RecursiveIteratorIterator::SELF_FIRST);
-
-            foreach ($iterator as $fileInfo) {
-                $subPath = substr($fileInfo->getPathname(), strlen($stagedPath));
-                $targetLivePath = $livePath . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $subPath);
-
-                if ($storageDir && strpos(realpath($targetLivePath), $storageDir) === 0) {
-                    continue;
-                }
-
-                if ($fileInfo->isDir()) {
-                    if (!is_dir($targetLivePath)) {
-                        @mkdir($targetLivePath, 0755, true);
-                    }
-                } else {
-                    $targetDir = dirname($targetLivePath);
-                    if (!is_dir($targetDir)) {
-                        @mkdir($targetDir, 0755, true);
-                    }
-                    @copy($fileInfo->getPathname(), $targetLivePath);
-                }
-            }
-        } else {
-            @copy($stagedPath, $livePath);
-        }
-    }
-
-    deleteCmsDirRecursive($stagingDir);
-
-    logAction('backup_restore', 'Восстановлен бэкап: ' . $fileName, 'INFO');
-    setFlash('Система успешно восстановлена из резервной копии! Все данные откатаны назад.');
-    return ['success' => 'Restored', 'error' => ''];
-}
-
-/**
- * 7. ОБРАБОТКА СОЗДАНИЯ/РЕДАКТИРОВАНИЯ СТРАНИЦЫ
+ * Создаёт или обновляет страницу из формы редактора.
+ *
+ * Санирует ID и slug, собирает данные страницы, вызывает хуки
+ * `page_data_before_save` / `page_before_save` / `page_saved`.
+ *
+ * @return array ['success' => string, 'error' => string]
  */
 function handleSavePage(): array {    
     $action = $_POST['page_action'] ?? 'create';
@@ -1750,6 +888,12 @@ function handleSavePage(): array {
     $allowedStatuses = ['draft', 'scheduled', 'published', 'archived'];
     if (!in_array($status, $allowedStatuses, true)) {
         $status = 'draft';
+    }
+    // Планирование доступно только при активном плагине автопубликации:
+    // без него статус `scheduled` никто не переведёт в `published`.
+    // Защита от устаревшей открытой вкладки и подделанного POST.
+    if ($status === 'scheduled' && !isPageSchedulingEnabled()) {
+        return ['success' => '', 'error' => 'Автопубликация отключена. Выберите другой статус страницы.'];
     }
     $metaDescription = trim($_POST['meta_description'] ?? '');
     $metaKeywords = trim($_POST['meta_keywords'] ?? '');
@@ -1942,52 +1086,22 @@ function handleSavePage(): array {
         $pageData['slug_history'] = $computedSlugHistory;
     }
 
-    // === ИСТОРИЯ ИЗМЕНЕНИЙ ===
-    if ($action === 'create') {
-        // Новая страница — генерируем history_key
-        $pageData['history_key'] = bin2hex(random_bytes(8));
-    } else {
-        // Редактирование — сохраняем history_key из старой версии
-        $oldPageForHistory = loadPageById($id);
-        if ($oldPageForHistory) {
-            $oldKey = (string)($oldPageForHistory['history_key'] ?? '');
-            if (preg_match('/^[a-f0-9]{16}$/i', $oldKey)) {
-                $pageData['history_key'] = $oldKey;
-            } else {
-                // Fallback для страниц без ключа
-                $pageData['history_key'] = bin2hex(random_bytes(8));
-            }
+    // Версия страницы на диске до перезаписи (null при создании)
+    $oldPage = ($action === 'create') ? null : loadPageById($id);
 
-            // Снапшот текущего состояния ПЕРЕД перезаписью
-            savePageSnapshot($oldPageForHistory, $pageData, $_SESSION['admin_login'] ?? 'system');
+    // Плагины: правка данных перед записью (history_key, preview_token, служебные поля)
+    $pageData = apply_filters('page_data_before_save', $pageData, $id, $oldPage);
 
-            // preview_token: сохраняем, если в POST валидный 32-hex токен.
-            // Иначе — не пишем, из JSON он удалится при перезаписи.
-            $postedToken = trim($_POST['preview_token'] ?? '');
-            if (preg_match('/^[a-f0-9]{32}$/i', $postedToken)) {
-                $pageData['preview_token'] = $postedToken;
-            }
-        }
-    }
-    
+    // Хук «до сохранения страницы» (для плагинов: история, превью)
+    do_action('page_before_save', $id, $pageData, $oldPage);
+
     // Сохраняем файл через безопасную атомарную функцию ядра
     if (savePageData($id, $pageData) !== false) {
         // Удаляем кеш страницы (HTML + объединённые ассеты)
         clearPageCacheById($id);
 
-        // Сохранение = previews этой страницы больше неактуальны
-        if (function_exists('cleanupSessionPagePreviews')) {
-            cleanupSessionPagePreviews(session_id(), $id);
-
-            // При создании новой страницы также чистим previews с пустым page_id
-            // (они создавались для ещё не сохранённой страницы)
-            if ($action === 'create') {
-                cleanupSessionPagePreviews(session_id(), '');
-            }
-        }
-
-        // SEO: обновить sitemap/robots, если включено автообновление
-        maybeRegenerateSeoFiles();
+        // Плагины: страница сохранена (SEO, история, превью)
+        do_action('page_saved', $id, $pageData, $oldPage);
         
         $msg = 'Страница "' . $title . '" успешно ' . ($action === 'create' ? 'создана' : 'обновлена');
         logAction('page_save', $msg . ' (ID: ' . $id . ')', 'INFO');
@@ -1997,103 +1111,6 @@ function handleSavePage(): array {
     }
     logAction('page_save', 'Ошибка сохранения страницы "' . $title . '" (ID: ' . $id . ')', 'ERROR');
     return ['success' => '', 'error' => 'Ошибка при сохранении файла. Проверьте права на запись.'];
-}
-
-/**
- * ХЭНДЛЕР: Cron-публикация и архивация страниц.
- * 
- * Логика:
- *   - scheduled + publish_at <= now   → published (publish_at = null)
- *   - published + unpublish_at <= now → archived  (unpublish_at = null)
- * 
- * @param string $clientToken Токен из GET
- * @return void
- */
-function handleCronPublishAction(string $clientToken): void {
-    // Проверка токена (тот же, что у крона бэкапов)
-    if ($clientToken === '' || $clientToken !== getCronToken()) {
-        header('HTTP/1.1 403 Forbidden');
-        die('Error: Access denied');
-    }
-
-    $pagesDir = DATA_DIR . 'pages/';
-    if (!is_dir($pagesDir)) {
-        header('Content-Type: text/plain; charset=utf-8');
-        echo "Status: OK, no pages";
-        exit;
-    }
-
-    $files = glob($pagesDir . '*.json');
-    if (empty($files)) {
-        header('Content-Type: text/plain; charset=utf-8');
-        echo "Status: OK, no pages";
-        exit;
-    }
-
-    $now = time();
-    $publishedCount = 0;
-    $archivedCount  = 0;
-    $errors         = 0;
-
-    foreach ($files as $file) {
-        $page = _jsonToArray($file);
-        if (empty($page['id'])) {
-            continue;
-        }
-
-        $changed = false;
-
-        // Сценарий А: scheduled → published
-        if (($page['status'] ?? '') === 'scheduled'
-            && !empty($page['publish_at'])
-            && (int)$page['publish_at'] <= $now
-        ) {
-            $page['status']     = 'published';
-            $page['publish_at'] = null;
-
-            // Если unpublish_at уже в прошлом — сразу archived
-            if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] <= $now) {
-                $page['status']       = 'archived';
-                $page['unpublish_at'] = null;
-                $archivedCount++;
-                logAction('page_archive', 'Автоснятие: "' . ($page['title'] ?? $page['id']) . '" (ID: ' . $page['id'] . ')', 'INFO');
-            } else {
-                $publishedCount++;
-                logAction('page_publish', 'Автопубликация: "' . ($page['title'] ?? $page['id']) . '" (ID: ' . $page['id'] . ')', 'INFO');
-            }
-
-            $changed = true;
-        }
-        // Сценарий Б: published → archived
-        elseif (($page['status'] ?? '') === 'published'
-            && !empty($page['unpublish_at'])
-            && (int)$page['unpublish_at'] <= $now
-        ) {
-            $page['status']       = 'archived';
-            $page['unpublish_at'] = null;
-
-            $archivedCount++;
-            $changed = true;
-
-            logAction('page_archive', 'Автоснятие: "' . ($page['title'] ?? $page['id']) . '" (ID: ' . $page['id'] . ')', 'INFO');
-        }
-
-        if ($changed) {
-            if (savePageData($page['id'], $page)) {
-                clearPageCacheById($page['id']);
-            } else {
-                $errors++;
-                logAction('page_publish', 'Ошибка записи при автопубликации: ' . $page['id'], 'ERROR');
-            }
-        }
-    }
-
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "Status: OK, published: {$publishedCount}, archived: {$archivedCount}";
-    if ($errors > 0) {
-        echo ", errors: {$errors}";
-    }
-    exit;
 }
 
 /**
@@ -2147,7 +1164,9 @@ function getPageStatusBadge(array $page): array {
 }
 
 /**
- * 8. ОБРАБОТКА НАЗНАЧЕНИЯ ГЛАВНОЙ СТРАНИЦЫ
+ * Назначает страницу главной и сбрасывает кеш старой и новой главной.
+ *
+ * @return void
  */
 function handleSetHomePage(): void {
     $pageId = $_POST['id'] ?? '';
@@ -2174,6 +1193,9 @@ function handleSetHomePage(): void {
     $oldHomeId = getHomePageId();
     $oldHome = loadPageById($oldHomeId);
     
+    // Хук «до смены главной страницы» (для будущих плагинов)
+    do_action('home_before_change', $oldHomeId, $pageId);
+
     // Обновляем globals.json
     $globals = getData('settings');
     $globals['home_page_id'] = $pageId;
@@ -2199,8 +1221,8 @@ function handleSetHomePage(): void {
         @unlink($homeCacheFile);
     }
     
-    // SEO: главная сменилась — приоритет в sitemap 1.0 изменился
-    maybeRegenerateSeoFiles();
+    // Плагины: главная страница сменилась
+    do_action('home_changed', $pageId);
     
     logAction('page_set_home', 'Страница "' . $page['title'] . '" назначена главной (ID: ' . $pageId . ')', 'INFO');
     setFlash('Страница "' . $page['title'] . '" теперь главная!');
@@ -2209,7 +1231,9 @@ function handleSetHomePage(): void {
 }
 
 /**
- * 9. ОБРАБОТКА КЛОНИРОВАНИЯ СТРАНИЦЫ
+ * Клонирует страницу в черновик с новым ID.
+ *
+ * @return void
  */
 function handleClonePage(): void {
     $pageId = $_POST['id'] ?? '';
@@ -2248,14 +1272,13 @@ function handleClonePage(): void {
     // Preview-токен тоже не копируем
     unset($newPage['preview_token']);
     
+    // Хук «до клонирования страницы» (для будущих плагинов)
+    do_action('page_before_clone', $pageId);
+
     // Сохраняем новую страницу
-    $filePath = DATA_DIR . 'pages/' . $newId . '.json';
-    $jsonString = json_encode($newPage, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    
-    if (file_put_contents($filePath, $jsonString) !== false) {
-        // SEO: клонирована страница (draft — не попадёт в sitemap,
-        // но вызов безопасен и обновит метку времени)
-        maybeRegenerateSeoFiles();
+    if (savePageData($newId, $newPage)) {
+        // Плагины: страница клонирована
+        do_action('page_cloned', $pageId, $newId);
         
         logAction('page_clone', 'Страница "' . $page['title'] . '" клонирована как "' . $newPage['title'] . '" (ID: ' . $newId . ')', 'INFO');
         setFlash('Страница "' . $newPage['title'] . '" успешно создана!');
@@ -2269,7 +1292,92 @@ function handleClonePage(): void {
 }
 
 /**
- * 10. ОБРАБОТКА УДАЛЕНИЯ СТРАНИЦЫ
+ * Проверяет, доступна ли корзина для страниц и меню.
+ *
+ * Возможность включается плагином через фильтр `trash_enabled`: только он
+ * умеет перемещать файлы в data/trash/ и восстанавливать их. Пока фильтра
+ * нет, удаление выполняется окончательно, а кнопка и модалка корзины не
+ * выводятся.
+ *
+ * @return bool true, если активный плагин включил корзину.
+ */
+function isTrashEnabled(): bool {
+    return (bool) apply_filters('trash_enabled', false);
+}
+
+/**
+ * Возвращает текст подтверждения удаления страницы или меню.
+ *
+ * @param string $type  'page' | 'menu'
+ * @param string $title Название страницы или меню
+ * @return string Текст для confirm()
+ */
+function getDeleteConfirmMessage(string $type, string $title): string {
+    $enabled = isTrashEnabled();
+
+    if ($type === 'menu') {
+        return $enabled
+            ? 'Переместить меню «' . $title . '» в корзину?'
+            : 'Плагин «Корзина» отключён. Меню «' . $title . '» будет удалено окончательно, восстановить его не получится. Удалить?';
+    }
+
+    return $enabled
+        ? 'Переместить страницу «' . $title . '» в корзину?'
+        : 'Плагин «Корзина» отключён. Страница «' . $title . '» будет удалена окончательно, восстановить её не получится. Удалить?';
+}
+
+/**
+ * Окончательно удаляет страницу или меню, когда корзина отключена.
+ *
+ * Читает данные до удаления, чтобы плагины (например, history) получили
+ * history_key и метаданные через `trash_item_purged`.
+ *
+ * @param string $type      'page' | 'menu'
+ * @param string $id        ID сущности
+ * @param string $sourceDir Папка-источник (с trailing separator)
+ * @return array ['success' => bool, 'error' => string]
+ */
+function deleteEntityPermanently(string $type, string $id, string $sourceDir): array {
+    if (!in_array($type, ['page', 'menu'], true)) {
+        return ['success' => false, 'error' => 'Неизвестный тип сущности.'];
+    }
+    if (!isValidId($id)) {
+        return ['success' => false, 'error' => 'Невалидный ID.'];
+    }
+
+    $sourceFile = $sourceDir . $id . '.json';
+    if (!file_exists($sourceFile)) {
+        return ['success' => false, 'error' => 'Файл не найден.'];
+    }
+
+    $data = json_decode((string)file_get_contents($sourceFile), true);
+    if (!is_array($data)) {
+        return ['success' => false, 'error' => 'Повреждённый JSON.'];
+    }
+
+    $sizeBytes = (int)@filesize($sourceFile);
+
+    if (!@unlink($sourceFile)) {
+        return ['success' => false, 'error' => 'Не удалось удалить файл.'];
+    }
+
+    // Плагины: элемент удалён окончательно (история, превью)
+    $data['_trash'] = [
+        'type'        => $type,
+        'original_id' => $id,
+        'deleted_at'  => time(),
+        'deleted_by'  => $_SESSION['admin_login'] ?? 'system',
+        'size_bytes'  => $sizeBytes,
+    ];
+    do_action('trash_item_purged', $data);
+
+    return ['success' => true, 'error' => ''];
+}
+
+/**
+ * Удаляет страницу: в корзину, если плагин активен, иначе окончательно.
+ *
+ * @return void
  */
 function handleDeletePage(): void {
     $pageId = $_POST['id'] ?? '';
@@ -2294,18 +1402,36 @@ function handleDeletePage(): void {
         exit;
     }
     
-    $result = trashPage($pageId);
+    // Хук «до удаления страницы» (для будущих плагинов)
+    do_action('page_before_delete', $pageId);
+
+    // Корзина живёт в плагине. null — плагин не активен, удаляем окончательно.
+    $result = apply_filters('trash_entity_result', null, 'page', $pageId);
+    $permanent = ($result === null);
+
+    if ($permanent) {
+        $result = deleteEntityPermanently('page', $pageId, DATA_DIR . 'pages' . DIRECTORY_SEPARATOR);
+    } elseif (!is_array($result)) {
+        $result = ['success' => false, 'error' => 'Некорректный ответ плагина корзины.'];
+    }
 
     if ($result['success']) {
         clearPageCacheById($pageId);
 
-        // SEO: обновить sitemap/robots, если включено автообновление
-        maybeRegenerateSeoFiles();
-        
-        logAction('page_trash', 'Страница "' . $page['title'] . '" перемещена в корзину (ID: ' . $pageId . ')', 'INFO');
-        setFlash('Страница "' . $page['title'] . '" перемещена в корзину.');
+        // Плагины: страница удалена (в корзину или окончательно)
+        do_action('page_deleted', $pageId);
+
+        if ($permanent) {
+            logAction('page_delete', 'Страница "' . $page['title'] . '" удалена окончательно (ID: ' . $pageId . ')', 'INFO');
+            setFlash('Страница "' . $page['title'] . '" удалена окончательно.');
+        } else {
+            logAction('page_trash', 'Страница "' . $page['title'] . '" перемещена в корзину (ID: ' . $pageId . ')', 'INFO');
+            setFlash('Страница "' . $page['title'] . '" перемещена в корзину.');
+        }
     } else {
-        logAction('page_trash', 'Ошибка перемещения в корзину "' . $page['title'] . '" (ID: ' . $pageId . '): ' . $result['error'], 'ERROR');
+        $action = $permanent ? 'page_delete' : 'page_trash';
+        $verb   = $permanent ? 'удаления' : 'перемещения в корзину';
+        logAction($action, 'Ошибка ' . $verb . ' "' . $page['title'] . '" (ID: ' . $pageId . '): ' . $result['error'], 'ERROR');
         setFlash('Ошибка: ' . $result['error'], 'error');
     }
 
@@ -2314,15 +1440,17 @@ function handleDeletePage(): void {
 }
 
 /**
- * 11. Загружает форму настроек модуля для конструктора
+ * Отдаёт HTML-форму настроек модуля для конструктора.
+ *
+ * Проверяет CSRF, валидирует ID модуля и подключает
+ * `config/modules/{id}/module.php`.
+ *
+ * @return void
  */
 function handleGetModuleSettings(): void {
     // Проверяем CSRF-токен (для POST-запросов)
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $clientToken = $_POST['csrf_token'] ?? '';
-        $sessionToken = $_SESSION['csrf_token'] ?? '';
-        
-        if (empty($sessionToken) || !hash_equals($sessionToken, $clientToken)) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             header('HTTP/1.1 403 Forbidden');
             echo json_encode(['success' => false, 'error' => 'Критическая ошибка безопасности: CSRF-токен невалиден или устарел. Обновите страницу.']);
             exit;
@@ -2340,7 +1468,7 @@ function handleGetModuleSettings(): void {
     $moduleSettings = [];
 
     // === ВАЛИДАЦИЯ ID МОДУЛЯ ===
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleType)) {
+    if (!isValidId($moduleType)) {
         logAction('module_settings', 'Невалидный module_type: ' . $moduleType, 'ERROR');
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'error' => 'Невалидный ID модуля']);
@@ -2401,33 +1529,46 @@ function handleGetModuleSettings(): void {
 }
 
 /**
- * 12. Обработка формы модулей
+ * Обрабатывает действия с модулями: установка, обновление, удаление, очистка.
+ *
+ * @return array ['success' => bool] или результат AJAX-ответа
  */
 function handleModuleAction(): array {
     $action = $_POST['module_action'] ?? '';
     $moduleId = $_POST['module_id'] ?? '';
-    
-    if ($action === 'delete' && $moduleId) {
+
+    if (($action === 'delete' || $action === 'purge') && $moduleId) {
+        if (!isValidId($moduleId)) {
+            logAction('module_delete', 'Попытка удаления модуля с невалидным ID: ' . $moduleId, 'ERROR');
+            setFlash('Невалидный ID модуля.', 'error');
+            return ['success' => false];
+        }
+
         // Проверяем использование
         $usedIn = findModuleUsage($moduleId);
         if (!empty($usedIn)) {
             logAction('module_delete', 'Модуль "' . $moduleId . '" используется. Удалите модуль со страниц, чтобы удалить его.', 'ERROR');
-            $_SESSION['module_error'] = 'Модуль используется на страницах: ' . implode(', ', $usedIn) . '. Удалите модуль со страниц, чтобы удалить его.';
+            setFlash('Модуль используется на страницах: ' . implode(', ', $usedIn) . '. Удалите модуль со страниц, чтобы удалить его.', 'error');
             return ['success' => false];
         }
-        
-        // Удаляем распакованные файлы
+
+        if ($action === 'purge') {
+            $result = purgeModule($moduleId);
+            logAction('module_purge', 'Модуль "' . $moduleId . '" удалён полностью. Удалено файлов: ' . $result['deleted'], 'INFO');
+            setFlash('Модуль "' . $moduleId . '" удалён полностью. Удалено файлов: ' . $result['deleted']);
+            return ['success' => true];
+        }
+
+        // Удаляем только распакованные файлы
         $result = removeModuleFiles($moduleId);
         logAction('module_delete', 'Модуль "' . $moduleId . '" удалён. Удалено файлов: ' . $result['deleted'], 'INFO');
-        $_SESSION['module_success'] = 'Модуль "' . $moduleId . '" удалён. Удалено файлов: ' . $result['deleted'];
+        setFlash('Модуль "' . $moduleId . '" удалён. Удалено файлов: ' . $result['deleted']);
         return ['success' => true];
     }
     
     if ($action === 'upload') {
         // Проверяем CSRF
-        $clientToken = $_POST['csrf_token'] ?? '';
-        $sessionToken = $_SESSION['csrf_token'] ?? '';
-        if (empty($sessionToken) || !hash_equals($sessionToken, $clientToken)) {
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
             echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: CSRF-токен невалиден']);
             exit;
         }
@@ -2439,6 +1580,13 @@ function handleModuleAction(): array {
         }
 
         $file = $_FILES['module_archive'];
+
+        // Лимит размера архива — 10 МБ
+        if (($file['size'] ?? 0) > 10 * 1024 * 1024) {
+            echo json_encode(['success' => false, 'error' => 'Архив больше 10 МБ']);
+            exit;
+        }
+
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
         if ($ext !== 'zip') {
@@ -2464,7 +1612,11 @@ function handleModuleAction(): array {
         }
 
         $manifest = json_decode($manifestContent, true);
-        $moduleId = $manifest['id'];
+        if (!is_array($manifest)) {
+            echo json_encode(['success' => false, 'error' => 'manifest.json имеет неверный формат']);
+            exit;
+        }
+        $moduleId = (string)($manifest['id'] ?? '');
         
         if (empty($moduleId)) {
             echo json_encode(['success' => false, 'error' => 'В manifest.json отсутствует поле "id"']);
@@ -2472,7 +1624,7 @@ function handleModuleAction(): array {
         }
 
         // Валидация ID модуля: только латиница, цифры, дефис, подчёркивание
-        if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleId)) {
+        if (!isValidId($moduleId)) {
             logAction('module_install', 'Попытка установки модуля с невалидным ID: ' . $moduleId, 'ERROR');
             echo json_encode(['success' => false, 'error' => 'Невалидный ID модуля. Разрешены только латиница, цифры, дефис и подчёркивание.']);
             exit;
@@ -2490,7 +1642,8 @@ function handleModuleAction(): array {
 
         if ($isUpdate) {
             // === ОБНОВЛЕНИЕ МОДУЛЯ ===
-            removeModuleFiles($moduleId);
+            // Старый код не удаляем: распаковка уберёт его в резервную копию
+            // и вернёт, если что-то пойдёт не так.
             if (file_exists($archivePath)) {
                 $attempt = 0;
                 while ($attempt < 5 && !@unlink($archivePath)) {
@@ -2536,51 +1689,38 @@ function handleModuleAction(): array {
         ];
         saveModulesData($modules);
 
-        // Если auto_unpack = true — распаковываем сразу
-        if ($autoUnpack) {
-            $unpackResult = unpackModule($moduleId);
+        $usedIn = findModuleUsage($moduleId);
+        $shouldUnpack = $autoUnpack || !empty($usedIn);
+
+        if ($shouldUnpack) {
+            // Старый код уйдёт в резервную копию и вернётся при ошибке
+            $unpackResult = unpackModuleArchive($archivePath, $moduleId);
             if (!$unpackResult['success']) {
-                logAction('module_install', 'Модуль "' . $moduleId . '" загружен, но не распакован', 'ERROR');
+                logAction('module_install', 'Модуль "' . $moduleId . '" загружен, но не распакован: ' . $unpackResult['message'], 'ERROR');
                 echo json_encode([
-                    'success' => false, 
+                    'success' => false,
                     'error' => 'Модуль загружен, но не распакован: ' . $unpackResult['message']
                 ]);
                 exit;
             }
-            logAction('module_install', 'Модуль "' . $moduleId . '" установлен и распакован', 'INFO');
+            logAction('module_install', 'Модуль "' . $moduleId . '" установлен/обновлён и распакован', 'INFO');
             echo json_encode([
-                'success' => true, 
-                'message' => 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" успешно установлен и распакован!'
+                'success' => true,
+                'message' => $isUpdate
+                    ? 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" обновлён и распакован!'
+                    : 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" успешно установлен и распакован!'
             ]);
         } else {
-            // Проверяем, используется ли модуль на страницах
-            $usedIn = findModuleUsage($moduleId);
-            if (!empty($usedIn)) {
-                // Если используется — распаковываем
-                $unpackResult = unpackModule($moduleId);
-                if (!$unpackResult['success']) {
-                    logAction('module_install', 'Модуль "' . $moduleId . '"  загружен, но не распакован: ' . $unpackResult['message'], 'ERROR');
-                    echo json_encode([
-                        'success' => false, 
-                        'error' => 'Модуль загружен, но не распакован: ' . $unpackResult['message']
-                    ]);
-                    exit;
-                }
-                logAction('module_install', 'Модуль "' . $moduleId . '" обновлён и перераспакован', 'INFO');
-                echo json_encode([
-                    'success' => true, 
-                    'message' => 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" обновлён и перераспакован!'
-                ]);
-            } else {
-                $message = $isUpdate 
-                        ? 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" обновлён! (распакуется при добавлении)'
-                        : 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" успешно установлен!';
-                logAction('module_install', $message, 'INFO');
-                echo json_encode([
-                    'success' => true, 
-                    'message' => $message
-                ]);
+            // Не используется и auto_unpack выключен: код не нужен,
+            // он распакуется при добавлении модуля на страницу.
+            if ($isUpdate) {
+                removeModuleFiles($moduleId);
             }
+            $message = $isUpdate
+                ? 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" обновлён! Код распакуется при добавлении на страницу.'
+                : 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" добавлен в библиотеку! Код распакуется при добавлении на страницу.';
+            logAction('module_install', $message, 'INFO');
+            echo json_encode(['success' => true, 'message' => $message]);
         }
         exit;
     }
@@ -2590,186 +1730,9 @@ function handleModuleAction(): array {
 }
 
 /**
- * Распаковывает модуль из архива в общие папки
- * 
- * @param string $moduleId Идентификатор модуля
- * @return array ['success' => bool, 'message' => string]
- */
-function unpackModule(string $moduleId): array {
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleId)) {
-        return ['success' => false, 'message' => 'Невалидный ID модуля'];
-    }
-    
-    $archivePath = APP_ROOT . '/config/modules/archives/' . $moduleId . '.zip';
-    
-    if (!file_exists($archivePath)) {
-        return ['success' => false, 'message' => 'Архив модуля не найден'];
-    }
-    
-    // Проверяем, распакован ли уже
-    if (isModuleInstalled($moduleId)) {
-        return ['success' => true, 'message' => 'Модуль уже распакован'];
-    }
-    
-    $zip = new ZipArchive();
-    if ($zip->open($archivePath) !== true) {
-        return ['success' => false, 'message' => 'Не удалось открыть архив'];
-    }
-    
-    // === ЗАЩИТА ОТ ZIP SLIP ===
-    $zipSlipEntry = detectZipSlip($zip);
-    if ($zipSlipEntry !== null) {
-        $zip->close();
-        logAction('module_unpack', 'ZIP Slip заблокирован: ' . $zipSlipEntry, 'ERROR');
-        return ['success' => false, 'message' => 'Архив содержит небезопасные имена файлов. Установка отменена.'];
-    }
-    // === КОНЕЦ ЗАЩИТЫ ===
-    
-    // Создаём временную папку для распаковки
-    $tempDir = APP_ROOT . '/config/modules/_temp/' . $moduleId;
-    if (!is_dir($tempDir)) {
-        mkdir($tempDir, 0755, true);
-    }
-    
-    // Распаковываем архив во временную папку
-    $zip->extractTo($tempDir);
-    $zip->close();
-    
-    // Копируем файлы из admin/ в config/modules/{id}/
-    $adminSource = $tempDir . '/admin/';
-    if (is_dir($adminSource)) {
-        $adminDest = APP_ROOT . '/config/modules/' . $moduleId . '/';
-        if (!is_dir($adminDest)) {
-            mkdir($adminDest, 0755, true);
-        }
-        
-        // Копируем все файлы из admin/
-        $files = scandir($adminSource);
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') continue;
-            copy($adminSource . $file, $adminDest . $file);
-        }
-    }
-    
-    // Копируем файлы из site/ в общие папки
-    $siteSource = $tempDir . '/site/';
-    if (is_dir($siteSource)) {
-        // site/module.php → modules/{id}.php
-        if (file_exists($siteSource . 'module.php')) {
-            copy($siteSource . 'module.php', APP_ROOT . '/modules/' . $moduleId . '.php');
-        }
-        // site/style.css → css/{id}.css
-        if (file_exists($siteSource . 'style.css')) {
-            copy($siteSource . 'style.css', APP_ROOT . '/css/' . $moduleId . '.css');
-        }
-        // site/script.js → js/{id}.js
-        if (file_exists($siteSource . 'script.js')) {
-            copy($siteSource . 'script.js', APP_ROOT . '/js/' . $moduleId . '.js');
-        }
-    }
-    
-    // Удаляем временную папку
-    $files = array_diff(scandir($tempDir), ['.', '..']);
-    foreach ($files as $file) {
-        $path = $tempDir . '/' . $file;
-        if (is_dir($path)) {
-            $subFiles = array_diff(scandir($path), ['.', '..']);
-            foreach ($subFiles as $subFile) {
-                unlink($path . '/' . $subFile);
-            }
-            rmdir($path);
-        } else {
-            unlink($path);
-        }
-    }
-    rmdir($tempDir);
-    
-    // ===== СОЗДАЁМ .min ФАЙЛЫ, ЕСЛИ МИНИФИКАЦИЯ ВКЛЮЧЕНА =====
-    $settings = getSettingsData();
-    if (!empty($settings['assets_minify'])) {
-        $exceptions = $settings['minify_exceptions'] ?? [];
-        // Проверяем, не в исключениях ли модуль
-        if (empty($exceptions[$moduleId]['css']) || empty($exceptions[$moduleId]['js'])) {
-            createMinFilesForModule($moduleId);
-        }
-    }
-    
-    clearPageCache();
-    
-    return ['success' => true, 'message' => 'Модуль успешно распакован'];
-}
-
-/**
- * Удаляет распакованные файлы модуля
- * 
- * @param string $moduleId Идентификатор модуля
- * @return array ['success' => bool, 'message' => string, 'deleted' => int]
- */
-function removeModuleFiles(string $moduleId): array {
-    $deleted = 0;   
-    
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $moduleId)) {
-        return ['success' => false, 'message' => 'Невалидный ID модуля', 'deleted'=>$deleted];
-    }    
-    
-    // 1. Удаляем папку модуля в админке
-    $adminDir = APP_ROOT . '/config/modules/' . $moduleId;
-    if (is_dir($adminDir)) {
-        $files = array_diff(scandir($adminDir), ['.', '..']);
-        foreach ($files as $file) {
-            if (unlink($adminDir . '/' . $file)) {
-                $deleted++;
-            }
-        }
-        if (rmdir($adminDir)) {
-            $deleted++;
-        }
-    }
-
-    // 2. Удаляем файлы на сайте
-    $siteFiles = [
-        APP_ROOT . '/modules/' . $moduleId . '.php',
-        APP_ROOT . '/css/' . $moduleId . '.css',
-        APP_ROOT . '/css/' . $moduleId . '.min.css',
-        APP_ROOT . '/js/' . $moduleId . '.js',
-        APP_ROOT . '/js/' . $moduleId . '.min.js'
-    ];
-    
-    foreach ($siteFiles as $file) {
-        if (file_exists($file) && unlink($file)) {
-            $deleted++;
-        }
-    }
-    
-    clearPageCache();
-    
-    return [
-        'success' => true,
-        'message' => 'Удалено файлов: ' . $deleted,
-        'deleted' => $deleted
-    ];
-}
-
-/**
- * Обновляет модуль (удаляет старые файлы и распаковывает заново)
- * 
- * @param string $moduleId Идентификатор модуля
- * @return array ['success' => bool, 'message' => string]
- */
-function reinstallModule(string $moduleId): array {
-    // Удаляем старые файлы
-    removeModuleFiles($moduleId);
-    
-    // Распаковываем заново
-    return unpackModule($moduleId);
-}
-
-/**
- * 13. ОБРАБОТКА НАСТРОЕК МЕНЮ
- */
-
-/**
- * Сохранение меню
+ * Сохраняет меню: создаёт новое, редактирует или переименовывает ID.
+ *
+ * @return array ['success' => string, 'error' => string]
  */
 function handleSaveMenu(): array {
     $isEdit = isset($_POST['menu_id_original']) && !empty($_POST['menu_name']);
@@ -2850,9 +1813,21 @@ function handleSaveMenu(): array {
     return ['success' => '', 'error' => 'Ошибка при записи файла меню на диск.'];
 }
 
+/**
+ * Назначает меню главным или снимает этот статус.
+ *
+ * @return void
+ */
 function handleSetMainMenu(): void {
     $menuId = $_POST['id'] ?? '';
     if (empty($menuId)) {
+        setFlash('Ошибка: ID меню не указан.', 'error');
+        header('Location: ?tab=menu');
+        exit;
+    }
+    // ID пойдёт в settings.main_menu и в лог — вырезаем всё, кроме разрешённых символов
+    $menuId = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)$menuId);
+    if ($menuId === '') {
         setFlash('Ошибка: ID меню не указан.', 'error');
         header('Location: ?tab=menu');
         exit;
@@ -2884,7 +1859,9 @@ function handleSetMainMenu(): void {
 }
 
 /**
- * Удаление меню
+ * Удаляет меню: в корзину, если плагин активен, иначе окончательно.
+ *
+ * @return void
  */
 function handleDeleteMenu(): void {
     $menuId = $_POST['id'] ?? '';
@@ -2911,13 +1888,28 @@ function handleDeleteMenu(): void {
         exit;
     }
     
-    $result = trashMenu($menuId);
+    // Корзина живёт в плагине. null — плагин не активен, удаляем окончательно.
+    $result = apply_filters('trash_entity_result', null, 'menu', $menuId);
+    $permanent = ($result === null);
+
+    if ($permanent) {
+        $result = deleteEntityPermanently('menu', $menuId, DATA_DIR . 'menus' . DIRECTORY_SEPARATOR);
+    } elseif (!is_array($result)) {
+        $result = ['success' => false, 'error' => 'Некорректный ответ плагина корзины.'];
+    }
 
     if ($result['success']) {
-        logAction('menu_trash', 'Меню "' . $menu['name'] . '" перемещено в корзину (ID: ' . $menuId . ')', 'INFO');
-        setFlash('Меню "' . $menu['name'] . '" перемещено в корзину.');
+        if ($permanent) {
+            logAction('menu_delete', 'Меню "' . $menu['name'] . '" удалено окончательно (ID: ' . $menuId . ')', 'INFO');
+            setFlash('Меню "' . $menu['name'] . '" удалено окончательно.');
+        } else {
+            logAction('menu_trash', 'Меню "' . $menu['name'] . '" перемещено в корзину (ID: ' . $menuId . ')', 'INFO');
+            setFlash('Меню "' . $menu['name'] . '" перемещено в корзину.');
+        }
     } else {
-        logAction('menu_trash', 'Ошибка перемещения в корзину "' . $menu['name'] . '" (ID: ' . $menuId . '): ' . $result['error'], 'ERROR');
+        $action = $permanent ? 'menu_delete' : 'menu_trash';
+        $verb   = $permanent ? 'удаления' : 'перемещения в корзину';
+        logAction($action, 'Ошибка ' . $verb . ' "' . $menu['name'] . '" (ID: ' . $menuId . '): ' . $result['error'], 'ERROR');
         setFlash('Ошибка: ' . $result['error'], 'error');
     }
 
@@ -2940,13 +1932,42 @@ function handleDeleteMenu(): void {
  */
 function logAction(string $action, string $message, string $level = 'INFO', ?string $user = null): void {
     $settings = getLogSettings();
-    $logDir = $settings['storage_path'] ?? DATA_DIR . 'logs/';
-    
-    // Нормализуем путь
-    if (strpos($logDir, DATA_DIR) !== 0 && strpos($logDir, APP_ROOT) !== 0) {
-        $logDir = DATA_DIR . 'logs/';
+
+    // Проверка 1: логирование выключено — не пишем
+    if (empty($settings['log_enabled'])) {
+        return;
     }
-    
+
+    // Проверка 2: действие отключено в настройках — не пишем
+    $allowedActions = $settings['log_actions'] ?? [];
+    if (empty($allowedActions[$action])) {
+        return;
+    }
+
+    // Проверка 3: путь к логам (пустая строка → fallback на CMS_LOGS_DIR)
+    $logDir = trim($settings['storage_path'] ?? '') ?: CMS_LOGS_DIR;
+
+    // Нормализуем слэши для кросс-платформенного сравнения
+    $normalizedLogDir    = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $logDir);
+    $normalizedConfigDir = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, CONFIG_DIR);
+    $normalizedDataDir   = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, DATA_DIR);
+
+    // Абсолютный путь (Linux/Mac: /... | Windows: C:\... или C:/...)
+    $isAbsolute = preg_match('#^(/|[a-zA-Z]:[\\\\/])#', $logDir) === 1;
+
+    // Внутри сайта (config/ или data/) — регистронезависимо (Windows)
+    $isInsideSite = stripos($normalizedLogDir, $normalizedConfigDir) === 0
+                 || stripos($normalizedLogDir, $normalizedDataDir) === 0;
+
+    // Разрешены: абсолютные пути и пути внутри config/ или data/
+    // Всё остальное (относительные пути вне сайта) — fallback на дефолт
+    if (!$isAbsolute && !$isInsideSite) {
+        $logDir = CMS_LOGS_DIR;
+    }
+
+    // Нормализуем trailing separator
+    $logDir = rtrim($logDir, '/\\') . DIRECTORY_SEPARATOR;
+
     if (!is_dir($logDir)) {
         @mkdir($logDir, 0755, true);
     }
@@ -2954,9 +1975,15 @@ function logAction(string $action, string $message, string $level = 'INFO', ?str
     $logFile = $logDir . 'admin.log';
     
     $user = $user ?? ($_SESSION['admin_login'] ?? 'system');
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $user = str_replace(["\r", "\n"], ' ', $user);
+    $ip = str_replace(["\r", "\n"], ' ', $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
     $timestamp = date('Y-m-d H:i:s');
     $level = strtoupper($level);
+
+    // CR/LF и управляющие символы подделывают строки журнала (log injection)
+    $action  = str_replace(["\r", "\n"], ' ', $action);
+    $message = str_replace(["\r", "\n"], ' ', $message);
+    $level   = str_replace(["\r", "\n"], ' ', $level);
     
     $line = sprintf(
         "[%s] [%s] [%s] [%s] %s: %s\n",
@@ -2978,7 +2005,10 @@ function logAction(string $action, string $message, string $level = 'INFO', ?str
 }
 
 /**
- * Ротация лог-файла
+ * Ротирует лог-файл и удаляет старые архивы сверх лимита.
+ *
+ * @param string $logDir Папка с `admin.log`
+ * @return void
  */
 function rotateLog(string $logDir): void {
     $logFile = $logDir . 'admin.log';
@@ -3011,176 +2041,73 @@ function rotateLog(string $logDir): void {
 }
 
 /**
- * Возвращает список всех возможных действий для логирования
+ * Гарантирует существование папки логов (по пути из настроек или CMS_LOGS_DIR) + .htaccess.
+ * Вызывается на admin_init; защита папки не зависит от плагина logs.
  *
- * @return array Массив действий с метками
+ * @return void
  */
-function getLogActions(): array {
-    return [
-        // Страницы
-        'page_save' => 'Сохранение страницы',
-        'page_delete' => 'Удаление страницы',
-        'page_clone' => 'Клонирование страницы',
-        'page_set_home' => 'Назначение главной страницы',
-        
-        // Меню
-        'menu_save' => 'Сохранение меню',
-        'menu_delete' => 'Удаление меню',
-        'menu_set_main' => 'Назначение главного меню',
-        
-        // Настройки
-        'settings_save' => 'Сохранение настроек сайта',
-        'security_save' => 'Сохранение настроек безопасности',
-        
-        // Бэкапы
-        'backup_create' => 'Создание бэкапа',
-        'backup_restore' => 'Восстановление из бэкапа',
-        'backup_delete' => 'Удаление бэкапа',
-        
-        // Файлы
-        'file_upload' => 'Загрузка файлов',
-        'file_delete' => 'Удаление файлов',
-        'file_edit' => 'Редактирование файлов',
-        'file_rename' => 'Переименование файлов',
-        'file_chmod' => 'Изменение прав доступа',
-        'file_create_dir' => 'Создание папки',
-        'file_create_file' => 'Создание файла',
-        
-        // Модули
-        'module_install' => 'Установка модуля',
-        'module_delete' => 'Удаление модуля',
-        'module_update' => 'Обновление модуля',
-        
-        // Авторизация
-        'auth_login' => 'Вход в админку',
-        'auth_logout' => 'Выход из админки',
-        'auth_failed' => 'Неудачная попытка входа',
-    ];
+function ensureLogsDir(): void {
+    $settings = getLogSettings();
+    $logDir = trim($settings['storage_path'] ?? '') ?: CMS_LOGS_DIR;
+
+    // Нормализуем trailing separator
+    $logDir = rtrim($logDir, '/\\') . DIRECTORY_SEPARATOR;
+
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+
+    // .htaccess — только если папка внутри сайта (вне сайта не нужно)
+    $realRoot = realpath(APP_ROOT);
+    $realLogs = realpath($logDir);
+    if ($realRoot !== false && $realLogs !== false && strpos($realLogs, $realRoot) === 0) {
+        $htaccess = $logDir . '.htaccess';
+        if (!file_exists($htaccess)) {
+            $data = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
+                  . "<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n";
+            @file_put_contents($htaccess, $data);
+        }
+    }
 }
 
 /**
- * Получить настройки логирования
+ * Возвращает настройки логирования с дефолтами.
+ *
+ * Список действий берётся из `get_log_actions()`; сохранённый выбор
+ * приоритетнее. Новые действия включены по умолчанию.
+ *
+ * @return array Настройки `log_enabled`, `log_levels`, `storage_path`, `max_size`, `keep_count`, `log_actions`
  */
 function getLogSettings(): array {
     $settings = getData('settings');
+
+    // Список действий берётся из реестра: все по умолчанию включены
+    $logActions = [];
+    foreach (get_log_actions() as $action => $label) {
+        $logActions[$action] = true;
+    }
+
     $defaults = [
         'log_enabled' => true,
         'log_levels' => ['INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-        'storage_path' => DATA_DIR . 'logs/',
+        'storage_path' => CMS_LOGS_DIR,
         'max_size' => 5 * 1024 * 1024, // 5 MB
         'keep_count' => 10,
-        'log_actions' => [
-            'page_save' => true,
-            'page_delete' => true,
-            'menu_save' => true,
-            'menu_delete' => true,
-            'settings_save' => true,
-            'backup_create' => true,
-            'backup_restore' => true,
-            'backup_delete' => true,
-            'file_upload' => true,
-            'file_delete' => true,
-            'file_edit' => true,
-            'module_install' => true,
-            'module_delete' => true,
-            'auth_login' => true,
-            'auth_logout' => true,
-        ]
+        'log_actions' => $logActions,
     ];
-    
-    return array_merge($defaults, $settings['log_settings'] ?? []);
+
+    $saved  = $settings['log_settings'] ?? [];
+    $result = array_merge($defaults, $saved);
+
+    // Новые действия включаются по умолчанию; сохранённый выбор приоритетнее
+    if (isset($saved['log_actions']) && is_array($saved['log_actions'])) {
+        $result['log_actions'] = array_merge($logActions, $saved['log_actions']);
+    }
+
+    return $result;
 }
 
-/**
- * Парсит строку лога в массив
- *
- * @param string $line Строка лога
- * @return array|null Массив с данными или null
- */
-function parseLogLine(string $line): ?array {
-    $pattern = '/\[([^\]]+)\]\s+\[([^\]]+)\]\s+\[([^\]]+)\]\s+\[([^\]]+)\]\s+([^:]+):\s+(.+)/';
-    
-    if (preg_match($pattern, trim($line), $matches)) {
-        return [
-            'timestamp' => $matches[1],
-            'level' => $matches[2],
-            'user' => $matches[3],
-            'ip' => $matches[4],
-            'action' => $matches[5],
-            'message' => $matches[6]
-        ];
-    }
-    
-    return null;
-}
-
-function handleSaveLogSettings(): array {
-    $settings = getData('settings');
-    
-    $settings['log_settings'] = [
-        'log_enabled' => isset($_POST['log_enabled']),
-        'storage_path' => trim($_POST['storage_path'] ?? DATA_DIR . 'logs/'),
-        'max_size' => intval($_POST['max_size'] ?? 5) * 1024 * 1024,
-        'keep_count' => intval($_POST['keep_count'] ?? 10),
-        'log_actions' => $_POST['log_actions'] ?? []
-    ];
-    
-    if (saveData('settings', $settings)) {
-        setFlash('Настройки логирования сохранены', 'success', 3);
-    } else {
-        setFlash('Ошибка сохранения настроек', 'error', 5);
-    }
-    
-    header('Location: index.php?tab=logs');
-    exit;
-}
-
-/**
- * Обработка AJAX-запроса на получение логов
- */
-function handleGetLogs(): void {
-    header('Content-Type: application/json; charset=utf-8');
-    
-    $settings = getLogSettings();
-    $logDir = $settings['storage_path'] ?? DATA_DIR . 'logs/';
-    $logFile = $logDir . 'admin.log';
-    
-    $filterLevel = $_GET['level'] ?? '';
-    $filterAction = $_GET['action'] ?? '';
-    $search = $_GET['search'] ?? '';
-    $page = intval($_GET['page'] ?? 1);
-    $perPage = intval($_GET['per_page'] ?? 50);
-    
-    $logs = [];
-    if (file_exists($logFile)) {
-        $lines = file($logFile);
-        $lines = array_reverse($lines);
-        
-        foreach ($lines as $line) {
-            $parsed = parseLogLine($line);
-            if (!$parsed) continue;
-            
-            if ($filterLevel && $parsed['level'] !== $filterLevel) continue;
-            if ($filterAction && strpos($parsed['action'], $filterAction) === false) continue;
-            if ($search && stripos($line, $search) === false) continue;
-            
-            $logs[] = $parsed;
-        }
-    }
-    
-    $total = count($logs);
-    $totalPages = ceil($total / $perPage);
-    $offset = ($page - 1) * $perPage;
-    $logs = array_slice($logs, $offset, $perPage);
-    
-    echo json_encode([
-        'logs' => $logs,
-        'total' => $total,
-        'page' => $page,
-        'totalPages' => $totalPages
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
-}
+add_action('admin_init', 'ensureLogsDir');
 
 /**
  * =========================================================================
@@ -3189,7 +2116,10 @@ function handleGetLogs(): void {
  */
 
 /**
- * Полная минификация CSS
+ * Минифицирует CSS: убирает BOM, комментарии и лишние пробелы.
+ *
+ * @param string $css Исходный CSS
+ * @return string Минифицированный CSS
  */
 function minifyCss($css) {
     // Удаляем BOM
@@ -3224,7 +2154,10 @@ function minifyCss($css) {
 }
 
 /**
- * Полная минификация JS
+ * Минифицирует JS: убирает BOM, комментарии и лишние пробелы.
+ *
+ * @param string $js Исходный JS
+ * @return string Минифицированный JS
  */
 function minifyJs($js) {
     // Удаляем BOM
@@ -3252,7 +2185,10 @@ function minifyJs($js) {
 }
 
 /**
- * Создаёт .min файлы для одного модуля
+ * Создаёт `.min.css` / `.min.js` для одного модуля.
+ *
+ * @param string $moduleId ID модуля
+ * @return array Список созданных файлов относительно корня
  */
 function createMinFilesForModule($moduleId) {
     $baseDir = APP_ROOT;
@@ -3315,9 +2251,10 @@ function createMinFilesForAllModules($settings = null) {
 }
 
 /**
- * Получить статистику минификации
- * 
- * @return array ['css' => ['total' => int, 'minified' => int, 'ratio' => float, 'original_size' => int, 'minified_size' => int], 'js' => ...]
+ * Получить статистику минификации.
+ *
+ * @param array|null $exceptions Исключения; null — взять из настроек
+ * @return array ['css' => [...], 'js' => [...]]
  */
 function getMinifyStats($exceptions = null): array {
     $modules = getModulesData();
@@ -3377,7 +2314,10 @@ function getMinifyStats($exceptions = null): array {
 }
 
 /**
- * Форматирует размер файла в читаемый вид
+ * Форматирует размер файла в читаемый вид.
+ *
+ * @param int $bytes Размер в байтах
+ * @return string Например, `12.4 KB`
  */
 function formatSize($bytes): string {
     if ($bytes === 0) {
@@ -3388,6 +2328,11 @@ function formatSize($bytes): string {
     return round($bytes / pow(1024, $i), 1) . ' ' . $units[$i];
 }
 
+/**
+ * Отдаёт статистику минификации в JSON (AJAX).
+ *
+ * @return void
+ */
 function handleGetMinifyStats(): void {
     $excludeCss = $_GET['minify_exclude_css'] ?? [];
     $excludeJs = $_GET['minify_exclude_js'] ?? [];
@@ -3409,6 +2354,11 @@ function handleGetMinifyStats(): void {
     exit;
 }
 
+/**
+ * Сохраняет исключения минификации из обычной формы и редиректит.
+ *
+ * @return void
+ */
 function handleSaveMinifyExceptions(): void {
     $exceptions = [];
     $excludeCss = $_POST['exclude_css'] ?? [];
@@ -3435,6 +2385,13 @@ function handleSaveMinifyExceptions(): void {
     exit;
 }
 
+/**
+ * Создаёт `.min`-файлы для всех модулей с учётом переданных исключений.
+ *
+ * @param array $settings Настройки сайта
+ * @param array $exceptions Исключения `[moduleId => ['css' => bool, 'js' => bool]]`
+ * @return array Список созданных файлов
+ */
 function createMinFilesForAllModulesWithExceptions($settings, $exceptions) {
     if (empty($settings['assets_minify'])) {
         return [];
@@ -3456,7 +2413,11 @@ function createMinFilesForAllModulesWithExceptions($settings, $exceptions) {
 }
 
 /**
- * Пересборка .min для всех модулей
+ * Пересобирает `.min` для всех модулей (AJAX).
+ *
+ * @param array $excludeCss Модули, исключённые для CSS
+ * @param array $excludeJs Модули, исключённые для JS
+ * @return void
  */
 function handleRebuildAllMin($excludeCss = [], $excludeJs = []): void {
     $settings = getSettingsData();
@@ -3494,7 +2455,10 @@ function handleRebuildAllMin($excludeCss = [], $excludeJs = []): void {
 }
 
 /**
- * Пересборка .min для одного модуля
+ * Пересобирает `.min` для одного модуля (AJAX).
+ *
+ * @param string $moduleId ID модуля
+ * @return void
  */
 function handleRebuildModuleMin($moduleId): void {
     if (empty($moduleId)) {
@@ -3561,7 +2525,9 @@ function handleRebuildModuleMin($moduleId): void {
 }
 
 /**
- * Удаление всех .min файлов
+ * Удаляет все `.min`-файлы (AJAX).
+ *
+ * @return void
  */
 function handleDeleteAllMin(): void {
     $deleted = 0;
@@ -3587,12 +2553,13 @@ function handleDeleteAllMin(): void {
 }
 
 /**
- * Сохранение исключений минификации (AJAX)
+ * Сохраняет исключения минификации через AJAX.
+ *
+ * @return void
  */
 function handleSaveMinifyExceptionsAjax(): void {
     // Проверка CSRF
-    $token = $_POST['csrf_token'] ?? '';
-    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
         echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: CSRF-токен невалиден']);
         exit;
     }
@@ -3621,7 +2588,9 @@ function handleSaveMinifyExceptionsAjax(): void {
 }
 
 /**
- * Очистка кеша страниц и объединённых ассетов
+ * Очищает кеш страниц и объединённых ассетов.
+ *
+ * @return void
  */
 function clearPageCache(): void {
     // Очищаем кеш страниц
@@ -3673,2129 +2642,223 @@ function clearPageCacheById(string $id): void {
 }
 
 /**
- * ОБРАБОТКА КОРЗИНЫ (СТРАНИЦЫ И МЕНЮ)
+ * ПЛАГИНЫ
  */
-// Папка корзины
-if (!defined('TRASH_DIR')) {
-    define('TRASH_DIR', DATA_DIR . 'trash' . DIRECTORY_SEPARATOR);
-}
-
 /**
- * Гарантирует существование папки корзины + .htaccess защиту.
+ * Обработчик загрузки и установки плагина из ZIP (POST).
  *
- * @return bool true если папка доступна для записи
+ * @return array ['success' => string, 'error' => string]
  */
-function ensureTrashDir(): bool {
-    if (!is_dir(TRASH_DIR)) {
-        if (!@mkdir(TRASH_DIR, 0755, true)) {
-            return false;
-        }
-    }
-
-    // Защита от прямого доступа
-    $htaccess = TRASH_DIR . '.htaccess';
-    if (!file_exists($htaccess)) {
-        $data = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
-              . "<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n";
-        @file_put_contents($htaccess, $data);
-    }
-
-    return is_writable(TRASH_DIR);
-}
-
-/**
- * Общая функция перемещения сущности в корзину.
- *
- * @param string $type       'page' | 'menu'
- * @param string $id         ID сущности
- * @param string $sourceDir  Папка-источник (с trailing separator)
- * @return array ['success' => bool, 'error' => string]
- */
-function trashEntity(string $type, string $id, string $sourceDir): array {
-    // Валидация
-    if (!in_array($type, ['page', 'menu'], true)) {
-        return ['success' => false, 'error' => 'Неизвестный тип сущности.'];
-    }
-    if (!preg_match('#^[a-z0-9\-_]+$#i', $id)) {
-        return ['success' => false, 'error' => 'Невалидный ID.'];
-    }
-
-    $sourceFile = $sourceDir . $id . '.json';
-    if (!file_exists($sourceFile)) {
-        return ['success' => false, 'error' => 'Файл не найден.'];
-    }
-
-    if (!ensureTrashDir()) {
-        return ['success' => false, 'error' => 'Папка корзины недоступна для записи.'];
-    }
-
-    // Читаем исходные данные
-    $data = json_decode(file_get_contents($sourceFile), true);
-    if (!is_array($data)) {
-        return ['success' => false, 'error' => 'Повреждённый JSON.'];
+function handlePluginUpload(): array {
+    if (!isset($_FILES['plugin_zip']) || $_FILES['plugin_zip']['error'] !== UPLOAD_ERR_OK) {
+        return ['success' => '', 'error' => 'Ошибка загрузки файла.'];
     }
     
-    $login = $_SESSION['admin_login'] ?? 'system';
-
-    // Добавляем метаданные
-    $data['_trash'] = [
-        'type'        => $type,
-        'original_id' => $id,
-        'deleted_at'  => time(),
-        'deleted_by'  => $login,
-        'size_bytes'  => filesize($sourceFile),
-    ];
-
-    // Генерируем имя в корзине
-    $trashName = $type . '_' . $id . '_' . time() . '.json';
-    $trashPath = TRASH_DIR . $trashName;
-
-    // Записываем в корзину
-    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    if (!safeFileWrite($trashPath, $json)) {
-        return ['success' => false, 'error' => 'Не удалось записать файл в корзину.'];
+    $tempFile = $_FILES['plugin_zip']['tmp_name'];
+    
+    // Проверяем, что это ZIP
+    $zip = new ZipArchive();
+    if ($zip->open($tempFile) !== true) {
+        return ['success' => '', 'error' => 'Файл не является ZIP-архивом.'];
     }
-
-    // Удаляем оригинал
-    if (!@unlink($sourceFile)) {
-        // Откат: удаляем файл из корзины, если не смогли удалить оригинал
-        @unlink($trashPath);
-        return ['success' => false, 'error' => 'Не удалось удалить оригинал.'];
+    
+    // Читаем манифест (строго в корне архива)
+    $manifestJson = $zip->getFromName('plugin.json');
+    
+    if (!$manifestJson) {
+        $zip->close();
+        return ['success' => '', 'error' => 'В корне архива отсутствует plugin.json. Убедитесь, что вы упаковали файлы плагина, а не папку с ними.'];
     }
-
-    return ['success' => true, 'error' => ''];
-}
-
-/**
- * Перемещает страницу в корзину.
- *
- * @param string $id    ID страницы
- * @return array ['success' => bool, 'error' => string]
- */
-function trashPage(string $id): array {
-    return trashEntity('page', $id, DATA_DIR . 'pages' . DIRECTORY_SEPARATOR);
-}
-
-/**
- * Перемещает меню в корзину.
- *
- * @param string $id    ID меню
- * @return array ['success' => bool, 'error' => string]
- */
-function trashMenu(string $id): array {
-    return trashEntity('menu', $id, DATA_DIR . 'menus' . DIRECTORY_SEPARATOR);
-}
-
-/**
- * Возвращает список файлов в корзине с метаданными.
- *
- * @param string|null $type Фильтр по типу ('page' | 'menu'). null — все.
- * @return array Массив записей, отсортированных по deleted_at (свежие сверху)
- */
-function getTrashList(?string $type = null): array {
-    if (!is_dir(TRASH_DIR)) {
-        return [];
+    
+    $zip->close();
+    
+    $manifest = json_decode($manifestJson, true);
+    $id = $manifest['id'] ?? '';
+    
+    // Валидация ID
+    if (empty($id) || !isValidId($id)) {
+        return ['success' => '', 'error' => 'В plugin.json отсутствует или невалидное поле "id".'];
     }
-
-    $list = [];
-    $files = glob(TRASH_DIR . '*.json');
-
-    foreach ($files as $file) {
-        $name = basename($file);
-        $data = json_decode(file_get_contents($file), true);
-        if (!is_array($data) || empty($data['_trash'])) {
-            continue;
+    
+     // Читаем версию из нового манифеста
+    $newVersion = $manifest['version'] ?? '1.0.0';
+    
+    // Проверка: не установлен ли уже
+    $plugins = getPluginsData();
+    if (isset($plugins[$id])) {
+        $currentVersion = $plugins[$id]['version'] ?? '0.0.0';
+        
+        // Если версии совпадают — пропускаем
+        if (version_compare($newVersion, $currentVersion, '==')) {
+            return ['success' => '', 'error' => 'Плагин с ID "' . e($id) . '" уже установлен (версия ' . e($currentVersion) . '). Обновление не требуется.'];
         }
-
-        $meta = $data['_trash'];
-
-        // Фильтр по типу
-        if ($type !== null && ($meta['type'] ?? '') !== $type) {
-            continue;
+        
+        // Если новая версия ниже текущей — предупреждаем
+        if (version_compare($newVersion, $currentVersion, '<')) {
+            return ['success' => '', 'error' => 'Установленная версия плагина (' . e($currentVersion) . ') выше загруженной (' . e($newVersion) . ').'];
         }
-
-        $list[] = [
-            'file'        => $name,
-            'type'        => $meta['type'] ?? 'unknown',
-            'original_id' => $meta['original_id'] ?? '',
-            'title'       => $data['title'] ?? ($data['name'] ?? $meta['original_id']),
-            'deleted_at'  => (int)($meta['deleted_at'] ?? 0),
-            'deleted_by'  => (string)($meta['deleted_by'] ?? ''),
-            'size_bytes'  => (int)($meta['size_bytes'] ?? 0),
-        ];
-    }
-
-    usort($list, function($a, $b) {
-        return $b['deleted_at'] - $a['deleted_at'];
-    });
-
-    return $list;
-}
-
-/**
- * Возвращает количество файлов в корзине.
- *
- * @param string|null $type Фильтр по типу ('page' | 'menu'). null — все.
- * @return int
- */
-function getTrashCount(?string $type = null): int {
-    if (!is_dir(TRASH_DIR)) {
-        return 0;
-    }
-
-    $pattern = ($type !== null && in_array($type, ['page', 'menu'], true))
-        ? TRASH_DIR . $type . '_*.json'
-        : TRASH_DIR . '*.json';
-
-    $files = glob($pattern);
-    return is_array($files) ? count($files) : 0;
-}
-
-/**
- * Восстанавливает сущность из корзины.
- * Если ID занят — восстанавливает как {id}-restored, {id}-restored-2, ...
- * При восстановлении страницы slug также пересчитывается.
- *
- * @param string $trashFileName Имя файла в корзине (без пути)
- * @return array ['success' => bool, 'message' => string, 'error' => string, 'new_id' => string]
- */
-function restoreFromTrash(string $trashFileName): array {
-    // Валидация имени файла
-    if (!preg_match('#^[a-z]+_[a-z0-9\-_]+_\d+\.json$#i', $trashFileName)) {
-        return ['success' => false, 'message' => '', 'error' => 'Невалидное имя файла.', 'new_id' => ''];
-    }
-
-    $trashPath = TRASH_DIR . $trashFileName;
-    if (!file_exists($trashPath)) {
-        return ['success' => false, 'message' => '', 'error' => 'Файл не найден в корзине.', 'new_id' => ''];
-    }
-
-    $data = json_decode(file_get_contents($trashPath), true);
-    if (!is_array($data) || empty($data['_trash'])) {
-        return ['success' => false, 'message' => '', 'error' => 'Повреждённые данные в корзине.', 'new_id' => ''];
-    }
-
-    $meta = $data['_trash'];
-    $type = $meta['type'] ?? '';
-    $originalId = $meta['original_id'] ?? '';
-
-    if (!in_array($type, ['page', 'menu'], true) || $originalId === '') {
-        return ['success' => false, 'message' => '', 'error' => 'Неизвестный тип сущности.', 'new_id' => ''];
-    }
-
-    // Куда восстанавливать
-    $targetDir = ($type === 'page')
-        ? DATA_DIR . 'pages' . DIRECTORY_SEPARATOR
-        : DATA_DIR . 'menus' . DIRECTORY_SEPARATOR;
-
-    // Разрешаем конфликт ID
-    $newId = $originalId;
-    $counter = 1;
-    while (file_exists($targetDir . $newId . '.json')) {
-        $counter++;
-        $newId = $originalId . '-restored' . ($counter > 2 ? '-' . ($counter - 1) : '');
-        if ($counter > 100) {
-            return ['success' => false, 'message' => '', 'error' => 'Слишком много конфликтов ID.', 'new_id' => ''];
-        }
-    }
-
-    // Обновляем данные
-    $data['id'] = $newId;
-
-    // Пересчитываем slug для страниц
-    if ($type === 'page') {
-        // Если оригинальный slug был равен originalId — пересчитываем
-        // Если был свой (например, пустой для главной) — оставляем, но тоже пересчитываем
-        $data['slug'] = $newId;
-    }
-
-    // Убираем метаданные корзины
-    unset($data['_trash']);
-
-    // Записываем в целевую папку
-    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    $targetPath = $targetDir . $newId . '.json';
-
-    if (!safeFileWrite($targetPath, $json)) {
-        return ['success' => false, 'message' => '', 'error' => 'Не удалось записать восстановленный файл.', 'new_id' => ''];
-    }
-
-    // Удаляем из корзины
-    @unlink($trashPath);
-
-    // SEO: обновить sitemap/robots, если включено автообновление
-    if ($type === 'page') {
-        maybeRegenerateSeoFiles();
-    }
-
-    $label = ($type === 'page') ? 'Страница' : 'Меню';
-    $message = $label . ' восстановлена' . ($newId !== $originalId ? " как \"$newId\" (оригинальный ID был занят)" : '') . '.';
-
-    return ['success' => true, 'message' => $message, 'error' => '', 'new_id' => $newId];
-}
-
-/**
- * Окончательно удаляет указанные файлы из корзины.
- *
- * @param array $fileNames Массив имён файлов (без пути)
- * @return array ['success' => bool, 'deleted' => int, 'error' => string]
- */
-function deleteFromTrash(array $fileNames): array {
-    if (empty($fileNames)) {
-        return ['success' => false, 'deleted' => 0, 'error' => 'Не выбрано ни одного файла.'];
-    }
-
-    $deleted = 0;
-    $errors = 0;
-
-    foreach ($fileNames as $name) {
-        // Валидация
-        if (!preg_match('#^[a-z]+_[a-z0-9\-_]+_\d+\.json$#i', $name)) {
-            $errors++;
-            continue;
-        }
-
-        $path = TRASH_DIR . $name;
-        if (!file_exists($path)) {
-            $errors++;
-            continue;
-        }
-
-        // Читаем ДО удаления — чтобы знать history_key
-        $trashData = _jsonToArray($path);
-        $historyKey = '';
-        if (($trashData['_trash']['type'] ?? '') === 'page') {
-            $historyKey = (string)($trashData['history_key'] ?? '');
-        }
-
-        if (@unlink($path)) {
-            $deleted++;
-
-            // Чистим историю страницы
-            if ($historyKey !== '' && preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
-                clearPageHistory($historyKey);
-            }
-        } else {
-            $errors++;
-        }
-    }
-
-    if ($deleted === 0) {
-        return ['success' => false, 'deleted' => 0, 'error' => 'Не удалось удалить ни один файл.'];
-    }
-
-    return [
-        'success' => true,
-        'deleted' => $deleted,
-        'error'   => $errors > 0 ? "Не удалось удалить файлов: $errors" : '',
-    ];
-}
-
-/**
- * Полностью очищает корзину.
- *
- * @return array ['success' => bool, 'deleted' => int, 'error' => string]
- */
-function clearTrash(): array {
-    if (!is_dir(TRASH_DIR)) {
-        return ['success' => true, 'deleted' => 0, 'error' => ''];
-    }
-
-    $files = glob(TRASH_DIR . '*.json');
-    if (empty($files)) {
-        return ['success' => true, 'deleted' => 0, 'error' => ''];
-    }
-
-    $deleted = 0;
-    foreach ($files as $file) {
-        // Читаем ДО удаления — чтобы знать history_key
-        $trashData = _jsonToArray($file);
-        $historyKey = '';
-        if (($trashData['_trash']['type'] ?? '') === 'page') {
-            $historyKey = (string)($trashData['history_key'] ?? '');
-        }
-
-        if (@unlink($file)) {
-            $deleted++;
-
-            if ($historyKey !== '' && preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
-                clearPageHistory($historyKey);
-            }
-        }
-    }
-
-    return ['success' => true, 'deleted' => $deleted, 'error' => ''];
-}
-
-/**
- * Обработчик POST-действий корзины (восстановление / удаление / очистка).
- * Вызывается из config/index.php.
- *
- * Ожидает:
- * - $_POST['trash_action'] — 'restore' | 'delete_selected' | 'clear_all'
- * - $_POST['trash_context'] — 'page' | 'menu' (для редиректа)
- * - $_POST['trash_return_url'] — URL редиректа
- * - $_POST['trash_files'] — массив имён файлов (для restore/delete_selected)
- *
- * @return void
- */
-function handleTrashAction(): void {
-    $action   = $_POST['trash_action']   ?? '';
-    $context  = $_POST['trash_context']  ?? 'page';
-    $returnUrl = $_POST['trash_return_url'] ?? '?tab=pages';
-
-    // Валидация контекста и URL (защита от open redirect)
-    if (!in_array($context, ['page', 'menu'], true)) {
-        $context = 'page';
-    }
-    if (!preg_match('#^\?tab=[a-z_]+$#', $returnUrl)) {
-        $returnUrl = '?tab=' . ($context === 'page' ? 'pages' : 'menu');
-    }
-
-    // === Восстановление ===
-    if ($action === 'restore') {
-        $files = $_POST['trash_files'] ?? [];
-        if (!is_array($files) || empty($files)) {
-            setFlash('Не выбрано ни одного элемента для восстановления.', 'error');
-            header('Location: ' . $returnUrl);
-            exit;
-        }
-
-        $restored = 0;
-        $errors   = [];
-        foreach ($files as $file) {
-            $result = restoreFromTrash((string)$file);
-            if ($result['success']) {
-                $restored++;
-                logAction('trash_restore', $result['message'], 'INFO');
-            } else {
-                $errors[] = $result['error'];
-            }
-        }
-
-        if ($restored > 0 && empty($errors)) {
-            setFlash("Восстановлено элементов: $restored.");
-        } elseif ($restored > 0 && !empty($errors)) {
-            setFlash("Восстановлено: $restored. Ошибки: " . implode('; ', $errors), 'warning', 8);
-        } else {
-            setFlash('Не удалось восстановить: ' . implode('; ', $errors), 'error');
-        }
-
-        header('Location: ' . $returnUrl);
-        exit;
-    }
-
-    // === Удаление выбранных ===
-    if ($action === 'delete_selected') {
-        $files = $_POST['trash_files'] ?? [];
-        if (!is_array($files) || empty($files)) {
-            setFlash('Не выбрано ни одного элемента для удаления.', 'error');
-            header('Location: ' . $returnUrl);
-            exit;
-        }
-
-        $result = deleteFromTrash($files);
-        if ($result['success']) {
-            $msg = 'Удалено элементов: ' . $result['deleted'] . '.';
-            if (!empty($result['error'])) {
-                $msg .= ' ' . $result['error'];
-                setFlash($msg, 'warning', 6);
-            } else {
-                setFlash($msg);
-            }
-            logAction('trash_delete', 'Удалено из корзины: ' . $result['deleted'], 'INFO');
-        } else {
-            setFlash($result['error'], 'error');
-        }
-
-        header('Location: ' . $returnUrl);
-        exit;
-    }
-
-    // === Очистка всей корзины ===
-    if ($action === 'clear_all') {
-        $result = clearTrash();
-        if ($result['success']) {
-            if ($result['deleted'] > 0) {
-                setFlash('Корзина очищена. Удалено элементов: ' . $result['deleted'] . '.');
-                logAction('trash_clear', 'Корзина очищена: ' . $result['deleted'] . ' элементов', 'INFO');
-            } else {
-                setFlash('Корзина уже пуста.');
-            }
-        } else {
-            setFlash($result['error'] ?: 'Ошибка очистки корзины.', 'error');
-        }
-
-        header('Location: ' . $returnUrl);
-        exit;
-    }
-
-    // Неизвестное действие
-    setFlash('Неизвестное действие корзины.', 'error');
-    header('Location: ' . $returnUrl);
-    exit;
-}
-
-/**
- * ФУНКЦИИ ПРЕВЬЮ
- */
-// Папка временного превью
-if (!defined('PREVIEW_DIR')) {
-    define('PREVIEW_DIR', DATA_DIR . 'preview' . DIRECTORY_SEPARATOR);
-}
-
-/**
- * Гарантирует существование папки preview + .htaccess защиту.
- *
- * @return bool true если папка доступна для записи
- */
-function ensurePreviewDir(): bool {
-    if (!is_dir(PREVIEW_DIR)) {
-        if (!@mkdir(PREVIEW_DIR, 0755, true)) {
-            return false;
-        }
-    }
-
-    $htaccess = PREVIEW_DIR . '.htaccess';
-    if (!file_exists($htaccess)) {
-        $data = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
-              . "<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n";
-        @file_put_contents($htaccess, $data);
-    }
-
-    return is_writable(PREVIEW_DIR);
-}
-
-/**
- * Удаляет все preview-файлы.
- * Используется при успешном логине.
- *
- * @return int Количество удалённых файлов
- */
-function cleanupAllPreviews(): int {
-    if (!is_dir(PREVIEW_DIR)) {
-        return 0;
-    }
-
-    $files = glob(PREVIEW_DIR . '*.json');
-    if (empty($files)) {
-        return 0;
-    }
-
-    $deleted = 0;
-    foreach ($files as $file) {
-        if (@unlink($file)) {
-            $deleted++;
-        }
-    }
-
-    return $deleted;
-}
-
-/**
- * Удаляет preview-файлы конкретной сессии.
- * Используется при уходе из редактора.
- *
- * @param string $sessionId ID сессии (session_id())
- * @return int Количество удалённых файлов
- */
-function cleanupSessionPreviews(string $sessionId): int {
-    if ($sessionId === '' || !is_dir(PREVIEW_DIR)) {
-        return 0;
-    }
-
-    $files = glob(PREVIEW_DIR . '*.json');
-    if (empty($files)) {
-        return 0;
-    }
-
-    $deleted = 0;
-    foreach ($files as $file) {
-        $data = json_decode(file_get_contents($file), true);
-        if (!is_array($data)) {
-            @unlink($file);
-            continue;
-        }
-
-        $fileSessionId = $data['_preview']['session_id'] ?? '';
-        if ($fileSessionId === $sessionId) {
-            if (@unlink($file)) {
-                $deleted++;
-            }
-        }
-    }
-
-    return $deleted;
-}
-
-/**
- * Удаляет preview-файлы конкретной сессии для конкретной страницы.
- * Используется при заходе на edit.php и при сохранении.
- *
- * @param string $sessionId ID сессии
- * @param string $pageId    ID страницы
- * @return int Количество удалённых файлов
- */
-function cleanupSessionPagePreviews(string $sessionId, string $pageId): int {
-    if ($sessionId === '' || !is_dir(PREVIEW_DIR)) {
-        return 0;
-    }
-
-    $files = glob(PREVIEW_DIR . '*.json');
-    if (empty($files)) {
-        return 0;
-    }
-
-    $deleted = 0;
-    foreach ($files as $file) {
-        $data = json_decode(file_get_contents($file), true);
-        if (!is_array($data)) {
-            @unlink($file);
-            continue;
-        }
-
-        $meta = $data['_preview'] ?? [];
-        $fileSessionId = $meta['session_id'] ?? '';
-        $filePageId    = $meta['page_id'] ?? '';
-
-        if ($fileSessionId === $sessionId && $filePageId === $pageId) {
-            if (@unlink($file)) {
-                $deleted++;
-            }
-        }
-    }
-
-    return $deleted;
-}
-
-/**
- * Создаёт или перезаписывает preview-файл для пары (session + page).
- *
- * @param array       $pageData         Данные страницы (title, slug, template, rows, meta, ...)
- * @param string      $sessionId        ID сессии админа
- * @param string      $pageId           ID страницы (может быть '' для новой)
- * @param string|null $existingPreviewId Если был preview с этим ID — перезаписываем его (при совпадении session + page)
- * @param string      $createdBy        Логин админа
- * @return array ['success' => bool, 'preview_id' => string, 'error' => string]
- */
-function createPreview(array $pageData, string $sessionId, string $pageId,
-    ?string $existingPreviewId = null, string $createdBy = 'system'): array {
-    if ($sessionId === '') {
-        return ['success' => false, 'preview_id' => '', 'error' => 'Невалидная сессия.'];
-    }
-
-    if (!ensurePreviewDir()) {
-        return ['success' => false, 'preview_id' => '', 'error' => 'Папка preview недоступна для записи.'];
-    }
-
-    $previewId = '';
-    $targetPath = '';
-
-    // Проверяем, можно ли перезаписать существующий
-    if ($existingPreviewId !== null && preg_match('/^[a-f0-9]{32}$/i', $existingPreviewId)) {
-        $existingPath = PREVIEW_DIR . $existingPreviewId . '.json';
-        if (file_exists($existingPath)) {
-            $existingData = json_decode(file_get_contents($existingPath), true);
-            if (is_array($existingData)) {
-                $meta = $existingData['_preview'] ?? [];
-                if (($meta['session_id'] ?? '') === $sessionId
-                    && ($meta['page_id'] ?? '') === $pageId
-                ) {
-                    // Совпадает — перезаписываем
-                    $previewId = $existingPreviewId;
-                    $targetPath = $existingPath;
-                }
-            }
-        }
-    }
-
-    // Если не нашли существующий — создаём новый ID
-    if ($previewId === '') {
-        $previewId = bin2hex(random_bytes(16));
-        $targetPath = PREVIEW_DIR . $previewId . '.json';
-    }
-
-    // Добавляем метаданные
-    $pageData['_preview'] = [
-        'preview_id' => $previewId,
-        'session_id' => $sessionId,
-        'page_id'    => $pageId,
-        'created_at' => time(),
-        'created_by' => $createdBy,
-    ];
-
-    $json = json_encode($pageData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    if (!safeFileWrite($targetPath, $json)) {
-        return ['success' => false, 'preview_id' => '', 'error' => 'Не удалось записать preview-файл.'];
-    }
-
-    return ['success' => true, 'preview_id' => $previewId, 'error' => ''];
-}
-
-/**
- * Формирует URL preview-страницы.
- * Для сохранённой страницы — /{slug}?preview={id}.
- * Для новой (без slug) — /?preview={id}.
- *
- * @param string $previewId 32 hex-символа
- * @param string $slug      Slug страницы (может быть '')
- * @return string Относительный URL
- */
-function getPreviewUrl(string $previewId, string $slug = ''): string {
-    $base = '/';
-    if ($slug !== '') {
-        $base = '/' . trim($slug, '/');
-    }
-    return $base . '?preview=' . $previewId;
-}
-
-/**
- * Возвращает preview_token страницы (или пустую строку, если не задан).
- *
- * @param string $pageId
- * @return string
- */
-function getPagePreviewToken(string $pageId): string {
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
-        return '';
-    }
-
-    $page = loadPageById($pageId);
-    if (!$page) {
-        return '';
-    }
-
-    return (string)($page['preview_token'] ?? '');
-}
-
-/**
- * Формирует полный preview-URL для сохранённой страницы.
- *
- * @param string $pageId
- * @param string $token preview_token
- * @return string URL вида https://host/{slug}?preview={token}
- */
-function getPagePreviewUrl(string $pageId, string $token): string {
-    $page = loadPageById($pageId);
-    $slug = $page['slug'] ?? '';
-
-    $base = '/' . trim($slug, '/');
-    if ($slug === '') {
-        $base = '/';
-    }
-
-    return getBaseUrl() . $base . '?preview=' . $token;
-}
-
-/**
- * ФУНКЦИИ ГЕНЕРАЦИИ SEO-ФАЙЛОВ
- */
-/**
- * Генерирует sitemap.xml в корне сайта.
- *
- * Включает только published-страницы без истёкшего unpublish_at.
- * Главная получает priority 1.0, остальные — 0.8.
- *
- * @return array ['success' => bool, 'count' => int, 'error' => string]
- */
-function generateSitemap(): array {
-    $pagesDir = DATA_DIR . 'pages/';
-    if (!is_dir($pagesDir)) {
-        return ['success' => false, 'count' => 0, 'error' => 'Папка страниц не найдена.'];
-    }
-
-    // Протокол и хост
-    $baseUrl = getBaseUrl();
-
-    $files = glob($pagesDir . '*.json');
-    $urls = [];
-    $now = time();
-
-    foreach ($files as $file) {
-        $page = _jsonToArray($file);
-        if (empty($page)) {
-            continue;
-        }
-
-        // Только опубликованные
-        if (($page['status'] ?? '') !== 'published') {
-            continue;
-        }
-
-        // Не истёкшие по unpublish_at
-        if (!empty($page['unpublish_at']) && (int)$page['unpublish_at'] <= $now) {
-            continue;
-        }
-
-        $slug = $page['slug'] ?? $page['id'] ?? '';
-
-        if ($slug === '') {
-            $loc = $baseUrl . '/';
-            $priority = '1.0';
-        } else {
-            $loc = $baseUrl . '/' . trim($slug, '/');
-            $priority = '0.8';
-        }
-
-        $urls[] = [
-            'loc'        => $loc,
-            'lastmod'    => date('c', filemtime($file)),
-            'changefreq' => 'weekly',
-            'priority'   => $priority,
-        ];
-    }
-
-    // Сортировка: главная вперёд, потом по алфавиту
-    usort($urls, function($a, $b) {
-        if ($a['priority'] === '1.0' && $b['priority'] !== '1.0') return -1;
-        if ($a['priority'] !== '1.0' && $b['priority'] === '1.0') return 1;
-        return strcmp($a['loc'], $b['loc']);
-    });
-
-    // Формируем XML
-    $xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
-
-    foreach ($urls as $url) {
-        $xml .= "    <url>\n";
-        $xml .= "        <loc>" . htmlspecialchars($url['loc'], ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</loc>\n";
-        $xml .= "        <lastmod>" . $url['lastmod'] . "</lastmod>\n";
-        $xml .= "        <changefreq>" . $url['changefreq'] . "</changefreq>\n";
-        $xml .= "        <priority>" . $url['priority'] . "</priority>\n";
-        $xml .= "    </url>\n";
-    }
-
-    $xml .= '</urlset>' . "\n";
-
-    $targetPath = APP_ROOT . DIRECTORY_SEPARATOR . 'sitemap.xml';
-
-    if (!safeFileWrite($targetPath, $xml)) {
-        return ['success' => false, 'count' => 0, 'error' => 'Не удалось записать sitemap.xml.'];
-    }
-
-    return ['success' => true, 'count' => count($urls), 'error' => ''];
-}
-
-/**
- * Генерирует robots.txt в корне сайта.
- *
- * @return array ['success' => bool, 'error' => string]
- */
-function generateRobots(): array {
-    // Протокол и хост
-    $baseUrl = getBaseUrl();
-
-    $lines = [
-        'User-agent: *',
-        'Disallow: /config/',
-        'Disallow: /data/',
-        'Disallow: /cache/',
-        'Disallow: /*?preview=',
-        'Allow: /',
-        '',
-        'Sitemap: ' . $baseUrl . '/sitemap.xml',
-        '',
-    ];
-
-    $content = implode("\n", $lines);
-    $targetPath = APP_ROOT . DIRECTORY_SEPARATOR . 'robots.txt';
-
-    if (!safeFileWrite($targetPath, $content)) {
-        return ['success' => false, 'error' => 'Не удалось записать robots.txt.'];
-    }
-
-    return ['success' => true, 'error' => ''];
-}
-
-/**
- * Генерирует sitemap.xml и robots.txt (если соответствующая галочка включена).
- *
- * Проверяет настройки `seo_sitemap_enabled` и `seo_robots_enabled`.
- * Если галочка выключена — соответствующий файл не создаётся (или удаляется,
- * если существовал ранее).
- *
- * @return array ['sitemap' => array, 'robots' => array]
- */
-function generateSeoFiles(): array {
-    $settings = getSettingsData();
-
-    $sitemapEnabled = $settings['seo_sitemap_enabled'] ?? true;
-    $robotsEnabled  = $settings['seo_robots_enabled'] ?? true;
-
-    $result = [
-        'sitemap' => ['success' => true, 'skipped' => true, 'error' => ''],
-        'robots'  => ['success' => true, 'skipped' => true, 'error' => ''],
-    ];
-
-    // Sitemap
-    if ($sitemapEnabled) {
-        $result['sitemap'] = generateSitemap();
-    } else {
-        // Удаляем существующий файл
-        $path = APP_ROOT . DIRECTORY_SEPARATOR . 'sitemap.xml';
-        if (file_exists($path)) {
-            @unlink($path);
-        }
-    }
-
-    // Robots
-    if ($robotsEnabled) {
-        $result['robots'] = generateRobots();
-    } else {
-        $path = APP_ROOT . DIRECTORY_SEPARATOR . 'robots.txt';
-        if (file_exists($path)) {
-            @unlink($path);
-        }
-    }
-
-    // Обновляем метку времени последней генерации
-    $settings['last_seo_regenerate'] = time();
-    saveData('settings', $settings);
-
-    return $result;
-}
-
-/**
- * Проверяет галочку «Автообновление» и вызывает генерацию, если включена.
- *
- * Вызывается из handleSavePage, handleDeletePage, restoreFromTrash,
- * handleClonePage, handleSetHomePage.
- *
- * @return void
- */
-function maybeRegenerateSeoFiles(): void {
-    $settings = getSettingsData();
-    if (!empty($settings['seo_auto_regenerate'])) {
-        generateSeoFiles();
-    }
-}
-
-/**
- * ИСТОРИЯ ИЗМЕНЕНИЙ СТРАНИЦ
- */
-// Базовая папка истории
-if (!defined('HISTORY_DIR')) {
-    define('HISTORY_DIR', DATA_DIR . 'history' . DIRECTORY_SEPARATOR);
-}
-
-/**
- * Проверяет, включено ли сохранение истории изменений.
- *
- * @return bool
- */
-function isHistoryEnabled(): bool {
-    $settings = getSettingsData();
-    return !empty($settings['history_enabled']);
-}
-
-/**
- * Возвращает максимальное количество хранимых версий одной страницы.
- * Ограничено диапазоном 1..100.
- *
- * @return int
- */
-function getHistoryLimit(): int {
-    $settings = getSettingsData();
-    $limit = intval($settings['history_limit'] ?? 20);
-    return max(1, min(100, $limit));
-}
-
-/**
- * Возвращает путь к папке истории одной страницы (с trailing separator).
- * Не создаёт папку — только формирует путь.
- *
- * @param string $historyKey Ключ истории (16 hex-символов)
- * @return string Путь или пустая строка при невалидном ключе
- */
-function getHistoryDir(string $historyKey): string {
-    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
-        return '';
-    }
-    return HISTORY_DIR . $historyKey . DIRECTORY_SEPARATOR;
-}
-
-/**
- * Гарантирует существование базовой папки истории + .htaccess защиту.
- * Также создаёт вложенную папку для конкретной страницы.
- *
- * @param string $historyKey Ключ истории страницы (16 hex-символов)
- * @return bool true если папка доступна для записи
- */
-function ensureHistoryDir(string $historyKey): bool {
-    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
-        return false;
-    }
-
-    // Базовая папка + защита
-    if (!is_dir(HISTORY_DIR)) {
-        if (!@mkdir(HISTORY_DIR, 0755, true)) {
-            return false;
-        }
-    }
-
-    $htaccess = HISTORY_DIR . '.htaccess';
-    if (!file_exists($htaccess)) {
-        $data = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
-              . "<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n";
-        @file_put_contents($htaccess, $data);
-    }
-
-    // Папка конкретной страницы
-    $pageDir = HISTORY_DIR . $historyKey . DIRECTORY_SEPARATOR;
-    if (!is_dir($pageDir)) {
-        if (!@mkdir($pageDir, 0755, true)) {
-            return false;
-        }
-    }
-
-    return is_writable($pageDir);
-}
-
-/**
- * Возвращает history_key страницы.
- * Если ключа нет — генерирует, сохраняет в JSON страницы и возвращает.
- *
- * ВНИМАНИЕ: при генерации модифицирует файл на диске.
- * Используется как fallback для страниц, созданных до фичи.
- *
- * @param array $page Данные страницы (по ссылке, чтобы можно было обновить)
- * @return string 16 hex-символов или пустая строка
- */
-function getOrCreateHistoryKey(array &$page): string {
-    $existing = (string)($page['history_key'] ?? '');
-    if (preg_match('/^[a-f0-9]{16}$/i', $existing)) {
-        return $existing;
-    }
-
-    $key = bin2hex(random_bytes(8));
-    $page['history_key'] = $key;
-
-    // Пишем обновлённый JSON обратно в файл страницы
-    $pageId = (string)($page['id'] ?? '');
-    if ($pageId !== '' && preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
-        savePageData($pageId, $page);
-    }
-
-    return $key;
-}
-
-/**
- * Удаляет самые старые версии, оставляя не больше $limit штук.
- * Сортировка по имени файла (timestamp = имя).
- *
- * @param string $historyKey Ключ истории
- * @param int    $limit      Максимум хранимых версий (1..100)
- * @return int Количество удалённых файлов
- */
-function rotatePageHistory(string $historyKey, int $limit): int {
-    $limit = max(1, min(100, $limit));
-    $dir = getHistoryDir($historyKey);
-    if ($dir === '' || !is_dir($dir)) {
-        return 0;
-    }
-
-    $files = glob($dir . '*.json');
-    if (!is_array($files) || count($files) <= $limit) {
-        return 0;
-    }
-
-    // Сортируем по имени (= timestamp), по возрастанию
-    usort($files, function($a, $b) {
-        return strcmp(basename($a), basename($b));
-    });
-
-    $toDelete = array_slice($files, 0, count($files) - $limit);
-    $deleted = 0;
-    foreach ($toDelete as $file) {
-        if (@unlink($file)) {
-            $deleted++;
-        }
-    }
-
-    return $deleted;
-}
-
-/**
- * Сохраняет снапшот страницы в историю.
- * Вызывается ПЕРЕД перезаписью текущего файла.
- *
- * Снапшот НЕ пишется, если:
- * - история отключена;
- * - старое состояние ≡ новое (пользователь ничего не менял);
- * - такое же состояние уже есть в последнем снапшоте.
- *
- * @param array  $oldPage  Данные страницы ДО сохранения (то, что на диске)
- * @param array  $newPage  Данные страницы ПОСЛЕ сохранения (то, что будет записано)
- * @param string $savedBy  Логин админа (или 'system')
- * @return bool true при успешной записи
- */
-function savePageSnapshot(array $oldPage, array $newPage, string $savedBy = 'system'): bool {
-    // Проверка: история включена
-    if (!isHistoryEnabled()) {
-        return false;
-    }
-
-    // Если пользователь ничего не менял — снапшот не нужен
-    $oldHash = md5(json_encode(normalizeHistoryContent(extractHistoryContent($oldPage))));
-    $newHash = md5(json_encode(normalizeHistoryContent(extractHistoryContent($newPage))));
-    if ($oldHash === $newHash) {
-        return false;
-    }
-
-    $pageData = $oldPage;
-
-    $pageId = (string)($pageData['id'] ?? '');
-    if ($pageId === '' || !preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
-        return false;
-    }
-
-    // Ключ истории (создаём при необходимости — это пишет в текущий JSON)
-    $historyKey = getOrCreateHistoryKey($pageData);
-    if ($historyKey === '') {
-        return false;
-    }
-
-    if (!ensureHistoryDir($historyKey)) {
-        return false;
-    }
-
-    // === ДЕДУПЛИКАЦИЯ С ПОСЛЕДНИМ ===
-    // Если такое же состояние уже есть в свежем снапшоте — не пишем.
-    // $newHash уже посчитан выше (при сравнении old ≡ new).
-    $existingFiles = glob(HISTORY_DIR . $historyKey . DIRECTORY_SEPARATOR . '*.json');
-    if (is_array($existingFiles) && !empty($existingFiles)) {
-        // Сортируем по имени (timestamp), берём последний
-        usort($existingFiles, function($a, $b) {
-            return strcmp(basename($a), basename($b));
-        });
-        $lastFile = end($existingFiles);
-
-        $lastData = _jsonToArray($lastFile);
-        if (!empty($lastData)) {
-            $lastHash = md5(json_encode(normalizeHistoryContent(extractHistoryContent($lastData))));
-            if ($lastHash === $newHash) {
-                return false; // контент не изменился — пропускаем
-            }
-        }
-        // Если lastData пустой (битый) — продолжаем, пишем снапшот
-    }
-
-    // Формируем снапшот: полный JSON + _history
-    $snapshot = $pageData;
-    $snapshot['_history'] = [
-        'page_id'     => $pageId,
-        'snapshot_at' => time(),
-        'saved_by'    => $savedBy,
-        'size_bytes'  => 0,
-    ];
-
-    $json = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    if ($json === false) {
-        return false;
-    }
-
-    // size_bytes после кодирования
-    $snapshot['_history']['size_bytes'] = strlen($json);
-    $json = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-
-    $timestamp = $snapshot['_history']['snapshot_at'];
-    $targetPath = HISTORY_DIR . $historyKey . DIRECTORY_SEPARATOR . $timestamp . '.json';
-
-    if (!safeFileWrite($targetPath, $json)) {
-        return false;
-    }
-
-    // Ротация: удаляем самые старые, если превышен лимит
-    rotatePageHistory($historyKey, getHistoryLimit());
-
-    return true;
-}
-
-/**
- * Возвращает список версий страницы (свежие сверху).
- *
- * @param string $historyKey Ключ истории
- * @return array Массив записей: [timestamp, snapshot_at, saved_by, size_bytes, page_id]
- */
-function getPageHistory(string $historyKey): array {
-    $dir = getHistoryDir($historyKey);
-    if ($dir === '' || !is_dir($dir)) {
-        return [];
-    }
-
-    $files = glob($dir . '*.json');
-    if (!is_array($files) || empty($files)) {
-        return [];
-    }
-
-    $list = [];
-    foreach ($files as $file) {
-        $timestamp = (int)basename($file, '.json');
-        if ($timestamp <= 0) {
-            continue;
-        }
-
-        $data = _jsonToArray($file);
-        if (empty($data) || empty($data['_history'])) {
-            continue;
-        }
-
-        $meta = $data['_history'];
-
-        $list[] = [
-            'timestamp'   => $timestamp,
-            'snapshot_at' => (int)($meta['snapshot_at'] ?? $timestamp),
-            'saved_by'    => (string)($meta['saved_by'] ?? ''),
-            'size_bytes'  => (int)($meta['size_bytes'] ?? 0),
-            'page_id'     => (string)($meta['page_id'] ?? ''),
-        ];
-    }
-
-    // Свежие сверху
-    usort($list, function($a, $b) {
-        return $b['timestamp'] - $a['timestamp'];
-    });
-
-    return $list;
-}
-
-/**
- * Читает конкретный снапшот версии страницы.
- * Возвращает данные БЕЗ служебного блока _history.
- *
- * @param string $historyKey Ключ истории
- * @param int    $timestamp  Unix timestamp версии
- * @return array|null Данные страницы или null
- */
-function getHistorySnapshot(string $historyKey, int $timestamp): ?array {
-    if ($timestamp <= 0) {
-        return null;
-    }
-
-    $dir = getHistoryDir($historyKey);
-    if ($dir === '' || !is_dir($dir)) {
-        return null;
-    }
-
-    $file = $dir . $timestamp . '.json';
-    if (!file_exists($file)) {
-        return null;
-    }
-
-    $data = _jsonToArray($file);
-    if (empty($data)) {
-        return null;
-    }
-
-    unset($data['_history']);
-
-    return $data;
-}
-
-/**
- * Список контентных полей страницы — участвуют в снапшоте,
- * сравнении и откате. Один источник правды.
- *
- * Не входят:
- * - status, publish_at, unpublish_at — жизненный цикл, не контент.
- * - slug_history — накопительная история адресов.
- * - id, slug, history_key, preview_token — служебные.
- *
- * @return array
- */
-function getHistoryContentFields(): array {
-    return [
-        'title',
-        'template',
-        'meta',
-        'show_header',
-        'show_footer',
-        'rows',
-    ];
-}
-
-/**
- * Извлекает из страницы только контентные поля.
- *
- * @param array $page Данные страницы
- * @return array Массив из контентных полей (отсутствующие = null)
- */
-function extractHistoryContent(array $page): array {
-    $result = [];
-    foreach (getHistoryContentFields() as $field) {
-        $result[$field] = $page[$field] ?? null;
-    }
-    return $result;
-}
-
-/**
- * Нормализует контент для стабильного сравнения:
- * - вырезает служебное поле _jsId в rows[].columns[].modules[]
- * - рекурсивно сортирует ключи через ksort
- *
- * @param array $content
- * @return array
- */
-function normalizeHistoryContent(array $content): array {
-    if (isset($content['rows']) && is_array($content['rows'])) {
-        foreach ($content['rows'] as &$row) {
-            if (!is_array($row)) continue;
-
-            unset($row['_jsId']);
-
-            if (!empty($row['columns']) && is_array($row['columns'])) {
-                foreach ($row['columns'] as &$col) {
-                    if (!is_array($col)) continue;
-
-                    unset($col['_jsId']);
-
-                    if (!empty($col['modules']) && is_array($col['modules'])) {
-                        foreach ($col['modules'] as &$mod) {
-                            if (!is_array($mod)) continue;
-                            unset($mod['_jsId']);
-                        }
-                        unset($mod);
-                    }
-                }
-                unset($col);
-            }
-        }
-        unset($row);
-    }
-
-    return normalizeHistorySort($content);
-}
-
-/**
- * Рекурсивно сортирует ключи массива (по возрастанию) для стабильного json_encode.
- *
- * @param mixed $value
- * @return mixed
- */
-function normalizeHistorySort($value) {
-    if (!is_array($value)) {
-        return $value;
-    }
-
-    // Ассоциативный? Сортируем ключи
-    foreach ($value as &$item) {
-        $item = normalizeHistorySort($item);
-    }
-    unset($item);
-
-    ksort($value);
-    return $value;
-}
-
-/**
- * Удаляет одну версию истории.
- *
- * @param string $historyKey Ключ истории
- * @param int    $timestamp  Unix timestamp версии
- * @return array ['success' => bool, 'error' => string]
- */
-function deleteHistoryVersion(string $historyKey, int $timestamp): array {
-    if ($timestamp <= 0) {
-        return ['success' => false, 'error' => 'Невалидный timestamp.'];
-    }
-
-    $dir = getHistoryDir($historyKey);
-    if ($dir === '') {
-        return ['success' => false, 'error' => 'Невалидный ключ истории.'];
-    }
-
-    $file = $dir . $timestamp . '.json';
-    if (!file_exists($file)) {
-        return ['success' => false, 'error' => 'Версия не найдена.'];
-    }
-
-    if (!@unlink($file)) {
-        return ['success' => false, 'error' => 'Не удалось удалить версию.'];
-    }
-
-    return ['success' => true, 'error' => ''];
-}
-
-/**
- * Удаляет всю историю одной страницы (все версии + папку).
- *
- * @param string $historyKey Ключ истории
- * @return int Количество удалённых файлов
- */
-function clearPageHistory(string $historyKey): int {
-    $dir = getHistoryDir($historyKey);
-    if ($dir === '' || !is_dir($dir)) {
-        return 0;
-    }
-
-    $files = glob($dir . '*.json');
-    $deleted = 0;
-    if (is_array($files)) {
-        foreach ($files as $file) {
-            if (@unlink($file)) {
-                $deleted++;
-            }
-        }
-    }
-
-    @rmdir($dir);
-
-    return $deleted;
-}
-
-/**
- * Собирает статистику по всей истории сайта.
- * Используется в настройках — для отображения «страниц/версий/размер».
- *
- * @return array ['pages' => int, 'versions' => int, 'size_bytes' => int]
- */
-function getHistoryStats(): array {
-    $stats = ['pages' => 0, 'versions' => 0, 'size_bytes' => 0];
-
-    if (!is_dir(HISTORY_DIR)) {
-        return $stats;
-    }
-
-    $pageDirs = glob(HISTORY_DIR . '*', GLOB_ONLYDIR);
-    if (!is_array($pageDirs)) {
-        return $stats;
-    }
-
-    foreach ($pageDirs as $dir) {
-        $key = basename($dir);
-        if (!preg_match('/^[a-f0-9]{16}$/i', $key)) {
-            continue;
-        }
-
-        $files = glob($dir . DIRECTORY_SEPARATOR . '*.json');
-        if (!is_array($files) || empty($files)) {
-            continue;
-        }
-
-        $stats['pages']++;
-        $stats['versions'] += count($files);
-
-        foreach ($files as $file) {
-            $size = @filesize($file);
-            if ($size !== false) {
-                $stats['size_bytes'] += $size;
-            }
-        }
-    }
-
-    return $stats;
-}
-
-/**
- * Восстанавливает страницу из снапшота истории.
- * Сначала делает снапшот текущего состояния (чтобы откат был обратимым).
- *
- * ВАЖНО: восстанавливается только контент.
- * id, slug, preview_token, history_key — не трогаются.
- *
- * @param string $pageId    ID страницы
- * @param int    $timestamp Unix timestamp снапшота
- * @return array ['success' => bool, 'error' => string, 'message' => string]
- */
-function restorePageFromHistory(string $pageId, int $timestamp): array {
-    // Проверка ID
-    if (!preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
-        return ['success' => false, 'error' => 'Невалидный ID страницы.', 'message' => ''];
-    }
-
-    // Загружаем текущую страницу
-    $current = loadPageById($pageId);
-    if (!$current) {
-        return ['success' => false, 'error' => 'Страница не найдена.', 'message' => ''];
-    }
-
-    // Ключ истории
-    $historyKey = (string)($current['history_key'] ?? '');
-    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
-        return ['success' => false, 'error' => 'У страницы нет истории.', 'message' => ''];
-    }
-
-    // Читаем снапшот
-    $snapshot = getHistorySnapshot($historyKey, $timestamp);
-    if (!$snapshot) {
-        return ['success' => false, 'error' => 'Версия не найдена.', 'message' => ''];
-    }
-
-    // Снапшот текущего состояния — чтобы откат был обратимым
-    savePageSnapshot($current, $snapshot, $_SESSION['admin_login'] ?? 'system');
-
-    // Собираем новую версию страницы:
-    // контент из снапшота + служебные поля из текущей
-    $newPage = $current;
-
-    // Восстанавливаем только контентные поля (см. getHistoryContentFields)
-    foreach (getHistoryContentFields() as $field) {
-        if (array_key_exists($field, $snapshot)) {
-            $newPage[$field] = $snapshot[$field];
-        }
-    }
-
-    // Служебные поля — принудительно из текущей
-    $newPage['id']            = $current['id'];
-    $newPage['slug']          = $current['slug'] ?? '';
-    $newPage['history_key']   = $historyKey;
-
-    if (array_key_exists('preview_token', $current)) {
-        $newPage['preview_token'] = $current['preview_token'];
-    }
-
-    // Сохраняем
-    if (!savePageData($pageId, $newPage)) {
-        return ['success' => false, 'error' => 'Не удалось сохранить восстановленную версию.', 'message' => ''];
-    }
-
-    // Сброс кеша страницы
-    clearPageCacheById($pageId);
-
-    // SEO-файлы (если авторегенерация включена)
-    maybeRegenerateSeoFiles();
-
-    $dateStr = date('d.m.Y H:i', $timestamp);
-    return [
-        'success' => true,
-        'error'   => '',
-        'message' => 'Страница восстановлена к версии от ' . $dateStr . '.',
-    ];
-}
-
-/**
- * Обработчик POST: откат страницы к версии истории.
- * Вызывается из config/index.php.
- *
- * @param string $pageId
- * @param int    $timestamp
- * @return void
- */
-function handleRestorePageVersion(string $pageId, int $timestamp): void {
-    $result = restorePageFromHistory($pageId, $timestamp);
-
+        
+        // Если новая версия выше — это обновление, продолжаем
+        
+        // Хук ПЕРЕД обновлением
+        do_action('plugin_before_update', $id, $newVersion);
+    }
+    
+    // Устанавливаем (с перезаписью)
+    require_once __DIR__ . '/plugins.php';
+    $result = installPluginFromZip($tempFile, $id);
     if ($result['success']) {
-        logAction('page_restore', 'Страница "' . $pageId . '" восстановлена к версии от ' . date('d.m.Y H:i', $timestamp), 'INFO');
-        setFlash($result['message']);
-    } else {
-        logAction('page_restore', 'Ошибка отката: ' . $result['error'] . ' (ID: ' . $pageId . ', ts: ' . $timestamp . ')', 'ERROR');
-        setFlash($result['error'], 'error');
-    }
-
-    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
-    exit;
-}
-
-/**
- * Обработчик POST: удаление одной версии истории.
- * Вызывается из config/index.php.
- *
- * @param string $pageId
- * @param int    $timestamp
- * @return void
- */
-function handleDeleteHistoryVersion(string $pageId, int $timestamp): void {
-    // Загружаем страницу, чтобы получить history_key
-    $page = loadPageById($pageId);
-    if (!$page || !preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
-        setFlash('Страница не найдена.', 'error');
-        header('Location: ?tab=pages');
-        exit;
-    }
-
-    $historyKey = (string)($page['history_key'] ?? '');
-    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
-        setFlash('У страницы нет истории.', 'error');
-        header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
-        exit;
-    }
-
-    $result = deleteHistoryVersion($historyKey, $timestamp);
-
-    if ($result['success']) {
-        logAction('page_history_delete', 'Удалена версия истории страницы "' . $pageId . '" (ts: ' . $timestamp . ')', 'INFO');
-        setFlash('Версия удалена.');
-    } else {
-        logAction('page_history_delete', 'Ошибка удаления версии: ' . $result['error'] . ' (ID: ' . $pageId . ')', 'ERROR');
-        setFlash($result['error'], 'error');
-    }
-
-    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
-    exit;
-}
-
-/**
- * Обработчик POST: полная очистка истории одной страницы.
- * Вызывается из config/index.php.
- *
- * @param string $pageId
- * @return void
- */
-function handleClearPageHistory(string $pageId): void {
-    $page = loadPageById($pageId);
-    if (!$page || !preg_match('/^[a-z0-9\-_]+$/i', $pageId)) {
-        setFlash('Страница не найдена.', 'error');
-        header('Location: ?tab=pages');
-        exit;
-    }
-
-    $historyKey = (string)($page['history_key'] ?? '');
-    if (!preg_match('/^[a-f0-9]{16}$/i', $historyKey)) {
-        setFlash('У страницы нет истории.', 'error');
-        header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
-        exit;
-    }
-
-    $deleted = clearPageHistory($historyKey);
-
-    if ($deleted > 0) {
-        logAction('page_history_clear', 'Очищена история страницы "' . $pageId . '" (' . $deleted . ' версий)', 'INFO');
-        setFlash('История страницы очищена. Удалено версий: ' . $deleted . '.');
-    } else {
-        setFlash('История уже пуста.');
-    }
-
-    header('Location: ?tab=pages&action=edit&id=' . urlencode($pageId));
-    exit;
-}
-
-/**
- * AJAX-обработчик: полностью очищает историю всех страниц.
- * Вызывается из секции настроек «История».
- *
- * @return void
- */
-function handleClearAllHistory(): void {
-    $deletedVersions = 0;
-    $deletedPages    = 0;
-
-    if (is_dir(HISTORY_DIR)) {
-        $pageDirs = glob(HISTORY_DIR . '*', GLOB_ONLYDIR);
-        if (is_array($pageDirs)) {
-            foreach ($pageDirs as $dir) {
-                $key = basename($dir);
-                if (!preg_match('/^[a-f0-9]{16}$/i', $key)) {
-                    continue;
-                }
-
-                $files = glob($dir . DIRECTORY_SEPARATOR . '*.json');
-                if (is_array($files)) {
-                    foreach ($files as $file) {
-                        if (@unlink($file)) {
-                            $deletedVersions++;
-                        }
-                    }
-                }
-
-                if (@rmdir($dir)) {
-                    $deletedPages++;
-                }
-            }
+        if (isset($plugins[$id])) {
+            do_action('plugin_after_update', $id, $newVersion);
+            logAction('plugin_update', 'Плагин "' . $id . '" обновлён до версии ' . $newVersion, 'INFO');
+            $msg = 'Плагин "' . e($id) . '" успешно обновлен до версии ' . e($newVersion) . '!';
+        } else {
+            do_action('plugin_after_install', $id);
+            logAction('plugin_install', 'Установлен плагин "' . $id . '" (версия ' . $newVersion . ')', 'INFO');
+            $msg = $result['message'];
         }
+        return ['success' => $msg, 'error' => ''];
     }
-
-    if ($deletedVersions > 0) {
-        logAction('history_clear', 'История очищена: ' . $deletedPages . ' страниц, ' . $deletedVersions . ' версий', 'INFO');
-    }
-
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'success' => true,
-        'deleted_pages'    => $deletedPages,
-        'deleted_versions' => $deletedVersions,
-        'message' => $deletedVersions > 0
-            ? 'Удалено версий: ' . $deletedVersions . ' (страниц: ' . $deletedPages . ').'
-            : 'История уже пуста.',
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
 }
 
 /**
- * МЕДИА
- */
-
-/**
- * Проверяет, доступна ли конвертация в WebP на этом сервере.
- * Результат кешируется в памяти.
+ * Обрабатывает все POST-действия с плагинами (загрузка, вкл/выкл, удаление).
  *
- * @return bool
+ * @return array ['success' => string, 'error' => string]
  */
-function isWebpSupported(): bool {
-    static $cache = null;
-    if ($cache !== null) {
-        return $cache;
+function handlePluginAction(): array {
+    $action = $_POST['plugin_action'] ?? '';
+    $pluginId = $_POST['plugin_id'] ?? '';
+    
+    // --- УСТАНОВКА (UPLOAD) ---
+    if ($action === 'upload') {
+        return handlePluginUpload(); // Функция, которую мы уже написали
     }
-
-    if (extension_loaded('gd') && function_exists('imagewebp')) {
-        return $cache = true;
-    }
-    if (extension_loaded('imagick')) {
-        try {
-            $formats = Imagick::queryFormats('WEBP');
-            return $cache = !empty($formats);
-        } catch (Exception $e) {
-            return $cache = false;
+    
+    // --- УДАЛЕНИЕ ---
+    if ($action === 'delete' && $pluginId) {
+        if (!isValidId($pluginId)) {
+            return ['success' => '', 'error' => 'Невалидный ID плагина.'];
         }
-    }
-    return $cache = false;
-}
-
-/**
- * Конвертирует изображение в WebP.
- * Создаёт файл foo.webp рядом с оригиналом. Оригинал НЕ удаляется.
- *
- * Предполагается, что поддержка WebP уже проверена снаружи
- * (isWebpSupported()).
- *
- * @param string $sourcePath Полный путь к исходному файлу
- * @param int    $quality    Качество (1..100), по умолчанию 82
- * @return string|null Путь к .webp или null при ошибке
- */
-function convertToWebp(string $sourcePath, int $quality = 82): ?string {
-    if (!is_file($sourcePath)) {
-        return null;
-    }
-
-    $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
-
-    // Только jpg / jpeg / png
-    if (!in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
-        return null;
-    }
-
-    $quality = max(1, min(100, $quality));
-
-    // Целевой путь: foo.jpg → foo.webp
-    $targetPath = preg_replace('#\.(jpe?g|png)$#i', '.webp', $sourcePath);
-
-    // Если .webp уже есть — не перезаписываем
-    if (is_file($targetPath)) {
-        return $targetPath;
-    }
-
-    try {
-        // GD (приоритет)
-        if (extension_loaded('gd') && function_exists('imagewebp')) {
-            $image = null;
-            if ($ext === 'png') {
-                $image = @imagecreatefrompng($sourcePath);
-            } else {
-                $image = @imagecreatefromjpeg($sourcePath);
-            }
-
-            if ($image === false) {
-                return null;
-            }
-
-            if ($ext === 'png') {
-                imagepalettetotruecolor($image);
-                imagealphablending($image, true);
-                imagesavealpha($image, true);
-            }
-
-            $ok = @imagewebp($image, $targetPath, $quality);
-            imagedestroy($image);
-
-            if (!$ok || !is_file($targetPath)) {
-                @unlink($targetPath);
-                return null;
-            }
-
-            return $targetPath;
+        
+        $plugins = getPluginsData();
+        if (!isset($plugins[$pluginId])) {
+            return ['success' => '', 'error' => 'Плагин не найден.'];
         }
-
-        // Imagick (fallback)
-        if (extension_loaded('imagick')) {
-            $im = new Imagick($sourcePath);
-            $im->setImageFormat('webp');
-            $im->setImageCompressionQuality($quality);
-            $im->writeImage($targetPath);
-            $im->clear();
-            $im->destroy();
-
-            if (!is_file($targetPath)) {
-                return null;
-            }
-
-            return $targetPath;
-        }
-
-    } catch (Exception $e) {
-        if (is_file($targetPath)) {
-            @unlink($targetPath);
-        }
-        return null;
-    }
-
-    return null;
-}
-
-/**
- * Обёртка: читает настройки и вызывает convertToWebp, если включено.
- * Возвращает путь к .webp или null.
- *
- * @param string $sourcePath
- * @return string|null
- */
-function maybeConvertToWebp(string $sourcePath): ?string {
-    $settings = getSettingsData();
-    if (empty($settings['media_webp_enabled'])) {
-        return null;
-    }
-
-    // Защита от рассинхрона: галочка включена в settings.json,
-    // но на этом сервере поддержки WebP нет (например, после переноса).
-    if (!isWebpSupported()) {
-        return null;
-    }
-
-    $quality = max(1, min(100, (int)($settings['media_quality'] ?? 82)));
-    return convertToWebp($sourcePath, $quality);
-}
-
-/**
- * Считает, сколько jpg/png-файлов (в images/ и корне) не имеют парного .webp.
- *
- * @return int
- */
-function countImagesWithoutWebp(): int {
-    $files = array_merge(
-        getImageFiles(APP_ROOT . DIRECTORY_SEPARATOR . 'images', true),
-        getImageFiles(APP_ROOT, false)
-    );
-
-    $seen = [];
-    $count = 0;
-
-    foreach ($files as $original) {
-        $real = realpath($original);
-        if ($real === false || isset($seen[$real])) continue;
-        $seen[$real] = true;
-
-        $webp = preg_replace('#\.(jpe?g|png)$#i', '.webp', $original);
-        if (!is_file($webp)) {
-            $count++;
-        }
-    }
-
-    return $count;
-}
-
-/**
- * Конвертирует пачку существующих изображений (jpg/png без .webp).
- * Используется AJAX-шагами.
- *
- * @param int $step     Номер шага (0-based)
- * @param int $perStep  Сколько файлов за шаг (1..50)
- * @return array ['processed' => int, 'converted' => int, 'total' => int, 'is_finished' => bool]
- */
-function convertExistingImagesStep(int $step, int $perStep = 10): array {
-    $perStep = max(1, min(50, $perStep));
-    $step = max(0, $step);
-
-    // Собираем оригиналы (рекурсивно в images/, верхний уровень корня)
-    $allFiles = array_merge(
-        getImageFiles(APP_ROOT . DIRECTORY_SEPARATOR . 'images', true),
-        getImageFiles(APP_ROOT, false)
-    );
-
-    // Оставляем только те, у которых нет .webp
-    $seen = [];
-    $pending = [];
-
-    foreach ($allFiles as $file) {
-        $real = realpath($file);
-        if ($real === false || isset($seen[$real])) continue;
-        $seen[$real] = true;
-
-        $webp = preg_replace('#\.(jpe?g|png)$#i', '.webp', $file);
-        if (!is_file($webp)) {
-            $pending[] = $file;
-        }
-    }
-
-    $total = count($pending);
-    $offset = $step * $perStep;
-    $slice = array_slice($pending, $offset, $perStep);
-
-    $settings = getSettingsData();
-    $quality = max(1, min(100, (int)($settings['media_quality'] ?? 82)));
-
-    $converted = 0;
-    foreach ($slice as $file) {
-        if (convertToWebp($file, $quality) !== null) {
-            $converted++;
-        }
-    }
-
-    $processed = $offset + count($slice);
-    $isFinished = $processed >= $total;
-
-    return [
-        'processed'   => $processed,
-        'converted'   => $converted,
-        'total'       => $total,
-        'is_finished' => $isFinished,
-    ];
-}
-
-/**
- * AJAX-обработчик: конвертация существующих изображений шагами.
- *
- * @return void
- */
-function handleConvertExistingImagesStep(): void {
-    if (!isWebpSupported()) {
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'success' => false,
-            'error'   => 'WebP-конвертация не поддерживается на этом сервере.',
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    $step = intval($_POST['step'] ?? 0);
-    $perStep = intval($_POST['per_step'] ?? 10);
-
-    $result = convertExistingImagesStep($step, $perStep);
-
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'success'     => true,
-        'processed'   => $result['processed'],
-        'converted'   => $result['converted'],
-        'total'       => $result['total'],
-        'is_finished' => $result['is_finished'],
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-/**
- * Рекурсивно собирает файлы jpg/jpeg/png в директории.
- *
- * @param string $rootDir
- * @param bool   $recursive
- * @return array Абсолютные пути
- */
-function getImageFiles(string $rootDir, bool $recursive = true): array {
-    if (!is_dir($rootDir)) {
-        return [];
-    }
-
-    if (!$recursive) {
-        $files = array_merge(
-            glob($rootDir . DIRECTORY_SEPARATOR . '*.jpg') ?: [],
-            glob($rootDir . DIRECTORY_SEPARATOR . '*.jpeg') ?: [],
-            glob($rootDir . DIRECTORY_SEPARATOR . '*.png') ?: []
-        );
-        return $files;
-    }
-
-    $files = [];
-    try {
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($rootDir, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::LEAVES_ONLY
-        );
-
-        foreach ($iterator as $file) {
-            if (!$file->isFile()) continue;
-            $ext = strtolower($file->getExtension());
-            if (in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
-                $files[] = $file->getPathname();
-            }
-        }
-    } catch (Exception $e) {
-        return [];
-    }
-
-    return $files;
-}
-
-/**
- * Собирает статистику по .webp-файлам в images/ и корне сайта.
- *
- * Считает только .webp, у которых есть "парный" оригинал (.jpg/.jpeg/.png).
- * Это "наши" сгенерированные .webp. Просто .webp без оригинала — не считаются.
- *
- * @return array ['count' => int, 'size_bytes' => int]
- */
-function getWebpStats(): array {
-    $stats = ['count' => 0, 'size_bytes' => 0];
-
-    // images/ — рекурсивно, корень — только верхний уровень
-    $files = array_merge(
-        getImageFiles(APP_ROOT . DIRECTORY_SEPARATOR . 'images', true),
-        getImageFiles(APP_ROOT, false)
-    );
-
-    $seen = [];
-
-    foreach ($files as $original) {
-        $webp = preg_replace('#\.(jpe?g|png)$#i', '.webp', $original);
-        if (!is_file($webp)) continue;
-
-        $real = realpath($webp);
-        if ($real === false || isset($seen[$real])) continue;
-        $seen[$real] = true;
-
-        $stats['count']++;
-        $size = @filesize($webp);
-        if ($size !== false) {
-            $stats['size_bytes'] += $size;
-        }
-    }
-
-    return $stats;
-}
-
-/**
- * Удаляет все .webp-файлы, у которых есть "парный" оригинал.
- * Оригиналы (jpg/png) НЕ удаляются.
- *
- * @return array ['deleted' => int, 'kept' => int, 'error' => string]
- */
-function deleteAllWebp(): array {
-    $deleted = 0;
-    $kept = 0;
-    $errors = 0;
-
-    // Все .webp рекурсивно в images/ и верхний уровень корня
-    $webpFiles = [];
-
-    // images/ — рекурсивно
-    $imagesDir = APP_ROOT . DIRECTORY_SEPARATOR . 'images';
-    if (is_dir($imagesDir)) {
-        try {
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($imagesDir, RecursiveDirectoryIterator::SKIP_DOTS),
-                RecursiveIteratorIterator::LEAVES_ONLY
+        
+        // Хук ДО удаления (пока код плагина еще доступен)
+        do_action('plugin_before_delete', $pluginId);
+        
+        // Удаляем папку плагина
+        $pluginDir = PLUGINS_DIR . DIRECTORY_SEPARATOR . $pluginId;
+        if (is_dir($pluginDir)) {
+            $files = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($pluginDir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CHILD_FIRST
             );
-            foreach ($iterator as $file) {
-                if ($file->isFile() && strtolower($file->getExtension()) === 'webp') {
-                    $webpFiles[] = $file->getPathname();
+            foreach ($files as $file) {
+                if ($file->isDir()) {
+                    rmdir($file->getRealPath());
+                } else {
+                    unlink($file->getRealPath());
                 }
             }
-        } catch (Exception $e) {
-            // ignore
+            rmdir($pluginDir);
         }
-    }
-
-    // корень — только верхний уровень
-    $rootWebp = glob(APP_ROOT . DIRECTORY_SEPARATOR . '*.webp') ?: [];
-    $webpFiles = array_merge($webpFiles, $rootWebp);
-
-    $seen = [];
-
-    foreach ($webpFiles as $webp) {
-        $real = realpath($webp);
-        if ($real === false || isset($seen[$real])) continue;
-        $seen[$real] = true;
-
-        $base = substr($webp, 0, -5);
-
-        $hasOriginal = false;
-        foreach (['.jpg', '.jpeg', '.png'] as $ext) {
-            if (is_file($base . $ext)) {
-                $hasOriginal = true;
-                break;
-            }
+        
+        // Удаляем публичные ассеты (css и js)
+        $cssFile = APP_ROOT . '/css/' . $pluginId . '.css';
+        if (file_exists($cssFile)) {
+            @unlink($cssFile);
         }
-
-        if (!$hasOriginal) {
-            $kept++;
-            continue;
+        
+        $jsFile = APP_ROOT . '/js/' . $pluginId . '.js';
+        if (file_exists($jsFile)) {
+            @unlink($jsFile);
         }
-
-        if (@unlink($webp)) {
-            $deleted++;
-        } else {
-            $errors++;
+        
+        // Удаляем минифицированные версии, если были
+        $cssMinFile = APP_ROOT . '/css/' . $pluginId . '.min.css';
+        if (file_exists($cssMinFile)) {
+            @unlink($cssMinFile);
         }
-    }
+        
+        $jsMinFile = APP_ROOT . '/js/' . $pluginId . '.min.js';
+        if (file_exists($jsMinFile)) {
+            @unlink($jsMinFile);
+        }
+        
+        // Удаляем ассеты админки (css и js)
+        $adminCssFile = CONFIG_DIR . '/css/' . $pluginId . '.css';
+        if (file_exists($adminCssFile)) {
+            @unlink($adminCssFile);
+        }
+        
+        $adminCssMinFile = CONFIG_DIR . '/css/' . $pluginId . '.min.css';
+        if (file_exists($adminCssMinFile)) {
+            @unlink($adminCssMinFile);
+        }
+        
+        $adminJsFile = CONFIG_DIR . '/js/' . $pluginId . '.js';
+        if (file_exists($adminJsFile)) {
+            @unlink($adminJsFile);
+        }
+        
+        $adminJsMinFile = CONFIG_DIR . '/js/' . $pluginId . '.min.js';
+        if (file_exists($adminJsMinFile)) {
+            @unlink($adminJsMinFile);
+        }
+        
+        // Удаляем из JSON
+        // Имя плагина — ДО unset
+        $pluginName = $plugins[$pluginId]['name'] ?? $pluginId;
 
-    $error = '';
-    if ($errors > 0) {
-        $error = 'Не удалось удалить файлов: ' . $errors . '.';
-    }
+        unset($plugins[$pluginId]);
+        savePluginsData($plugins);
+        do_action('plugin_after_delete', $pluginId);
+        logAction('plugin_delete', 'Удалён плагин "' . $pluginId . '"' . ($pluginName !== $pluginId ? ' (' . $pluginName . ')' : ''), 'INFO');
 
-    return ['deleted' => $deleted, 'kept' => $kept, 'error' => $error];
+        // Чистим кеш
+        $cacheFile = DATA_DIR . 'updates_cache.json';
+        if (file_exists($cacheFile)) {
+            $cache = json_decode(file_get_contents($cacheFile), true);
+            unset($cache['data']['new'][$pluginId]);
+            safeFileWrite($cacheFile, json_encode($cache, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        }
+        
+        return ['success' => 'Плагин "' . e($pluginName) . '" успешно удален.', 'error' => ''];
+    }
+    
+    // --- ПЕРЕКЛЮЧЕНИЕ СТАТУСА ---
+    if ($action === 'toggle' && $pluginId) {
+        if (!isValidId($pluginId)) {
+            return ['success' => '', 'error' => 'Невалидный ID плагина.'];
+        }
+        
+        $plugins = getPluginsData();
+        if (!isset($plugins[$pluginId])) {
+            return ['success' => '', 'error' => 'Плагин не найден.'];
+        }
+        
+        $active = ($_POST['plugin_active'] ?? '0') === '1';
+        
+        // Хук ДО переключения
+        do_action('plugin_before_toggle', $pluginId, $active);
+        
+        $plugins[$pluginId]['active'] = $active;
+        savePluginsData($plugins);
+        
+        // Хук ПОСЛЕ переключения
+        do_action('plugin_after_toggle', $pluginId, $active);
+
+        $pluginName = $plugins[$pluginId]['name'] ?? $pluginId;
+        logAction('plugin_toggle', 'Плагин "' . $pluginId . '" ' . ($active ? 'включён' : 'выключен') . ($pluginName !== $pluginId ? ' (' . $pluginName . ')' : ''), 'INFO');
+
+        return [
+            'success' => 'Плагин "' . e($pluginName) . '" ' . ($active ? 'включен' : 'выключен') . '.',
+            'error' => ''
+        ];
+    }
+    
+    return ['success' => '', 'error' => 'Неизвестное действие.'];
 }
-
-/**
- * AJAX-обработчик: удаление всех сгенерированных .webp.
- * Вызывается из секции «Медиа» в настройках.
- *
- * @return void
- */
-function handleDeleteAllWebp(): void {
-    $result = deleteAllWebp();
-
-    if ($result['deleted'] > 0) {
-        logAction('media_webp_delete', 'Удалено .webp: ' . $result['deleted'] . ' (оставлено без оригинала: ' . $result['kept'] . ')', 'INFO');
-    }
-
-    $message = 'Удалено .webp: ' . $result['deleted'] . '.';
-    if ($result['kept'] > 0) {
-        $message .= ' Оставлено (нет оригинала): ' . $result['kept'] . '.';
-    }
-    if (!empty($result['error'])) {
-        $message .= ' ' . $result['error'];
-    }
-
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'success' => true,
-        'deleted' => $result['deleted'],
-        'kept'    => $result['kept'],
-        'error'   => $result['error'],
-        'message' => $message,
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-/**
- * ТЕХНИЧЕСКИЕ РАБОТЫ
- */
-
-/**
- * Проверяет, включён ли режим техработ.
- * НЕ проверяет автоснятие — это делает фронт (index.php).
- *
- * @return bool
- */
-function isMaintenanceEnabled(): bool {
-    $settings = getSettingsData();
-    return !empty($settings['maintenance_enabled']);
-}
-
-/**
- * Возвращает bypass-токен для техработ.
- * Если токена нет — генерирует и сохраняет.
- *
- * @return string 32 hex-символа
- */
-function getMaintenanceBypassToken(): string {
-    $settings = getSettingsData();
-    if (!empty($settings['maintenance_bypass_token'])
-        && preg_match('/^[a-f0-9]{32}$/i', $settings['maintenance_bypass_token'])
-    ) {
-        return (string)$settings['maintenance_bypass_token'];
-    }
-    return regenerateMaintenanceToken();
-}
-
-/**
- * Перегенерирует bypass-токен и сохраняет в settings.json.
- * Внимание: сломает все ранее выданные bypass-ссылки.
- *
- * @return string Новый токен
- */
-function regenerateMaintenanceToken(): string {
-    $token = bin2hex(random_bytes(16));
-    $settings = getSettingsData();
-    $settings['maintenance_bypass_token'] = $token;
-    saveData('settings', $settings);
-    return $token;
-}
-

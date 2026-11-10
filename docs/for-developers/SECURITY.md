@@ -82,6 +82,8 @@ if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $tok
 | `escapeJsString($str)` | JS-строки в HTML-атрибутах | `\`, `'`, `"`, `\n`, `<`, `>`, `&` |
 | `sanitizeHtml($html)` | HTML с разрешёнными тегами | whitelist тегов + атрибутов |
 
+**SVG** — это XML с исполняемыми возможностями. Перед сохранением загруженного `.svg` вызывается `validateSvgContent($content)`: `<script>`, `on*`, `foreignObject`, встроенные HTML-элементы, `ENTITY`, `xml-stylesheet`, `javascript:`/`vbscript:`, CSS `expression()` и внешние `href` отклоняются. Дополнительно файл должен быть корректным XML (`SimpleXML` + `LIBXML_NONET`).
+
 ### Правила
 
 **1. В** **HTML-контенте** — **всегда** `e()`:
@@ -137,7 +139,7 @@ $name = sanitizeHtml($name);
 
 ### Защита
 
-**Функция** `detectZipSlip(ZipArchive $zip): ?string`:
+**Функция** `detectZipSlip(ZipArchive $zip): ?string` (определена в `config/core/security.php`):
 
 ```php
 function detectZipSlip(ZipArchive $zip): ?string {
@@ -158,7 +160,7 @@ function detectZipSlip(ZipArchive $zip): ?string {
 }
 ```
 
-**Используется** **в** `unpackModule` **и** `handleRestoreBackup` **ДО** `extractTo`:
+**Используется** **в** `unpackModuleArchive()`/`validateModuleArchive()` (**установка** **модулей**) **и** при восстановлении из бэкапа (плагин `backups`) **ДО** `extractTo`:
 
 ```php
 $zipSlipEntry = detectZipSlip($zip);
@@ -179,54 +181,19 @@ $zip->extractTo($tempDir);
 
 **Если** `$path = "../../config/data/credentials.json"`, **можно** **прочитать** **чужой** **файл**.
 
-### Защита в filemanager
+### Защита в проводнике
 
-**Функции** **из** `filemanager_api.php`:
+Проводник вынесен в плагин `filemanager` (`config/plugins/filemanager/`).
+Внутри плагина путь проверяется по цепочке: `fmSafePath()` (**whitelist**
+символов, запрет `..` и `//`), `fmSafeAbsolute()` (`realpath` + проверка
+префикса `APP_ROOT`), `fmIsBlacklisted()` (**запрещённые** **пути**:
+`config/data`, `config/backups`, `config/core`, `config/logs`, `data/logs`
+и кастомный `storage_path` логов).
 
-**`fmSafePath(string $path): ?string`** — **whitelist** **символов**:
-
-```php
-function fmSafePath(string $path): ?string {
-    $path = str_replace('\\', '/', $path);
-    $path = trim($path, '/');
-    if ($path === '') return '';
-    if (!preg_match('~^[a-zA-Z0-9\-_./]+$~', $path)) return null;
-    if (strpos($path, '..') !== false || strpos($path, '//') !== false) return null;
-    return $path;
-}
-```
-
-**`fmSafeAbsolute(string $relativePath): ?string`** — `realpath` + **проверка** **префикса**:
-
-```php
-function fmSafeAbsolute(string $relativePath): ?string {
-    $realRoot = realpath(FM_SITE_ROOT);
-    if ($realRoot === false) return null;
-    
-    $full = FM_SITE_ROOT;
-    if ($relativePath !== '') {
-        $full .= DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
-    }
-    
-    $check = file_exists($full) ? realpath($full) : realpath(dirname($full));
-    if ($check === false) return null;
-    if (strpos($check, $realRoot) !== 0) return null;
-    
-    return $full;
-}
-```
-
-**`fmIsBlacklisted(string $relativePath): bool`** — **запрещённые** **пути**:
-
-```php
-$blacklist = ['config/data', 'config/backups', 'config/core', 'data/logs'];
-```
-
-**`fmIsSensitiveFile(string $fileName): bool`** — **чувствительные** **файлы**:
-
-```php
-$sensitive = ['.pepper', 'credentials.json', 'login_attempts.json', 'backup_config.json'];
-```
+**`sensitive_files`** — **фильтр** для **чувствительных** **файлов**.
+Плагины добавляют свои имена (например, `backups` → `backup_config.json`).
+Базовый список (`.pepper`, `credentials.json`, `login_attempts.json`)
+задаёт плагин `filemanager`.
 
 ### Защита в `loadPage`
 
@@ -280,10 +247,10 @@ include APP_ROOT . '/config/modules/' . $moduleType . '/module.php';
 
 ### Защита
 
-**Всегда** **валидировать** **ID** **модуля**:
+**Всегда** **валидировать** **ID** **модуля** **через** `isValidId()` (`config/core/security.php`):
 
 ```php
-if (!preg_match('~^[a-z0-9\-_]+$~i', $moduleType)) {
+if (!isValidId($moduleId)) {
     echo json_encode(['success' => false, 'error' => 'Невалидный ID модуля']);
     exit;
 }
@@ -292,7 +259,10 @@ if (!preg_match('~^[a-z0-9\-_]+$~i', $moduleType)) {
 **Применяется** **в**:
 - `handleGetModuleSettings()`.
 - `unpackModule()`.
-- `removeModuleFiles()`.
+- `unpackModuleArchive()`.
+- `removeModuleFiles()`, `purgeModule()`.
+- `validateModuleArchive()`, `installModuleFromZip()`.
+- `downloadModuleZip()`.
 - `handleModuleAction()`.
 - `check_module` (**в** `config/index.php`).
 
@@ -409,29 +379,48 @@ $_SESSION['last_activity'] = time();
 
 ### Idle timeout
 
-**`checkAdminSessionTimeout()`** — **если** **неактивность** > **timeout** — **уничтожение** **сессии**:
+**`checkAdminSessionTimeout()`** — если неактивность > `session_timeout` — уничтожение сессии и редирект на `index.php?msg=timeout`:
 
 ```php
-function checkAdminSessionTimeout(array $bfData): void {
-    if (!isset($_SESSION['last_activity'])) return;
-    
-    $timeoutMinutes = intval($bfData['settings']['session_timeout'] ?? 20);
-    $inactiveTime = time() - $_SESSION['last_activity'];
-    
-    if ($inactiveTime > ($timeoutMinutes * 60)) {
-        $_SESSION = [];
-        if (ini_get("session.use_cookies")) {
-            $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000, ...);
-        }
-        session_destroy();
-        header("Location: index.php?msg=timeout");
-        exit;
-    }
-    
-    $_SESSION['last_activity'] = time();
+$timeoutSeconds = getAdminSessionTimeoutSeconds($bfData);
+$inactiveTime   = time() - (int)$_SESSION['last_activity'];
+
+if ($inactiveTime > $timeoutSeconds) {
+    // ...
+    header('Location: index.php?msg=timeout');
+    exit;
 }
+
+$_SESSION['last_activity'] = time();
 ```
+
+**Клиентский таймер.** `renderSessionNotice()` выводит скрытую sticky-полосу
+(`data-lifetime`, `data-warn`), а `initSessionTimer()` в `config/js/main.js`:
+
+- показывает предупреждение за `min(120, max(10, lifetime / 2))` секунд
+  (для таймаута 1 минута — за 30 секунд);
+- на нуле делает `GET index.php?ajax=session_ping`: если сессия жива
+  (работала другая вкладка) — синхронизирует таймер, иначе уходит на
+  `index.php?msg=timeout`;
+- продлевает сессию от любой активности (`pointerdown`, `keydown`, `wheel`,
+  `touchstart`, `mousemove`, `scroll`) с троттлингом
+  `max(15, min(60, lifetime / 4))` секунд;
+- при возврате в вкладку (`visibilitychange`, `pageshow` из bfcache) делает
+  ping и берёт с сервера актуальные `lifetime`/`remaining` — таймаут мог
+  измениться в соседней вкладке;
+- после успешного AJAX к `index.php` сбрасывает локальный отсчёт.
+
+**Смена `session_timeout`.** Формы вкладки «Безопасность» (`save_security`,
+`action_unban`, `action_manual_ban`) работают по схеме Post/Redirect/Get:
+`handle_admin_post_actions()` ставит флеш и делает редирект на
+`index.php?tab=security`. Поэтому `$sessionLifetime` на перерисованной
+странице уже новый, а F5 не отправляет POST повторно — иначе флеш
+«Настройки сохранены» появлялся бы после каждого обновления.
+
+**`index.php?ajax=session_ping`** обрабатывается в `config/index.php` до
+загрузки плагинов и виртуальных кронов. Возвращает JSON
+`{ok, remaining, lifetime, warn}`; без авторизации — `401`. Запрос сам
+обновляет `last_activity`, поэтому служит и продлением, и проверкой.
 
 ---
 
@@ -460,7 +449,7 @@ if (!preg_match('~^[a-z0-9\-\.]+(:\d+)?$~i', $safeHost)) {
 **Применяется** **в**:
 - `config.php` — `OG_URL`.
 - `handleSaveSecurity` — `From:`.
-- `config/index.php` — `cron_backup.php`.
+- `config/index.php` — построение URL крон-задач.
 
 ---
 
@@ -563,7 +552,7 @@ if (!file_exists($htaccessFile) ||
 
 **`data/settings.json`** — поле **`cron_token`**.
 
-**Не в `config/data/backup_config.json`** (как было до v1.3.0). Причина: токен **общий** для бэкапов и публикации страниц, а `backup_config.json` — конфиг только бэкапов.
+**Не в конфиге конкретной задачи** (как было до v1.3.0). Причина: токен **общий** для всех крон-задач.
 
 ### Как генерируется
 
@@ -581,14 +570,13 @@ function getCronToken(): string {
 
 ### Где используется
 
-**Два эндпоинта:**
+**Эндпоинты:**
 
 | URL | Обработчик |
 |-----|-----------|
-| `/config/cron/backup.php?token=...` | `handleCronBackupAction()` |
-| `/config/cron/publish.php?token=...` | `handleCronPublishAction()` |
+| `/config/cron/run.php?task={id}&token=...` | проверка `enabled`, захват запуска (`claim_cron_task_run()`), затем `run_cron_task()` (задачи из реестра, включая `publish`) |
 
-**Оба сравнивают переданный токен с `getCronToken()`:**
+**Все проверяют переданный токен через `getCronToken()`:**
 
 ```php
 if ($clientToken === '' || $clientToken !== getCronToken()) {
@@ -599,10 +587,10 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 ### Зачем токен вообще
 
-**Защита от случайного/чужого вызова крона.** Эндпоинты `cron/*.php` доступны из браузера. Без токена любой мог бы дёргать бэкап или публикацию.
+**Защита от случайного/чужого вызова крона.** Эндпоинт `config/cron/run.php` доступен из браузера. Без токена любой мог бы дёргать любую зарегистрированную задачу или публикацию.
 
 **Что токен **не** защищает:**
-- Не защищает `backup_config.json` (если утёк — там нет токена).
+- Не защищает данные задач (в них нет токена).
 - Не защищает от DoS — злоумышленник может долбить endpoint, но получить 403.
 
 ### Перегенерация
@@ -613,15 +601,15 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 **UI:**
 1. Клик «Перегенерировать» → подтверждение с предупреждением.
-2. AJAX `generate_cron_token` возвращает новый токен (без сохранения).
-3. JS подставляет новый токен в поле и в URL кронов.
+2. JS генерирует 32 hex-символа в браузере (`crypto.getRandomValues`), без запроса к серверу.
+3. Новый токен подставляется в поле и в URL кронов.
 4. Токен **записывается в `settings.json`** только при сохранении формы.
 
 **Последствия:** все настроенные внешние крон-задачи сломаются — надо обновить URL в планировщике хостинга. Предупреждение в UI явно об этом говорит.
 
 ### Сохранение в handleSaveSettings
 
-**Важно:** `handleSaveSettings()` **полностью пересобирает** `$newSettings`. Без явного сохранения `cron_token` и `last_cron_publish` — они **теряются** при любом сохранении настроек сайта.
+**Важно:** при полном сохранении (скрытое поле `settings_full=1`, форма «Настроек сайта») `handleSaveSettings()` **полностью пересобирает** `$newSettings`. Без явного сохранения `cron_token` **теряется** при таком сохранении.
 
 **Решение** (в блоке «СОХРАНЯЕМ ПОЛЯ, КОТОРЫЕ НЕ В ФОРМЕ»):
 
@@ -633,7 +621,6 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
     }
     return getCronToken();  // текущий
 })(),
-'last_cron_publish' => getLastCronPublishTime(),
 ```
 
 **Валидация `preg_match`** — защита от записи произвольной строки в `cron_token` через POST.
@@ -642,20 +629,23 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 ## 👁 Preview-токены
 
+Реализация — плагин `preview`. Ядро только проверяет `isPreviewEnabled()` и читает данные. При выключенном плагине `?preview=` игнорируется, AJAX-эндпоинты не отвечают.
+
 ### Временные preview
 
-**Файлы:** `data/preview/{preview_id}.json` (32 hex).
+**Файлы:** `data/preview/{preview_id}.json` (32 hex). Рядом `.htaccess`.
 
 **Защита:**
 
 - **Папка** `.htaccess`: `Require all denied` — прямой доступ запрещён.
 - **Валидация `preview_id`:** regex `^[a-f0-9]{32}$`.
-- **Создание:** POST + CSRF + авторизация админа.
+- **Создание:** AJAX-запрос плагина — POST + CSRF + авторизация админа.
+- **Генерация токена:** GET, только случайное значение, состояние не меняет.
 - **Не индексируется:** `X-Robots-Tag: noindex, nofollow, noarchive`.
 - **Не кешируется:** отключено в `index.php`.
 
 **Очистка (3 триггера):**
-1. Логин → всё.
+1. Логин → всё (хук `admin_login_success`).
 2. Заход на `edit.php?id=X` → previews сессии для `X`.
 3. Сохранение `X` → previews сессии для `X` (+ `''` для create).
 
@@ -667,12 +657,14 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 **Особенности:**
 
-- **Создаются только по кнопке** — не при сохранении.
+- **Генерируются по кнопке** (AJAX), записываются в JSON **только при сохранении** страницы.
 - **Открывают страницу в любом статусе** — включая `draft` и `archived`.
-- **Удаляются** кнопкой «Удалить» — сразу теряют силу.
+- **Удаляются** кнопкой «Удалить» + сохранение страницы — сразу теряют силу.
+- **Клонирование** токен не копирует; при создании страницы токен не пишется.
+- **При выключенном плагине** токен при сохранении теряется (как `history_key` без `history`).
 
 **Риски:**
-- **Утечка ссылки** = доступ к неопубликованному контенту. Отзыв — кнопка «Удалить».
+- **Утечка ссылки** = доступ к неопубликованному контенту. Отзыв — кнопка «Удалить» + сохранение.
 - **Индексация:** защита через `X-Robots-Tag` и отсутствие ссылок в публичном HTML.
 
 **Рекомендации:**
@@ -687,7 +679,7 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 **Расположение:** корень сайта.
 
-**Создаются/удаляются:** по настройкам `seo_sitemap_enabled` / `seo_robots_enabled`.
+**Создаются/удаляются:** плагином **SEO-инструменты** (`seo-tools`) по его настройкам.
 
 **Не содержат секретов** — публичные файлы.
 
@@ -700,7 +692,7 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 - `Allow: /`.
 - `Sitemap: {base}/sitemap.xml`.
 
-**Крон-эндпоинт** `cron/seo.php` — защищён токеном (`getCronToken()`).
+**Крон-эндпоинт** `cron/run.php?task=seo` — защищён токеном (`getCronToken()`).
 
 ### 301-редиректы
 
@@ -720,6 +712,8 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 ## 🕘 История изменений
 
+Функциональность вынесена в плагин **История изменений** (`history`). Ниже — требования к данным и защите, которые плагин обязан соблюдать.
+
 ### Что хранится
 
 Снапшоты страниц — `data/history/{history_key}/{timestamp}.json`. Каждый файл содержит **полный JSON страницы** + служебный блок `_history`.
@@ -728,7 +722,7 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 ### Защита
 
-- **Папка** `data/history/` + вложенные — `.htaccess` `Require all denied` (автосоздание в `ensureHistoryDir`).
+- **Папка** `data/history/` + вложенные — `.htaccess` `Require all denied` (автосоздание при первом снапшоте).
 - **Валидация `history_key`** — regex `^[a-f0-9]{16}$`. Иначе — пустая строка / отказ.
 - **Валидация `timestamp`** — `(int)`, `> 0`.
 - **Валидация `page_id`** — regex `^[a-z0-9\-_]+$`.
@@ -740,7 +734,7 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 - **Ручное** — кнопки «Удалить» / «Очистить всю» в модалке (с CSRF).
 - **Автоматическое** — ротация по лимиту (`history_limit`).
-- **Каскадное** — при окончательном удалении страницы из корзины (`deleteFromTrash`, `clearTrash`).
+- **Каскадное** — при окончательном удалении страницы из корзины (хук `trash_item_purged`).
 
 ### Откат — что защищает
 
@@ -752,7 +746,7 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 ### Защита от race condition в кроне
 
-**`generateSeoFiles()`** вызывается из крона, при сохранении страницы, вручную.
+**Генерация SEO-файлов** (плагин `seo-tools`) вызывается из крона, при сохранении страницы, вручную.
 
 **Потенциальная проблема:** параллельный вызов из двух потоков → один файл перезаписывается другим.
 
@@ -764,19 +758,16 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 
 ## 🚧 Технические работы
 
-### Что защищает
-
-Режим техработ — заглушка 503 для посетителей. Не должен давать **обход** или **утечку**.
+Режим техработ — плагин `maintenance` (`config/plugins/maintenance/`).
+Ядро оставляет хук `index_start` и публичный шаблон `templates/maintenance.php`;
+проверка режима, bypass и ответ 503 — в плагине.
 
 ### Bypass-токен
 
 - **Отдельный** от `cron_token` — не пересекается с кронами.
-- **32 hex** (`bin2hex(random_bytes(16))`).
-- Хранится в `data/settings.json` → `maintenance_bypass_token`.
-- **Не генерируется** при первом сохранении настроек, если `maintenance_enabled = false` (пустая строка).
-- **Генерируется автоматически** при включении техработ (в `handleSaveSettings`).
+- **32 hex**, хранится в `data/settings.json` → `maintenance_bypass_token`.
 - **Сравнение** через `hash_equals` — защита от timing attack.
-- **Перегенерация** — только по кнопке. Старые ссылки **ломаются**.
+- **Генерируется автоматически** при включении режима; перегенерация — только по кнопке, старые ссылки **ломаются**.
 
 ### Bypass-cookie
 
@@ -787,40 +778,18 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 - **Устанавливается** только при валидном `?bypass={token}`.
 - **Не удаляется** при выключении техработ (клиентская cookie, сервер не управляет).
 
-### Сообщение
+### Сообщение и заголовки
 
-- **HTML разрешён**, но через `sanitizeHtml` при сохранении (`handleSaveSettings`).
-- **Whitelist:** `b, i, u, strong, em, span, ul, ol, li, p, br, a, h1-h4`.
-- **Вырезается:** `<script>`, `<iframe>`, `<form>`, `on*`, `javascript:`, `data:text/html`.
-- **Вывод** в шаблоне — **как есть** (уже санитизировано). **Повторный** `e()` **не** нужен.
-
-### Заголовки 503
-
-- `HTTP/1.1 503 Service Unavailable`
-- `Retry-After: 3600`
-- `X-Robots-Tag: noindex, nofollow, noarchive`
-- В шаблоне: `<meta name="robots" content="noindex, nofollow, noarchive">`
-
-### Автоснятие
-
-- **Без крона.** На фронте при `maintenance_until < now`:
-  - `maintenance_enabled = false`, `maintenance_until = null`.
-  - Запись через `safeFileWrite` (в `index.php` нет `saveData`).
-  - `clearDataCache('settings')`.
-- **Не** даёт обхода — наоборот, **снимает** ограничение.
+- HTML сообщения сохраняется через `sanitizeHtml()`; вывод в шаблоне — как есть.
+- 503 отдаётся с `Retry-After: 3600` и `X-Robots-Tag: noindex, nofollow, noarchive`.
+- Автоснятие по `maintenance_until` — при первом запросе, без крона.
 
 ### Что **не** защищено
 
-- **`templates/maintenance.php`** — **публичный** шаблон, редактируется через проводник. 
+- **`templates/maintenance.php`** — **публичный** шаблон, редактируется через проводник.
 - **Bypass-cookie** — **клиентская**. Если пользователь **очистил** cookie — bypass **слетает**.
 - **DoH / прокси** — bypass-токен в URL **может** попасть в **логи** прокси / браузера. **Рекомендация:** не публикуй ссылку в открытых каналах.
-
-### Рекомендации
-
-- **Bypass-токен** — как **пароль**. Не передавай в мессенджерах / публичных каналах.
-- **Перегенерация** — если ссылка «утекла». Старые **ломаются**.
-- **`DEBUG_SITE`** — **выключен** на проде (не должно быть `display_errors`).
-- **`maintenance_message`** — **не** содержит **секретов** (это публичная страница).
+- **`maintenance_message`** — **не** должен содержать **секретов** (это публичная страница).
 
 ---
 
@@ -830,12 +799,13 @@ if ($clientToken === '' || $clientToken !== getCronToken()) {
 - [ ] **GET-параметры** — валидация (`intval`, `preg_match`).
 - [ ] **Вывод** — через `e()` / `escapeJsString()`.
 - [ ] **HTML-поля** — `validateHtml` + `sanitizeHtml`.
+- [ ] **Загрузка SVG** — `validateSvgContent` перед сохранением.
 - [ ] **URL** — `safeUrl()`.
 - [ ] **Пути** — `fmSafePath` + `fmSafeAbsolute`.
 - [ ] **ID** — валидация **regex**.
 - [ ] **ZipArchive** — `detectZipSlip` **перед** `extractTo`.
 - [ ] **File write** — `safeFileWrite` (**flock**).
-- [ ] **Логирование** — `logAction`.
+- [ ] **Логирование** — `logAction` (пишет в `config/logs/`).
 - [ ] **Токен крона** — если добавляешь новый крон-эндпоинт, используй `getCronToken()` для проверки; храни только в `settings.json`, не в конфигах подсистем.
 - [ ] **Ошибки** — не **раскрывать** **пути**/**данные**.
 
