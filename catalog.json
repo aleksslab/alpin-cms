@@ -48,7 +48,7 @@
             "type": "module",
             "name": "Контакты",
             "description": "Контактная информация, форма обратной связи и карта",
-            "version": "1.0.1",
+            "version": "1.0.5",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_contacts.zip",
             "icon": "icon-phone"
         },
@@ -104,7 +104,7 @@
             "type": "module",
             "name": "Яндекс.Карты",
             "description": "Интерактивная карта с кастомными метками",
-            "version": "1.0.1",
+            "version": "1.0.5",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_map-advanced.zip",
             "icon": "icon-map-pin"
         },
@@ -168,7 +168,7 @@
             "type": "module",
             "name": "Отзывы клиентов",
             "description": "Отзывы клиентов с фото, видео и рейтингом",
-            "version": "1.0.0",
+            "version": "1.0.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_testimonials.zip",
             "icon": "icon-message-square"
         },
@@ -209,6 +209,13 @@
             "description": "Настраиваемое уведомление о cookies: текст, ссылки на политику и условия, срок согласия.",
             "version": "1.1.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-banner.zip"
+        },
+        "cookie-consent": {
+            "type": "plugin",
+            "name": "Cookie-согласие",
+            "description": "Категории cookie, баннер с выбором и активация скриптов только после явного согласия посетителя.",
+            "version": "1.0.5",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-consent.zip"
         },
         "dark-theme": {
             "type": "plugin",
