@@ -4,6 +4,8 @@ if (!defined('APP_ROOT') || empty($_SESSION['admin_auth'])) {
     die('Доступ запрещен');
 }
 
+require_once __DIR__ . '/../core/docs.php';
+
 // Получаем список доступных для установки плагинов из кеша
 $cacheFile = DATA_DIR . 'updates_cache.json';
 $newExtensions = [];
@@ -85,6 +87,13 @@ uasort($plugins, function($a, $b) {
                             </td>
                             <td class="py-3 text-right px-4">
                                 <div class="flex items-center justify-end gap-2">
+                                    <?php if (docs_plugin_readme_path($id) !== null): ?>
+                                        <a href="index.php?tab=docs&amp;doc=<?php echo urlencode('plugin:' . $id); ?>"
+                                           class="w-8 h-8 rounded-lg flex items-center justify-center border border-slate-200 text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 transition-all"
+                                           title="Справка">
+                                            <span class="icon-book-open text-sm"></span>
+                                        </a>
+                                    <?php endif; ?>
                                     <form method="POST" action="index.php?tab=plugins" class="inline-block">
                                         <input type="hidden" name="csrf_token" value="<?php echo e($token); ?>">
                                         <input type="hidden" name="plugin_action" value="toggle">
@@ -133,6 +142,13 @@ uasort($plugins, function($a, $b) {
             <p class="text-xs text-slate-500 mb-3"><?php echo e($plugin['description'] ?? ''); ?></p>
             
             <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                <?php if (docs_plugin_readme_path($id) !== null): ?>
+                    <a href="index.php?tab=docs&amp;doc=<?php echo urlencode('plugin:' . $id); ?>"
+                       class="w-10 h-10 bg-white border border-slate-200 text-slate-500 rounded-lg flex items-center justify-center transition-all hover:bg-slate-50"
+                       title="Справка">
+                        <span class="icon-book-open text-sm"></span>
+                    </a>
+                <?php endif; ?>
                 <form method="POST" action="index.php?tab=plugins" class="flex-1">
                     <input type="hidden" name="csrf_token" value="<?php echo e($token); ?>">
                     <input type="hidden" name="plugin_action" value="toggle">

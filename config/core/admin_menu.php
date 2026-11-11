@@ -29,6 +29,7 @@ function get_admin_tabs(): array {
     // Группа 2: Управление системой
     $systemTabs[] = ['id' => 'plugins', 'title' => 'Плагины', 'icon' => 'icon-puzzle'];
     $systemTabs[] = ['id' => 'security', 'title' => 'Безопасность', 'icon' => 'icon-shield'];
+    $systemTabs[] = ['id' => 'docs', 'title' => 'Документация', 'icon' => 'icon-book-open'];
 
     // Добавляем вкладки от плагинов
     if (!empty($GLOBALS['cms_admin_tabs'])) {

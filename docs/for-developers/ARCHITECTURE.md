@@ -95,6 +95,8 @@ config/
 │   ├── admin_menu.php     # Формирование вкладок сайдбара (включая плагины)
 │   ├── admin_auth.php     # Авторизация, brute-force
 │   ├── admin_controller.php  # ЗАПИСЬ + логика
+│   ├── markdown.php       # Markdown-рендерер для вкладки «Документация»
+│   ├── docs.php           # Поиск README плагинов и файлов из docs/
 │   ├── media_modal.php       # Медиа-модалка
 │   └── icon_modal.php        # Модалка иконок
 │
@@ -121,6 +123,7 @@ config/
 │   ├── plugins.php        # Управление плагинами
 │   ├── modules.php
 │   ├── security.php
+│   ├── docs.php           # Вкладка «Документация»
 │   └── module_upload.php
 │
 ├── css/config.css         # Стили админки
@@ -473,6 +476,19 @@ if (file_exists($adminModuleFile)) {
     include $adminModuleFile;
 }
 ```
+
+### 8. Вкладка «Документация»
+
+Ядровая вкладка `docs` (`config/modules/docs.php`) показывает README установленных плагинов (включая выключенные) и файлы из `docs/for-users` и `docs/for-developers`. Навигация — обычные ссылки `index.php?tab=docs&doc={источник}:{id}`, JavaScript не нужен; ссылку «Справка» на README плагина ставит таблица в «Плагинах».
+
+| Файл | Назначение |
+|------|-----------|
+| `core/docs.php` | `docs_catalog()`, `docs_resolve()`, `docs_plugin_readme_path()` — поиск и чтение документов |
+| `core/markdown.php` | `markdown_render()` — Markdown в HTML плюс оглавление |
+
+- Пути проверяются `realpath()` внутри `PLUGINS_DIR` и `docs/`, размер файла ограничен `DOCS_MAX_BYTES` (300 КБ).
+- Сначала экранирование, потом разметка: сырой HTML из файла не проходит, ссылки — только `http`, `https`, `mailto` и относительные.
+- Плагин без `README.md` виден в списке, но без ссылки; картинки не поддерживаются, так как файлы плагина закрыты `.htaccess`.
 
 ---
 
