@@ -178,6 +178,7 @@ if ($isAuth) {
     <?php else: ?>
         <?php 
             // --- ФОРМИРОВАНИЕ ВКЛАДОК ---
+            require_once __DIR__ . '/core/docs.php';
             require_once __DIR__ . '/core/admin_menu.php';
             $tabsData = get_admin_tabs();
             
@@ -245,17 +246,26 @@ if ($isAuth) {
                             <?php 
                             $isActive = ($currentTab === $tabItem['id']);
                             $activeClass = $isActive ? 'active' : ''; 
+                            $tabHasDocs = docs_plugin_readme_path($tabItem['id']) !== null;
                             ?>
-                            <a href="index.php?tab=<?php echo urlencode($tabItem['id']); ?>" class="sidebar-menu-link <?php echo $activeClass; ?> flex items-center justify-between w-full">
-                                <div class="flex items-center gap-3">
-                                    <span class="<?php echo $tabItem['icon']; ?> text-base"></span>
-                                    <span><?php echo e($tabItem['title']); ?></span>
-                                </div>
-                                <!-- Если модуль отключен, выводим иконку скрытия справа -->
-                                <?php if (!$tabItem['visible']): ?>
-                                    <span class="icon-eye-off text-xs text-slate-400/80 ml-auto" title="Модуль скрыт на сайте"></span>
+                            <div class="sidebar-tab-row">
+                                <a href="index.php?tab=<?php echo urlencode($tabItem['id']); ?>" class="sidebar-menu-link <?php echo $activeClass; ?> flex items-center justify-between w-full">
+                                    <div class="flex items-center gap-3">
+                                        <span class="<?php echo $tabItem['icon']; ?> text-base"></span>
+                                        <span><?php echo e($tabItem['title']); ?></span>
+                                    </div>
+                                    <!-- Если модуль отключен, выводим иконку скрытия справа -->
+                                    <?php if (!$tabItem['visible']): ?>
+                                        <span class="icon-eye-off text-xs text-slate-400/80 ml-auto" title="Модуль скрыт на сайте"></span>
+                                    <?php endif; ?>
+                                </a>
+                                <?php if ($tabHasDocs): ?>
+                                    <a href="index.php?tab=docs&amp;doc=<?php echo urlencode('plugin:' . $tabItem['id']); ?>"
+                                       class="sidebar-tab-help" title="Справка по плагину" aria-label="Справка по плагину">
+                                        <span class="icon-book-open text-xs"></span>
+                                    </a>
                                 <?php endif; ?>
-                            </a>
+                            </div>
                         <?php endforeach; ?>
                     </div>
                 </div>
@@ -278,12 +288,21 @@ if ($isAuth) {
                         <?php foreach ($systemTabs as $tabItem): ?>
                             <?php 
                             $isActive = ($currentTab === $tabItem['id']);
-                            $activeClass = $isActive ? 'active' : ''; 
+                            $activeClass = $isActive ? 'active' : '';
+                            $tabHasDocs = docs_plugin_readme_path($tabItem['id']) !== null;
                             ?>
-                            <a href="index.php?tab=<?php echo urlencode($tabItem['id']); ?>" class="sidebar-menu-link <?php echo $activeClass; ?>">
-                                <span class="<?php echo $tabItem['icon']; ?> text-base"></span>
-                                <span><?php echo e($tabItem['title']); ?></span>
-                            </a>
+                            <div class="sidebar-tab-row">
+                                <a href="index.php?tab=<?php echo urlencode($tabItem['id']); ?>" class="sidebar-menu-link <?php echo $activeClass; ?>">
+                                    <span class="<?php echo $tabItem['icon']; ?> text-base"></span>
+                                    <span><?php echo e($tabItem['title']); ?></span>
+                                </a>
+                                <?php if ($tabHasDocs): ?>
+                                    <a href="index.php?tab=docs&amp;doc=<?php echo urlencode('plugin:' . $tabItem['id']); ?>"
+                                       class="sidebar-tab-help" title="Справка по плагину" aria-label="Справка по плагину">
+                                        <span class="icon-book-open text-xs"></span>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
                         <?php endforeach; ?>
                     </div>
                 </div>

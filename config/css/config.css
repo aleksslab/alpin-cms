@@ -171,6 +171,13 @@ input[type="checkbox"]:disabled {
     color: #34D399 !important;
     border-color: #065F46 !important;
 }
+[data-theme="dark"] .sidebar-tab-help {
+    color: var(--text-muted) !important;
+}
+[data-theme="dark"] .sidebar-tab-help:hover {
+    background-color: var(--bg-hover) !important;
+    color: var(--text-main) !important;
+}
 
 [data-theme="dark"] .sidebar-group-title {
     color: var(--text-muted) !important;
@@ -997,6 +1004,32 @@ input[type="checkbox"]:disabled {
     background-color: #ecfdf5 !important;
     color: var(--primary-dark) !important;
     border: 1px solid #d1fae5 !important;
+}
+
+/* Вкладка плагина с README: ссылка и кнопка «Справка» рядом */
+.sidebar-tab-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+}
+.sidebar-tab-row .sidebar-menu-link {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+}
+.sidebar-tab-help {
+    flex: 0 0 auto !important;
+    width: 26px !important;
+    height: 26px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+    color: #94a3b8 !important;
+    transition: all 0.15s ease-in-out !important;
+}
+.sidebar-tab-help:hover {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
 }
 
 /* Затемняющий бэкдроп для мобилок */
