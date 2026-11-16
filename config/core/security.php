@@ -26,7 +26,10 @@ function e(?string $str): string {
 }
 
 /**
- * Атомарная запись файла с блокировкой (flock).
+ * Атомарная запись файла.
+ *
+ * Перезапись идёт через временный файл и rename(), дописывание — с flock:
+ * читатель не увидит пустой или недописанный файл.
  *
  * @param string $path Путь к файлу
  * @param string $content Содержимое
@@ -34,8 +37,70 @@ function e(?string $str): string {
  * @return bool
  */
 function safeFileWrite(string $path, string $content, bool $append = false): bool {
-    $flags = $append ? (FILE_APPEND | LOCK_EX) : LOCK_EX;
-    return @file_put_contents($path, $content, $flags) !== false;
+    // Дописывание оставляем как есть: атомарная подмена для него неприменима.
+    if ($append) {
+        return @file_put_contents($path, $content, FILE_APPEND | LOCK_EX) !== false;
+    }
+
+    // Пишем во временный файл рядом с целевым, а затем переименовываем.
+    // rename() в пределах одного каталога атомарен: читатель всегда видит
+    // либо старую, либо новую версию целиком, а обрыв процесса не оставляет
+    // усечённый файл (file_put_contents сначала обнуляет цель).
+    try {
+        $suffix = bin2hex(random_bytes(8));
+    } catch (Exception $e) {
+        $suffix = uniqid('', true);
+    }
+
+    $tmpPath = $path . '.' . $suffix . '.tmp';
+    $handle = @fopen($tmpPath, 'wb');
+
+    if ($handle === false) {
+        return false;
+    }
+
+    $length = strlen($content);
+    $offset = 0;
+    $writeOk = true;
+
+    while ($offset < $length) {
+        $chunk = @fwrite($handle, substr($content, $offset));
+
+        if ($chunk === false || $chunk === 0) {
+            $writeOk = false;
+            break;
+        }
+
+        $offset += $chunk;
+    }
+
+    $flushOk = @fflush($handle);
+    @fclose($handle);
+
+    if (!$writeOk || !$flushOk) {
+        @unlink($tmpPath);
+        return false;
+    }
+
+    // Сохраняем права исходного файла: после rename() их задаёт umask.
+    if (file_exists($path)) {
+        $perms = @fileperms($path);
+        if ($perms !== false) {
+            @chmod($tmpPath, $perms & 0777);
+        }
+    }
+
+    if (!@rename($tmpPath, $path)) {
+        // Windows: rename() не проходит, если файл в этот момент открыт
+        // читателем (PHP открывает без FILE_SHARE_DELETE). Откатываемся
+        // на прямую запись с блокировкой: она переживает конкурентное чтение,
+        // хотя и теряет атомарность — только в этом аварийном пути.
+        $fallback = @file_put_contents($path, $content, LOCK_EX);
+        @unlink($tmpPath);
+        return $fallback !== false;
+    }
+
+    return true;
 }
 
 /**

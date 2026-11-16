@@ -5,9 +5,11 @@ if (!defined('APP_ROOT') || empty($_SESSION['admin_auth'])) {
 
 $settingsData = getSettingsData();
 
-// Бургер
-$burgerEnabled = $settingsData['burger_enabled'] ?? false;
-$burgerBreakpoint = $settingsData['burger_breakpoint'] ?? 'md';
+// Бургер (по умолчанию включён — как в isBurgerEnabled())
+$burgerEnabled = $settingsData['burger_enabled'] ?? true;
+// Валидированное значение: иначе в форме ни один вариант не выбран,
+// а фронт молча работает на 'md'.
+$burgerBreakpoint = getBurgerBreakpoint();
 
 // Визуальные элементы
 $logo = $settingsData['logo'] ?? '';
@@ -205,59 +207,6 @@ foreach ($minifyExceptions as $id => $data) {
     
     const hiddenSections = <?php echo json_encode($hiddenSections ?? [], JSON_UNESCAPED_UNICODE); ?>;
 
-    window.openSectionsModal = function() {
-        const modal = document.getElementById('sections-settings-modal');
-        const container = document.getElementById('sections-list-container');
-        if (!modal || !container) return;
-
-        // Сортируем: сначала те, что в savedOrder, потом остальные
-        const savedOrder = JSON.parse(document.getElementById('config_sections_order_json').value || '[]');
-        let sortedSections = [];
-        
-        // Добавляем из savedOrder
-        savedOrder.forEach(id => {
-            const found = allSections.find(s => s.id === id);
-            if (found) sortedSections.push(found);
-        });
-        
-        // Добавляем остальные
-        allSections.forEach(s => {
-            if (!sortedSections.find(item => item.id === s.id)) {
-                sortedSections.push(s);
-            }
-        });
-
-        // Рендерим список
-        container.innerHTML = sortedSections.map((section, index) => {
-            const isHidden = hiddenSections.includes(section.id);
-            return `
-                <div class="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl mb-2" data-id="${section.id}">
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm font-medium text-slate-700">${section.title}</span>
-                    </div>
-                    <div class="flex items-center gap-1">
-                        <button type="button" onclick="moveSection(this, -1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 ${index === 0 ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}" ${index === 0 ? 'disabled' : ''}>
-                            <span class="icon-chevron-up text-sm"></span>
-                        </button>
-                        <button type="button" onclick="moveSection(this, 1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 ${index === sortedSections.length - 1 ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}" ${index === sortedSections.length - 1 ? 'disabled' : ''}>
-                            <span class="icon-chevron-down text-sm"></span>
-                        </button>
-                        <label class="flex items-center gap-2 cursor-pointer ml-2 pl-2 border-l border-slate-200">
-                            <input type="checkbox" class="section-visibility-toggle w-4 h-4 text-[var(--primary-color)] rounded border-slate-300 focus:ring-[var(--primary-color)]" ${isHidden ? '' : 'checked'} data-id="${section.id}">
-                            <span class="text-xs text-slate-500">Показывать</span>
-                        </label>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        modal.classList.add('active');
-    };
-
-    window.closeSectionsModal = function() {
-        document.getElementById('sections-settings-modal').classList.remove('active');
-    };
-
     // Глобальный массив с текущим порядком
     let currentSections = [];
 
@@ -335,23 +284,6 @@ foreach ($minifyExceptions as $id => $data) {
 
     window.closeSectionsModal = function() {
         document.getElementById('sections-settings-modal').classList.remove('active');
-    };
-
-    window.saveSectionsSettings = function() {
-        const order = currentSections.map(s => s.id);
-        const hidden = [];
-        
-        // Собираем скрытые (по чекбоксам)
-        document.querySelectorAll('.section-visibility-toggle').forEach(cb => {
-            if (!cb.checked) {
-                hidden.push(cb.getAttribute('data-id'));
-            }
-        });
-        
-        document.getElementById('config_sections_order_json').value = JSON.stringify(order);
-        document.getElementById('config_sections_hidden_json').value = JSON.stringify(hidden);
-        
-        closeSectionsModal();
     };
 
     window.saveSectionsSettings = function() {

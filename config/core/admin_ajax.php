@@ -32,7 +32,8 @@ function handle_admin_ajax_actions(): void {
         $pageId = $_GET['id'] ?? '';
         $action = empty($pageId) ? 'create' : ($_GET['action'] ?? 'edit');
         $templateId = $_GET['template'] ?? 'full-width';
-        require_once __DIR__ . '/modules/pages/constructor.php';
+        // dirname(__DIR__) — это config/: путь не зависит от DOCUMENT_ROOT.
+        require_once dirname(__DIR__) . '/modules/pages/constructor.php';
         exit;
     }
     
@@ -196,20 +197,43 @@ function handle_admin_ajax_actions(): void {
         exit;
     }
 
-    // --- ОБНОВЛЕНИЕ КАТАЛОГА (AJAX) ---
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'refresh_catalog' && isset($_GET['tab']) && in_array($_GET['tab'], ['plugins', 'modules'], true)) {
+    // --- ОБНОВЛЕНИЕ КАТАЛОГА (AJAX, только POST + CSRF) ---
+    if (isset($_GET['ajax']) && $_GET['ajax'] === 'refresh_catalog') {
         header('Content-Type: application/json; charset=utf-8');
+
+        // Действие ходит в сеть и пишет updates_cache.json — GET не принимаем.
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            echo json_encode(['success' => false, 'error' => 'Требуется POST-запрос.']);
+            exit;
+        }
+
+        $csrfToken = $_POST['csrf_token'] ?? '';
+        if (!is_string($csrfToken)) {
+            $csrfToken = '';
+        }
+
+        if (!isset($_GET['tab']) || !in_array($_GET['tab'], ['plugins', 'modules'], true)
+            || !verifyCsrfToken($csrfToken)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: CSRF-токен невалиден.']);
+            exit;
+        }
         
         $settings = getSettingsData();
         $catalogUrl = !empty($settings['updates_catalog_url']) ? $settings['updates_catalog_url'] : UPDATES_DEFAULT_CATALOG_URL;
         
         require_once __DIR__ . '/plugins.php';
-        $result = refresh_updates_cache($catalogUrl);
+        $error = null;
+        $result = refresh_updates_cache($catalogUrl, $error);
         
         if ($result !== false) {
             echo json_encode(['success' => true]);
         } else {
-            echo json_encode(['success' => false, 'error' => 'Не удалось скачать каталог.']);
+            $message = 'Не удалось скачать каталог';
+            $message .= ($error !== null && $error !== '') ? ': ' . $error : '.';
+            echo json_encode(['success' => false, 'error' => $message]);
         }
         exit;
     }

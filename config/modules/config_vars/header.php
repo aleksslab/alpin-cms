@@ -81,7 +81,7 @@
                                    class="w-4 h-4 text-[var(--primary-color)] rounded border-slate-300 focus:ring-[var(--primary-color)]">
                             <span class="text-sm font-medium text-slate-700">Включить бургер-меню</span>
                         </label>
-                        <p class="text-[10px] text-slate-400 mt-1">На мобильных устройствах меню сворачивается в бургер</p>
+                        <p class="text-[10px] text-slate-400 mt-1">Ниже брейкпоинта меню сворачивается в бургер. Если выключить, меню остаётся видимым и переносится на новую строку.</p>
                     </div>
                     <div class="editor-field">
                         <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Брекпоинт</label>
@@ -91,7 +91,7 @@
                             <option value="lg" <?php echo $burgerBreakpoint === 'lg' ? 'selected' : ''; ?>>lg (1024px)</option>
                             <option value="xl" <?php echo $burgerBreakpoint === 'xl' ? 'selected' : ''; ?>>xl (1280px)</option>
                         </select>
-                        <p class="text-[10px] text-slate-400 mt-1">На этом брекпоинте и меньше меню сворачивается в бургер</p>
+                        <p class="text-[10px] text-slate-400 mt-1">Ниже этого брейкпоинта меню сворачивается в бургер, на нём и выше — показывается строкой</p>
                     </div>
                 </div>
             </div>

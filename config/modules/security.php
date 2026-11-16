@@ -30,26 +30,38 @@ if (file_exists(CMS_ATTEMPTS_FILE)) {
 <p class="text-slate-500 text-sm mb-8">Управление учетными данными администратора и параметрами защиты от перебора паролей (Anti-Brute Force).</p>
 
 <?php // ГЛАВНАЯ ФОРМА: УЧЕТНЫЕ ДАННЫЕ И НАСТРОЙКИ ЛИМИТОВ ; ?>
-<form id="security-edit-form" method="POST" action="index.php?tab=security" class="space-y-6 mb-6">
+<form id="security-edit-form" method="POST" action="index.php?tab=security" data-sec-confirm="save" class="space-y-6 mb-6">
     <input type="hidden" name="csrf_token" value="<?php echo $token; ?>">
     <?php // БЛОК 1: АДМИН ПАНЕЛЬ (трехколоночный ряд на обновленных флекс-классах) ?>
     <div class="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
         <h3 class="text-lg font-bold text-slate-800 border-b border-slate-200/60 pb-3">Учетная запись администратора</h3>
 
-        <div class="editor-row">
+        <div class="editor-row editor-row--top">
             <div class="editor-field space-y-2">
                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Имя пользователя (Логин)</label>
                 <input type="text" name="sec_login" value="<?php echo e($creds['login'] ?? 'admin'); ?>" required autocomplete="off" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl text-base text-slate-800 focus:outline-none focus:border-[var(--primary-color)]" />
+                <p class="text-[11px] text-slate-400">Используется для входа в панель управления. При смене логина нужно задать новый пароль.</p>
             </div>
             
             <div class="editor-field space-y-2">
-                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Новый пароль (оставьте пустым, если не меняете)</label>
+                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Новый пароль</label>
                 <input type="password" id="sec-password" name="sec_password" autocomplete="new-password" placeholder="••••••••" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl text-base text-slate-800 focus:outline-none focus:border-[var(--primary-color)]" />
+                <p class="text-[11px] text-slate-400">Оставьте пустым, если не меняете. При смене логина обязателен.</p>
+            </div>
+        </div>
+
+        <div class="editor-row editor-row--top">
+            <?php // Аварийное поле для работы без JavaScript: main.js его скрывает. ?>
+            <div class="editor-field space-y-2" data-sec-password-fallback>
+                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Текущий пароль</label>
+                <input type="password" name="sec_current_password" autocomplete="current-password" placeholder="••••••••" class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl text-base text-slate-800 focus:outline-none focus:border-[var(--primary-color)]" />
+                <p class="text-[11px] text-slate-400">Поле для работы без JavaScript. Обычно пароль спрашивается в отдельном окне при сохранении.</p>
             </div>
             
             <div class="editor-field space-y-2">
                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Таймаут сессии (в минутах)</label>
                 <input type="number" name="bf_session_timeout" value="<?php echo intval($bfSettings['session_timeout'] ?? 20); ?>" min="1" max="1440" required class="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl text-base text-slate-800 focus:outline-none focus:border-[var(--primary-color)]" />
+                <p class="text-[11px] text-slate-400">От 1 до 1440 минут. По истечении потребуется повторный вход.</p>
             </div>
         </div>
     </div>
@@ -133,7 +145,7 @@ if (file_exists(CMS_ATTEMPTS_FILE)) {
         </div>
         
         <?php // Ряд 2: Изолированная форма ручного бана ; ?>
-        <form method="POST" action="index.php?tab=security" style="display: flex !important; flex-direction: row !important; align-items: center !important; gap: 16px !important; width: 100% !important; max-width: 576px !important; margin-top: 16px !important; border-bottom: none;">
+        <form method="POST" action="index.php?tab=security" data-sec-confirm="ban" style="display: flex !important; flex-direction: row !important; align-items: center !important; gap: 16px !important; width: 100% !important; max-width: 576px !important; margin-top: 16px !important; border-bottom: none;">
             <input type="hidden" name="csrf_token" value="<?php echo $token; ?>">
             <div style="flex: 1 1 0% !important;">
                 <input type="text" name="manual_ban_ip" placeholder="Например, 95.21.34.12" required pattern="^((25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)$" class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-base focus:outline-none focus:border-rose-500 transition-colors" style="height: 32px;" />
@@ -197,7 +209,7 @@ if (file_exists(CMS_ATTEMPTS_FILE)) {
                                 ?>
                             </td>
                             <td class="py-3.5 text-right pr-2">
-                                <form method="POST" action="index.php?tab=security" onsubmit="return confirm('Вы уверены, что хотите разблокировать этот IP-адрес?');">
+                                <form method="POST" action="index.php?tab=security" data-sec-confirm="unban">
                                     <input type="hidden" name="csrf_token" value="<?php echo $token; ?>">
                                     <input type="hidden" name="unban_ip" value="<?php echo e($ip); ?>">
                                     <button type="submit" name="action_unban" class="btn-unban text-xs transition-colors">
@@ -248,7 +260,7 @@ if (file_exists(CMS_ATTEMPTS_FILE)) {
                         </div>
 
                         <div class="pt-2 border-t border-slate-200/40 flex justify-end">
-                            <form method="POST" action="index.php?tab=security" onsubmit="return confirm('Вы уверены, что хотите разблокировать этот IP-адрес?');" class="w-full">
+                            <form method="POST" action="index.php?tab=security" data-sec-confirm="unban" class="w-full">
                                 <input type="hidden" name="csrf_token" value="<?php echo $token; ?>">
                                 <input type="hidden" name="unban_ip" value="<?php echo e($ip); ?>">
                                 <button type="submit" name="action_unban" class="btn-unban-mobile transition-all">
@@ -261,5 +273,29 @@ if (file_exists(CMS_ATTEMPTS_FILE)) {
             <?php endif; ?>
         </div>
 
+    </div>
+</div>
+
+<?php // МОДАЛКА ПОДТВЕРЖДЕНИЯ ТЕКУЩИМ ПАРОЛЕМ ; ?>
+<div class="js-security-confirm fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 px-4" role="dialog" aria-modal="true" aria-labelledby="js-security-confirm-title">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
+        <div class="space-y-1">
+            <h3 id="js-security-confirm-title" class="text-lg font-bold text-slate-800">Подтверждение действия</h3>
+            <p class="text-sm text-slate-500 js-security-confirm-text">Введите текущий пароль администратора.</p>
+        </div>
+        <form class="js-security-confirm-form" novalidate>
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Текущий пароль</label>
+            <input type="password" name="sec_current_password" autocomplete="current-password" placeholder="••••••••" class="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-800 focus:outline-none focus:border-[var(--primary-color)]" />
+            <p class="hidden mt-2 text-sm text-rose-500 js-security-confirm-error"></p>
+            <p class="mt-2 text-[11px] text-slate-400">Пароль проверяется один раз. После третьей ошибки сессия завершается.</p>
+            <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
+                <button type="button" class="js-security-confirm-cancel px-6 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors cursor-pointer">
+                    Отмена
+                </button>
+                <button type="submit" class="js-security-confirm-submit px-6 py-3 rounded-xl bg-[var(--primary-color)] text-white font-bold text-sm hover:bg-[var(--primary-dark)] transition-colors cursor-pointer shadow-md shadow-[var(--primary-color)]/20">
+                    Подтвердить
+                </button>
+            </div>
+        </form>
     </div>
 </div>

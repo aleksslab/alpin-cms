@@ -18,6 +18,7 @@ $isPreview   = $routeData['isPreview'];
 $isNewPage   = $routeData['isNewPage'];
 $slug        = $routeData['slug'];
 $usedModules = $routeData['usedModules'];
+$cacheAllowed = $routeData['cacheAllowed'] ?? false;
 
 // --- Получаем настройки для хедера и футера ---
 $settings = function_exists('getSettingsData') ? getSettingsData() : [];
@@ -39,15 +40,25 @@ $cacheTTL = $settings['cache_ttl'] ?? 86400;
 $cacheDir = APP_ROOT . '/cache/pages/';
 $cacheFile = $cacheDir . ($slug ?: 'home') . '.html';
 
-// Проверяем кеш. В preview-режиме кеш ОТКЛЮЧАЕМ полностью
-if ($cacheEnabled && !$isPreview && file_exists($cacheFile)) {
+// CSRF-токен у каждого посетителя свой. В кеше он хранится заглушкой,
+// а при выдаче подменяется на токен текущей сессии — иначе форма с
+// закешированной страницы не проходит проверку.
+$csrfPlaceholder = '__ALPIN_CSRF_TOKEN__';
+
+// Проверяем кеш. В preview-режиме кеш ОТКЛЮЧАЕМ полностью.
+// cacheAllowed = false — страница не опубликована (или это заглушка главной):
+// старый кеш отдавать нельзя, иначе снятая с публикации страница продолжит жить.
+if ($cacheEnabled && !$isPreview && $cacheAllowed && file_exists($cacheFile)) {
     $cacheAge = time() - filemtime($cacheFile);
     if ($cacheTTL === 0 || $cacheAge < $cacheTTL) {
-        if (defined('DEBUG_SITE') && DEBUG_SITE) {
-            header('X-Cache: HIT');
+        $cachedHtml = @file_get_contents($cacheFile);
+        if ($cachedHtml !== false) {
+            if (defined('DEBUG_SITE') && DEBUG_SITE) {
+                header('X-Cache: HIT');
+            }
+            echo str_replace($csrfPlaceholder, $token, $cachedHtml);
+            exit;
         }
-        readfile($cacheFile);
-        exit;
     }
 }
 
@@ -210,21 +221,27 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
 // ===== СОХРАНЯЕМ КЕШ =====
 $html = ob_get_clean();
 
-// В preview-режиме НЕ сохраняем в кеш
-if ($cacheEnabled && !$isPreview) {
+// В кеш пишем заглушку вместо CSRF-токена (подмена — при выдаче выше).
+// В preview-режиме НЕ сохраняем в кеш.
+if ($cacheEnabled && !$isPreview && $cacheAllowed) {
     if (!is_dir($cacheDir)) {
         mkdir($cacheDir, 0755, true);
     }
 
+    $cacheHtml = str_replace($token, $csrfPlaceholder, $html);
+
     // Пишем во временный файл и подменяем атомарно: читатель не увидит
     // недописанный HTML, а два параллельных запроса не переплетут вывод.
     $tmpCache = $cacheFile . '.' . bin2hex(random_bytes(4)) . '.tmp';
-    if (@file_put_contents($tmpCache, $html, LOCK_EX) !== false) {
+    if (@file_put_contents($tmpCache, $cacheHtml, LOCK_EX) !== false) {
         if (!@rename($tmpCache, $cacheFile)) {
             @copy($tmpCache, $cacheFile);
             @unlink($tmpCache);
         }
     }
+} elseif ($cacheEnabled && !$isPreview && file_exists($cacheFile)) {
+    // Страница снята с публикации или удалена — старый кеш больше не нужен.
+    @unlink($cacheFile);
 }
 
 echo $html;

@@ -41,7 +41,12 @@ $hasMain = isset($zonesWithContent['main']) && !empty($zonesWithContent['main'])
 $hasSidebar = $hasSidebarLeft || $hasSidebarRight;
 
 if ($showHeader) {
-    $headerVariant = $settings['header_variant'] ?? 'default';    
+    $headerVariant = $settings['header_variant'] ?? 'default';
+    // Вариант подставляется в путь include — только валидный ID существующего каталога.
+    if (!is_string($headerVariant) || !isValidId($headerVariant)
+        || !is_dir(APP_ROOT . '/templates/headers/' . $headerVariant)) {
+        $headerVariant = 'default';
+    }
     $headerFixed = $settings['header_fixed'] ?? true;
     $headerFile = APP_ROOT . '/templates/headers/' . $headerVariant . '/header.php';
     if (file_exists($headerFile)) {
@@ -120,13 +125,16 @@ if (!empty($pageRows)) {
                     $data = $module['data'] ?? [];
                     $moduleData = $data;
                     $moduleClass = $module['settings']['class'] ?? '';
-                    $moduleFile = APP_ROOT . '/modules/' . $module['type'] . '.php';
+                    // Тип приходит из rows_json: в путь include пускаем только валидный ID.
+                    $moduleType = $module['type'] ?? '';
+                    $moduleType = is_string($moduleType) && isValidId($moduleType) ? $moduleType : '';
+                    $moduleFile = APP_ROOT . '/modules/' . $moduleType . '.php';
                     
                     echo '<div' . (!empty($moduleClass) ? ' class="' . e($moduleClass) . '"' : '') . (!empty($modId) ? ' id="' . e($modId) . '"' : '') . '>';
-                    if (file_exists($moduleFile)) {
+                    if ($moduleType !== '' && file_exists($moduleFile)) {
                         include $moduleFile;
                     } else {
-                        echo '<!-- Модуль ' . $module['type'] . ' не найден -->';
+                        echo '<!-- Модуль ' . e($moduleType) . ' не найден -->';
                     }
                     echo '</div>';
                 }
@@ -147,13 +155,16 @@ if (!empty($pageRows)) {
                         $data = $module['data'] ?? [];
                         $moduleData = $data;
                         $moduleClass = $module['settings']['class'] ?? '';
-                        $moduleFile = APP_ROOT . '/modules/' . $module['type'] . '.php';
+                        // Тип приходит из rows_json: в путь include пускаем только валидный ID.
+                        $moduleType = $module['type'] ?? '';
+                        $moduleType = is_string($moduleType) && isValidId($moduleType) ? $moduleType : '';
+                        $moduleFile = APP_ROOT . '/modules/' . $moduleType . '.php';
                         
                         echo '<div' . (!empty($moduleClass) ? ' class="' . e($moduleClass) . '"' : '') . (!empty($modId) ? ' id="' . e($modId) . '"' : '') . '>';
-                        if (file_exists($moduleFile)) {
+                        if ($moduleType !== '' && file_exists($moduleFile)) {
                             include $moduleFile;
                         } else {
-                            echo '<!-- Модуль ' . $module['type'] . ' не найден -->';
+                            echo '<!-- Модуль ' . e($moduleType) . ' не найден -->';
                         }
                         echo '</div>';
                     }
@@ -195,6 +206,11 @@ if (!empty($pageRows)) {
 
 if ($showFooter) {
     $footerVariant = $settings['footer_variant'] ?? 'default';
+    // Вариант подставляется в путь include — только валидный ID существующего каталога.
+    if (!is_string($footerVariant) || !isValidId($footerVariant)
+        || !is_dir(APP_ROOT . '/templates/footers/' . $footerVariant)) {
+        $footerVariant = 'default';
+    }
     $footerFile = APP_ROOT . '/templates/footers/' . $footerVariant . '/footer.php';
     if (file_exists($footerFile)) {
         include $footerFile;

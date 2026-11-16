@@ -394,12 +394,16 @@ function installPluginFromZip(string $zipPath, string $id): array {
 /**
  * Скачивает каталог расширений с GitHub.
  *
- * @param string $url
+ * @param string      $url   Адрес JSON-каталога
+ * @param string|null $error Причина ошибки (заполняется при неудаче)
  * @return array|null
  */
-function fetch_catalog(string $url): ?array {
+function fetch_catalog(string $url, ?string &$error = null): ?array {
+    $error = null;
+
     // Каталог может быть задан в настройках: разрешаем только http(s)
     if (!in_array(strtolower((string)parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+        $error = 'URL каталога должен начинаться с http:// или https://';
         return null;
     }
 
@@ -407,9 +411,12 @@ function fetch_catalog(string $url): ?array {
         'curl' => function_exists('curl_init'),
         'fopen' => ini_get('allow_url_fopen') == '1'
     ];
-    
-    if (!$env['curl'] && !$env['fopen']) return null;
-    
+
+    if (!$env['curl'] && !$env['fopen']) {
+        $error = 'На сервере недоступны cURL и allow_url_fopen';
+        return null;
+    }
+
     $json = false;
     if ($env['curl']) {
         $ch = curl_init($url);
@@ -418,29 +425,69 @@ function fetch_catalog(string $url): ?array {
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         curl_setopt($ch, CURLOPT_USERAGENT, 'AlPin-CMS-Core/1.0');
         $json = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
-        if ($httpCode !== 200) $json = false;
+
+        if ($json === false || $httpCode !== 200) {
+            if ($curlError !== '') {
+                $error = 'cURL: ' . $curlError;
+            } elseif ($httpCode === 404) {
+                $error = 'HTTP 404 — каталог не найден по указанному URL';
+            } else {
+                $error = 'HTTP ' . $httpCode;
+            }
+            return null;
+        }
     } elseif ($env['fopen']) {
         $context = stream_context_create([
             'http' => ['timeout' => 10, 'user_agent' => 'AlPin-CMS-Core/1.0']
         ]);
         $json = @file_get_contents($url, false, $context);
+
+        if ($json === false) {
+            $error = 'file_get_contents: не удалось получить ответ';
+            return null;
+        }
+
+        // file_get_contents не возвращает код ответа — разбираем заголовки
+        $httpCode = 0;
+        foreach ($http_response_header ?? [] as $header) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $header, $m)) {
+                $httpCode = (int)$m[1];
+            }
+        }
+        if ($httpCode !== 0 && $httpCode !== 200) {
+            $error = ($httpCode === 404)
+                ? 'HTTP 404 — каталог не найден по указанному URL'
+                : 'HTTP ' . $httpCode;
+            return null;
+        }
     }
-    
-    if ($json === false) return null;
+
+    if ($json === false) {
+        $error = 'Не удалось получить ответ';
+        return null;
+    }
+
     $data = json_decode($json, true);
-    return is_array($data) ? $data : null;
+    if (!is_array($data)) {
+        $error = 'Ответ каталога не является корректным JSON';
+        return null;
+    }
+
+    return $data;
 }
 
 /**
  * Скачивает каталог, сравнивает с установленными и обновляет кеш.
  *
- * @param string $catalogUrl URL каталога
+ * @param string      $catalogUrl URL каталога
+ * @param string|null $error      Причина ошибки (заполняется при неудаче)
  * @return array|false Данные каталога или false при ошибке
  */
-function refresh_updates_cache(string $catalogUrl) {
-    $catalog = fetch_catalog($catalogUrl);
+function refresh_updates_cache(string $catalogUrl, ?string &$error = null) {
+    $catalog = fetch_catalog($catalogUrl, $error);
     if (!$catalog) return false;
     
     $installedPlugins = getPluginsData();

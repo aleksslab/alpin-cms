@@ -6,6 +6,11 @@ $mainMenuHTML = renderMainMenu($menuItems);
 $burgerMenuHTML = renderMobileMenu($menuItems);
 
 $breakpoint = getBurgerBreakpoint();
+$burgerEnabled = isBurgerEnabled();
+
+// Свёрнутое меню выводим только когда есть чем его открыть. При выключенном
+// бургере строка меню остаётся видимой на всех ширинах.
+$menuRowClass = $burgerEnabled ? 'hidden ' . $breakpoint . ':block' : 'block';
 
 $hasContacts = !empty($phone) || !empty($email);
 ?>
@@ -55,8 +60,8 @@ $hasContacts = !empty($phone) || !empty($email);
                 </button>
                 <?php endif; ?>
 
-                <?php if (isBurgerEnabled()): ?>
-                <div class="<?php echo $breakpoint; ?>:hidden">
+                <?php if ($burgerEnabled): ?>
+                <div class="<?php echo e($breakpoint); ?>:hidden">
                     <button onclick="toggleMobileMenu()" class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer">
                         <span id="burger-icon" class="icon-menu text-xl"></span>
                     </button>
@@ -67,17 +72,17 @@ $hasContacts = !empty($phone) || !empty($email);
     </div>
     
     <!-- Меню под логотипом -->
-    <div class="hidden <?php echo $breakpoint; ?>:block">
+    <div class="<?php echo e($menuRowClass); ?>">
         <div class="container mx-auto px-6">
-            <nav class="flex items-center justify-center gap-8 h-12">
+            <nav class="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 min-h-12 py-2">
                 <?php echo $mainMenuHTML; ?>
             </nav>
         </div>
     </div>
 
     <!-- Мобильное меню -->
-    <?php if (isBurgerEnabled()): ?>
-        <div class="<?php echo $breakpoint; ?>:hidden">
+    <?php if ($burgerEnabled): ?>
+        <div class="<?php echo e($breakpoint); ?>:hidden">
             <div id="mobile-menu" class="hidden fixed inset-0 top-[calc(80px+1px)] h-[calc(100vh-80px)] w-screen z-50 flex-col">
                 <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity cursor-pointer" onclick="toggleMobileMenu()"></div>
                 <div class="relative z-10 bg-white border-b border-slate-100 shadow-xl py-4 px-6 flex flex-col max-h-[80vh] overflow-y-auto w-full animate-fade-in space-y-2">

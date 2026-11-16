@@ -111,6 +111,7 @@ uasort($modules, function ($a, $b) {
                         </div>
                     </div>
                 </div>
+                <?php /* В onclick двойное экранирование: escapeJsString() — для JS-строки, e() — для HTML-атрибута. */ ?>
                 <div class="flex gap-1 items-center flex-shrink-0">
                     <?php if ($updateInfo): ?>
                         <span class="text-[8px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">
@@ -119,7 +120,7 @@ uasort($modules, function ($a, $b) {
                     <?php elseif ($isInstalled): ?>
                         <span class="text-[8px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">распакован</span>
                     <?php elseif ($hasArchive): ?>
-                        <button type="button" onclick="unpackModule('<?php echo escapeJsString($id); ?>', this)"
+                        <button type="button" onclick="unpackModule('<?php echo e(escapeJsString($id)); ?>', this)"
                                 class="text-[8px] bg-[var(--primary-color)] text-white px-2 py-1 rounded-full hover:bg-[var(--primary-dark)] transition-all cursor-pointer">
                             Распаковать
                         </button>
@@ -149,12 +150,12 @@ uasort($modules, function ($a, $b) {
 
                 <div class="flex items-center gap-2 flex-shrink-0">
                     <?php if ($updateInfo): ?>
-                        <button type="button" onclick="installModuleFromCatalog('<?php echo escapeJsString($updateInfo['url'] ?? ''); ?>', '<?php echo escapeJsString($id); ?>', this)"
+                        <button type="button" onclick="installModuleFromCatalog('<?php echo e(escapeJsString(is_string($updateInfo['url'] ?? null) ? $updateInfo['url'] : '')); ?>', '<?php echo e(escapeJsString($id)); ?>', this)"
                                 class="text-[10px] text-amber-600 hover:text-amber-800 transition-colors cursor-pointer flex items-center gap-1 font-bold">
                             <span class="icon-download text-xs"></span> Обновить
                         </button>
                     <?php elseif ($isInstalled): ?>
-                        <button type="button" onclick="rebuildModuleMin('<?php echo escapeJsString($id); ?>')"
+                        <button type="button" onclick="rebuildModuleMin('<?php echo e(escapeJsString($id)); ?>')"
                                 class="text-[10px] text-slate-500 hover:text-[var(--primary-color)] transition-colors cursor-pointer flex items-center gap-1">
                             <span class="icon-refresh-cw text-xs"></span> Пересобрать
                         </button>
@@ -223,7 +224,7 @@ uasort($modules, function ($a, $b) {
                                     v<?php echo e($module['version'] ?? '1.0.0'); ?>
                                 </td>
                                 <td class="py-3 text-right px-4">
-                                    <button type="button" onclick="installModuleFromCatalog('<?php echo escapeJsString($module['url'] ?? ''); ?>', '<?php echo escapeJsString($id); ?>', this)" class="px-3 py-1.5 bg-[var(--primary-color)] text-white text-xs font-bold rounded-lg hover:bg-[var(--primary-dark)] transition-all flex items-center gap-1 ml-auto">
+                                    <button type="button" onclick="installModuleFromCatalog('<?php echo e(escapeJsString(is_string($module['url'] ?? null) ? $module['url'] : '')); ?>', '<?php echo e(escapeJsString($id)); ?>', this)" class="px-3 py-1.5 bg-[var(--primary-color)] text-white text-xs font-bold rounded-lg hover:bg-[var(--primary-dark)] transition-all flex items-center gap-1 ml-auto">
                                         <span class="icon-download text-sm"></span> Установить
                                     </button>
                                 </td>
@@ -246,7 +247,7 @@ uasort($modules, function ($a, $b) {
                     </div>
                     <p class="text-xs text-slate-500 mb-3"><?php echo e($module['description'] ?? ''); ?></p>
 
-                    <button type="button" onclick="installModuleFromCatalog('<?php echo escapeJsString($module['url'] ?? ''); ?>', '<?php echo escapeJsString($id); ?>', this)" class="w-full h-10 bg-[var(--primary-color)] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all">
+                    <button type="button" onclick="installModuleFromCatalog('<?php echo e(escapeJsString(is_string($module['url'] ?? null) ? $module['url'] : '')); ?>', '<?php echo e(escapeJsString($id)); ?>', this)" class="w-full h-10 bg-[var(--primary-color)] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all">
                         <span class="icon-download text-sm"></span> Установить
                     </button>
                 </div>
@@ -336,7 +337,14 @@ function refreshModulesCatalog(btn) {
     btn.disabled = true;
     btn.innerHTML = '<span class="icon-loader animate-spin text-base"></span> Обновление...';
 
-    fetch('index.php?tab=modules&ajax=refresh_catalog')
+    // Обновление каталога — только POST с CSRF-токеном
+    const formData = new FormData();
+    formData.append('csrf_token', '<?php echo escapeJsString($token); ?>');
+
+    fetch('index.php?tab=modules&ajax=refresh_catalog', {
+        method: 'POST',
+        body: formData
+    })
         .then(res => res.json())
         .then(data => {
             if (data.success) {

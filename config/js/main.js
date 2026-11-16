@@ -40,9 +40,8 @@
 
         function checkSecurityChanges() {
             var currentLogin = secLoginInput.value.trim();
-            var isLoginChanged = (currentLogin !== originalLogin);
 
-            if (isLoginChanged) {
+            if (currentLogin !== originalLogin) {
                 secPasswordInput.setAttribute('required', 'required');
                 secPasswordInput.classList.add('border-rose-300');
             } else {
@@ -53,6 +52,215 @@
 
         secLoginInput.addEventListener('input', checkSecurityChanges);
         secPasswordInput.addEventListener('input', checkSecurityChanges);
+    }
+
+    // ===== 2.1 ПОДТВЕРЖДЕНИЕ ОПАСНЫХ ДЕЙСТВИЙ ПАРОЛЕМ =====
+    function initSecurityConfirm() {
+        var forms = document.querySelectorAll('form[data-sec-confirm]');
+        var modal = document.querySelector('.js-security-confirm');
+
+        if (!forms.length || !modal) {
+            return;
+        }
+
+        // Без JavaScript аварийное поле пароля остаётся видимым.
+        var fallbacks = document.querySelectorAll('[data-sec-password-fallback]');
+        for (var i = 0; i < fallbacks.length; i++) {
+            fallbacks[i].classList.add('hidden');
+        }
+
+        var textBox = modal.querySelector('.js-security-confirm-text');
+        var modalForm = modal.querySelector('.js-security-confirm-form');
+        var passwordInput = modalForm ? modalForm.querySelector('input[name="sec_current_password"]') : null;
+        var errorBox = modal.querySelector('.js-security-confirm-error');
+        var submitBtn = modal.querySelector('.js-security-confirm-submit');
+        var cancelBtn = modal.querySelector('.js-security-confirm-cancel');
+
+        if (!modalForm || !passwordInput || !errorBox || !submitBtn || !cancelBtn) {
+            return;
+        }
+
+        var messages = {
+            save: 'Сохранить настройки безопасности?',
+            unban: 'Разблокировать IP-адрес?',
+            ban: 'Занести IP-адрес в постоянный чёрный список?'
+        };
+        // form.submit() не передаёт имя нажатой кнопки, поэтому флаг действия
+        // добавляем скрытым полем — на нём держится POST-роутинг админки.
+        var actionFlags = {
+            save: 'save_security',
+            unban: 'action_unban',
+            ban: 'action_manual_ban'
+        };
+        var pendingForm = null;
+        var pendingAction = '';
+        var isChecking = false;
+        // Номер поколения модалки. Растёт при каждом открытии/закрытии и при
+        // отправке: ответ, пришедший после смены поколения, игнорируется.
+        var confirmSeq = 0;
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.classList.remove('hidden');
+        }
+
+        function openModal(form, action) {
+            confirmSeq++;
+            // Прошлый запрос мог остаться «в полёте», а его ответ — проигнорирован
+            // (модалку закрыли). Сбрасываем состояние, иначе форма не отправится.
+            isChecking = false;
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-60');
+            pendingForm = form;
+            pendingAction = action;
+
+            var text = messages[action] || 'Подтвердите действие текущим паролем.';
+            var ipInput = form.querySelector('input[name="unban_ip"], input[name="manual_ban_ip"]');
+            if (ipInput && ipInput.value.trim() !== '') {
+                text = text.replace('IP-адрес', 'IP-адрес ' + ipInput.value.trim());
+            }
+            if (textBox) {
+                textBox.textContent = text;
+            }
+
+            errorBox.textContent = '';
+            errorBox.classList.add('hidden');
+            passwordInput.value = '';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            window.setTimeout(function() {
+                passwordInput.focus();
+            }, 30);
+        }
+
+        function closeModal() {
+            confirmSeq++;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            passwordInput.value = '';
+            pendingForm = null;
+            pendingAction = '';
+        }
+
+        for (var j = 0; j < forms.length; j++) {
+            forms[j].addEventListener('submit', function(event) {
+                var action = this.getAttribute('data-sec-confirm') || '';
+                if (!messages[action]) {
+                    return;
+                }
+                event.preventDefault();
+                openModal(this, action);
+            });
+        }
+
+        cancelBtn.addEventListener('click', closeModal);
+
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        modalForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            if (isChecking || !pendingForm) {
+                return;
+            }
+
+            var password = passwordInput.value;
+            if (password === '') {
+                showError('Введите текущий пароль.');
+                passwordInput.focus();
+                return;
+            }
+
+            // Фиксируем цель до запроса: пока он идёт, модалку могут закрыть
+            // или переоткрыть для другой формы — тогда ответ уже не нужен.
+            var form = pendingForm;
+            var action = pendingAction;
+            var seq = ++confirmSeq;
+
+            var csrfInput = form.querySelector('input[name="csrf_token"]');
+            var data = new FormData();
+            data.append('csrf_token', csrfInput ? csrfInput.value : '');
+            data.append('security_confirm', '1');
+            data.append('confirm_action', action);
+            data.append('sec_current_password', password);
+
+            isChecking = true;
+            errorBox.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-60');
+
+            fetch('index.php', {
+                method: 'POST',
+                body: data,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('http');
+                    }
+                    return response.json();
+                })
+                .then(function(json) {
+                    if (seq !== confirmSeq) {
+                        return;
+                    }
+                    if (json && json.logout) {
+                        window.location.href = 'index.php?msg=security_failed';
+                        return;
+                    }
+                    if (!json || !json.ok) {
+                        showError((json && json.error) ? json.error : 'Не удалось проверить пароль.');
+                        return;
+                    }
+
+                    var flag = actionFlags[action] || '';
+                    closeModal();
+
+                    if (flag) {
+                        var hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = flag;
+                        hidden.value = '1';
+                        form.appendChild(hidden);
+                    }
+
+                    // form.submit() не вызывает событие submit — повторного
+                    // перехвата модалкой не будет.
+                    form.submit();
+                })
+                .catch(function(err) {
+                    if (seq !== confirmSeq) {
+                        return;
+                    }
+                    // 403 — истёк CSRF-токен или сессия; 5xx — сбой сервера.
+                    // Ответ в этом случае не JSON, поэтому разбираем по статусу.
+                    if (err && err.message === 'http') {
+                        showError('Сессия истекла или сервер отклонил запрос. Обновите страницу.');
+                        return;
+                    }
+                    showError('Не удалось проверить пароль. Проверьте соединение и повторите.');
+                })
+                .then(function() {
+                    if (seq !== confirmSeq) {
+                        return;
+                    }
+                    isChecking = false;
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-60');
+                });
+        });
     }
 
     // ===== 3. МОБИЛЬНЫЙ БУРГЕР-МЕНЮ =====
@@ -358,6 +566,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             initLoginToggle();
             initSecurityCheck();
+            initSecurityConfirm();
             initBurgerMenu();
             initSidebarAccordion();
             initThemeToggle();
@@ -366,6 +575,7 @@
     } else {
         initLoginToggle();
         initSecurityCheck();
+        initSecurityConfirm();
         initBurgerMenu();
         initSidebarAccordion();
         initThemeToggle();

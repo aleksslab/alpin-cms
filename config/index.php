@@ -251,7 +251,7 @@ if ($isAuth) {
                             <div class="sidebar-tab-row">
                                 <a href="index.php?tab=<?php echo urlencode($tabItem['id']); ?>" class="sidebar-menu-link <?php echo $activeClass; ?> flex items-center justify-between w-full">
                                     <div class="flex items-center gap-3">
-                                        <span class="<?php echo $tabItem['icon']; ?> text-base"></span>
+                                        <span class="<?php echo e(is_string($tabItem['icon'] ?? null) ? $tabItem['icon'] : ''); ?> text-base"></span>
                                         <span><?php echo e($tabItem['title']); ?></span>
                                     </div>
                                     <!-- Если модуль отключен, выводим иконку скрытия справа -->
@@ -293,7 +293,7 @@ if ($isAuth) {
                             ?>
                             <div class="sidebar-tab-row">
                                 <a href="index.php?tab=<?php echo urlencode($tabItem['id']); ?>" class="sidebar-menu-link <?php echo $activeClass; ?>">
-                                    <span class="<?php echo $tabItem['icon']; ?> text-base"></span>
+                                    <span class="<?php echo e(is_string($tabItem['icon'] ?? null) ? $tabItem['icon'] : ''); ?> text-base"></span>
                                     <span><?php echo e($tabItem['title']); ?></span>
                                 </a>
                                 <?php if ($tabHasDocs): ?>

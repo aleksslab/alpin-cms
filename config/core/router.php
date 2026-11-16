@@ -19,7 +19,8 @@ if (!defined('APP_ROOT')) {
  *   'isPreview' => bool,      // Режим предпросмотра
  *   'isNewPage' => bool,      // Найдена ли страница
  *   'slug' => string,         // Текущий slug
- *   'usedModules' => array    // Используемые модули
+ *   'usedModules' => array,   // Используемые модули
+ *   'cacheAllowed' => bool    // Можно ли отдавать и писать кеш страницы
  * ]
  */
 function resolve_route(): array {
@@ -39,6 +40,7 @@ function resolve_route(): array {
     $usedModules = [];
     $template = null;
     $page = null;
+    $cacheAllowed = false;
 
     // --- PREVIEW MODE ---
     // Включается только активным плагином preview (фильтр preview_enabled).
@@ -73,11 +75,27 @@ function resolve_route(): array {
         }
     }
 
+    // --- КАСТОМНЫЕ МАРШРУТЫ ПЛАГИНОВ ---
+    // add_route() регистрирует обработчик, dispatch_custom_route() вызывает его.
+    // По контракту из PLUGINS.md callback сам завершает запрос (exit).
+    if (!$isPreview && $slug !== '' && dispatch_custom_route($slug)) {
+        exit;
+    }
+
     // --- ОБЫЧНЫЙ РОУТИНГ ---
     if (!$isPreview) {
         $page = loadPage($slug);
 
-        if ($page && $page['status'] === 'published') {
+        $isPublished = $page && ($page['status'] ?? '') === 'published';
+
+        // loadPage('') идёт через loadPageById() и не проверяет unpublish_at,
+        // поэтому для главной проверяем дату снятия с публикации здесь.
+        if ($isPublished && $slug === '' && !empty($page['unpublish_at'])
+            && (int)$page['unpublish_at'] <= time()) {
+            $isPublished = false;
+        }
+
+        if ($isPublished) {
             // Проверка: страница найдена по старому slug?
             $actualSlug = $page['slug'] ?? $page['id'] ?? '';
 
@@ -89,6 +107,7 @@ function resolve_route(): array {
             }
 
             $isNewPage = true;
+            $cacheAllowed = true;
             $template = loadTemplate($page['template'] ?? 'full-width');
             $usedModules = getUsedModules($page);
         }
@@ -120,5 +139,6 @@ function resolve_route(): array {
         'isNewPage'   => $isNewPage,
         'slug'        => $slug,
         'usedModules' => $usedModules,
+        'cacheAllowed' => $cacheAllowed,
     ];
 }

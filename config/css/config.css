@@ -473,6 +473,11 @@ input[type="checkbox"]:disabled {
     .editor-field {
         flex: 1 !important; /* Ячейки делят строку на равные аккуратные части */
     }
+    /* Строка с подсказками под полями: выравниваем по верхнему краю,
+       иначе подсказка под одним полем сдвигает соседнее вниз. */
+    .editor-row--top {
+        align-items: flex-start !important;
+    }
     .editor-action {
         width: 52px !important;
         flex-shrink: 0 !important;

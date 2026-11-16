@@ -649,6 +649,7 @@ function loadTemplate(string $id): ?array {
 /**
  * Возвращает зоны шаблона по его ID
  *
+ * @deprecated Не используется. Оставлено для совместимости.
  * @param string $templateId ID шаблона
  * @return array Массив зон с классами
  */
@@ -663,6 +664,7 @@ function getTemplateZones(string $templateId): array {
 /**
  * Группирует ряды страницы по зонам
  *
+ * @deprecated Не используется. Оставлено для совместимости.
  * @param array $rows Массив рядов
  * @return array Массив рядов, сгруппированных по зонам
  */
@@ -1011,16 +1013,35 @@ function getMenuItems(string $menuId): array {
  * @return bool True, если бургер включен в настройках, иначе false
  */
 function isBurgerEnabled(): bool {
-    return (bool)(getSettingsData()['burger_enabled'] ?? false);
+    // Ключа нет — считаем включённым: иначе меню на мобильных прячется,
+    // а открыть его нечем. Выключение должно быть осознанным.
+    return (bool)(getSettingsData()['burger_enabled'] ?? true);
+}
+
+/**
+ * Возвращает допустимые значения брейкпоинта бургера.
+ *
+ * Список совпадает с вариантами в настройках хедера. Значение подставляется
+ * в классы Tailwind, поэтому всё остальное отбрасывается.
+ *
+ * @return array Список допустимых значений
+ */
+function getBurgerBreakpointOptions(): array {
+    return ['sm', 'md', 'lg', 'xl'];
 }
 
 /**
  * Возвращает брекпоинт бургера
- * 
+ *
+ * Значение приходит из настроек и попадает в `class`, поэтому значение вне
+ * allowlist заменяется на 'md' — иначе кавычка в настройке закрыла бы атрибут.
+ *
  * @return string Строковое значение брейкпоинта (например, 'md', 'lg')
  */
 function getBurgerBreakpoint(): string {
-    return (string)(getSettingsData()['burger_breakpoint'] ?? 'md');
+    $breakpoint = (string)(getSettingsData()['burger_breakpoint'] ?? 'md');
+
+    return in_array($breakpoint, getBurgerBreakpointOptions(), true) ? $breakpoint : 'md';
 }
 
 /**

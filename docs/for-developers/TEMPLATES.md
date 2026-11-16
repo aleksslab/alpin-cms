@@ -149,7 +149,7 @@ templates/headers/my-header/
 - `renderMainMenu($items)` — **HTML** **desktop-меню**.
 - `renderMobileMenu($items)` — **HTML** **мобильного**.
 - `isBurgerEnabled()` — **включён** **ли** **бургер**.
-- `getBurgerBreakpoint()` — **брейкпоинт** (`sm`/`md`/`lg`/`xl`).
+- `getBurgerBreakpoint()` — **брейкпоинт** (`sm`/`md`/`lg`/`xl`; иное значение → `md`).
 
 ### Пример (минимальный)
 
@@ -162,9 +162,16 @@ $mainMenuHTML = renderMainMenu($menuItems);
 $burgerMenuHTML = renderMobileMenu($menuItems);
 
 $breakpoint = getBurgerBreakpoint();
+$burgerEnabled = isBurgerEnabled();
+
+// Свёрнутое меню — только если есть чем открыть. При выключенном бургере
+// меню не прячется, а переносится на свою строку.
+$navClass = $burgerEnabled
+    ? 'hidden ' . $breakpoint . ':flex items-center gap-8'
+    : 'order-last w-full flex flex-wrap items-center justify-center gap-6 md:order-none md:w-auto';
 ?>
-<header class="<?php echo $headerFixed ? 'sticky top-0 z-50 ' : ''; ?>bg-white border-b border-slate-100 h-20">
-    <div class="container mx-auto px-6 h-20 flex items-center justify-between">
+<header class="<?php echo $headerFixed ? 'sticky top-0 z-50 ' : ''; ?>bg-white border-b border-slate-100 min-h-20">
+    <div class="container mx-auto px-6 min-h-20 flex flex-wrap items-center justify-between gap-y-2">
         <!-- Логотип -->
         <a href="/" class="flex items-center gap-3">
             <?php if (!empty($site_logo)): ?>
@@ -175,12 +182,12 @@ $breakpoint = getBurgerBreakpoint();
         </a>
 
         <!-- Меню -->
-        <nav class="hidden <?php echo $breakpoint; ?>:flex items-center gap-8">
+        <nav class="<?php echo e($navClass); ?>">
             <?php echo $mainMenuHTML; ?>
         </nav>
 
         <!-- Бургер -->
-        <?php if (isBurgerEnabled()): ?>
+        <?php if ($burgerEnabled): ?>
             <button onclick="toggleMobileMenu()" class="<?php echo $breakpoint; ?>:hidden">
                 <span id="burger-icon" class="icon-menu text-xl"></span>
             </button>
@@ -188,7 +195,7 @@ $breakpoint = getBurgerBreakpoint();
     </div>
 
     <!-- Мобильное меню -->
-    <?php if (isBurgerEnabled()): ?>
+    <?php if ($burgerEnabled): ?>
         <div id="mobile-menu" class="hidden fixed inset-0 top-20 ...">
             <?php echo $burgerMenuHTML; ?>
         </div>
@@ -308,6 +315,10 @@ templates/footers/my-footer/
 4. **Группирует** **ряды** **по** **зонам**.
 5. **Рендерит** **ряды** → **колонки** → **модули**.
 6. **Включает** **футер** (`templates/footers/{variant}/footer.php`).
+
+**Перед `include`:** тип модуля проверяется `isValidId()`; варианты шапки и
+подвала — `isValidId()` + `is_dir()`. Невалидные значения в путь не попадают:
+для вариантов берётся `default`, затем `includes/header.php` / `includes/footer.php`.
 
 ### Ключевые переменные
 

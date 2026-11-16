@@ -290,9 +290,14 @@ function refreshPluginsCatalog(btn) {
     btn.disabled = true;
     btn.innerHTML = '<span class="icon-loader animate-spin text-base"></span> Обновление...';
     
-    // Отправляем AJAX-запрос на обновление каталога
-    // (Создадим этот эндпоинт ниже)
-    fetch('index.php?tab=plugins&ajax=refresh_catalog')
+    // Обновление каталога — только POST с CSRF-токеном
+    const formData = new FormData();
+    formData.append('csrf_token', '<?php echo escapeJsString($token); ?>');
+
+    fetch('index.php?tab=plugins&ajax=refresh_catalog', {
+        method: 'POST',
+        body: formData
+    })
         .then(res => res.json())
         .then(data => {
             if (data.success) {

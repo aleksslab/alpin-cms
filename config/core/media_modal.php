@@ -86,7 +86,7 @@ foreach ($files as $file) {
                             <img src="<?php echo $scanRoot ? '/' : '../'; ?><?php echo e($imgUrl); ?>" class="w-full h-full object-contain group-hover:scale-105 transition-all duration-300">
                             <!-- Плашка с расширением -->
                             <div class="absolute bottom-2 right-2 bg-black/70 text-white text-[9px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm">
-                                <?php echo $displayExt; ?>
+                                <?php echo e($displayExt); ?>
                             </div>
                             <div class="absolute inset-0 bg-slate-900/20 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
                                 <span class="px-2 py-1 bg-white text-slate-800 text-[10px] font-bold rounded-lg shadow border border-slate-100">Выбрать</span>

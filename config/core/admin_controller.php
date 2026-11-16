@@ -44,7 +44,59 @@ function getCronToken(): string {
     if (!empty($settings['cron_token'])) {
         return (string)$settings['cron_token'];
     }
+
+    // Файл существует, но не читается как JSON (BOM, обрыв записи, ручная
+    // правка). Перегенерация затёрла бы settings.json одним cron_token,
+    // поэтому токен не сохраняем — настройки останутся для восстановления.
+    if (isSettingsFileBroken()) {
+        notifySettingsBroken();
+        return bin2hex(random_bytes(16));
+    }
+
     return regenerateCronToken();
+}
+
+/**
+ * Проверяет, что data/settings.json существует, но не является корректным JSON.
+ *
+ * @return bool true, если файл есть, но прочитать его нельзя
+ */
+function isSettingsFileBroken(): bool {
+    $path = DATA_DIR . 'settings.json';
+    if (!file_exists($path)) {
+        return false;
+    }
+
+    $raw = @file_get_contents($path);
+    if ($raw === false || trim($raw) === '') {
+        return false;
+    }
+
+    json_decode($raw, true);
+    return json_last_error() !== JSON_ERROR_NONE;
+}
+
+/**
+ * Предупреждает администратора о повреждённом settings.json.
+ * Показывается один раз за сессию и пишется в журнал сервера.
+ *
+ * @return void
+ */
+function notifySettingsBroken(): void {
+    if (session_status() !== PHP_SESSION_ACTIVE || !empty($_SESSION['settings_broken_notified'])) {
+        return;
+    }
+
+    $_SESSION['settings_broken_notified'] = 1;
+    error_log('AlPin CMS: data/settings.json повреждён — настройки не перезаписаны');
+
+    if (function_exists('setFlash')) {
+        setFlash(
+            'Файл data/settings.json повреждён. Настройки не перезаписаны — восстановите файл из резервной копии.',
+            'error',
+            0
+        );
+    }
 }
 
 /**
@@ -55,6 +107,14 @@ function getCronToken(): string {
  */
 function regenerateCronToken(): string {
     $token = bin2hex(random_bytes(16));
+
+    // Повреждённый settings.json не перезаписываем: иначе в файле останется
+    // только cron_token, а все настройки сайта будут потеряны.
+    if (isSettingsFileBroken()) {
+        notifySettingsBroken();
+        return $token;
+    }
+
     $settings = getSettingsData();
     $settings['cron_token'] = $token;
     saveData('settings', $settings);
@@ -177,6 +237,7 @@ function getFlash(): ?array {
 /**
  * Проверяет, есть ли flash-сообщение в сессии
  *
+ * @deprecated Не используется. Оставлено для совместимости.
  * @return bool
  */
 function hasFlash(): bool {
@@ -444,6 +505,25 @@ function handleSaveSettings(): array {
     // Форма плагина шлёт лишь свои поля, её POST ядро из нуля не пересобирает.
     $isFullSave = post_flag('settings_full');
 
+    // Брейкпоинт бургера подставляется в классы Tailwind — только allowlist.
+    $burgerBreakpoint = trim($_POST['burger_breakpoint'] ?? 'md');
+    if (!in_array($burgerBreakpoint, getBurgerBreakpointOptions(), true)) {
+        $burgerBreakpoint = 'md';
+    }
+
+    // Вариант шапки/подвала подставляется в путь include — только существующий каталог.
+    $headerVariant = $_POST['header_variant'] ?? 'default';
+    if (!is_string($headerVariant) || !isValidId($headerVariant)
+        || !is_dir(APP_ROOT . '/templates/headers/' . $headerVariant)) {
+        $headerVariant = 'default';
+    }
+
+    $footerVariant = $_POST['footer_variant'] ?? 'default';
+    if (!is_string($footerVariant) || !isValidId($footerVariant)
+        || !is_dir(APP_ROOT . '/templates/footers/' . $footerVariant)) {
+        $footerVariant = 'default';
+    }
+
     $siteSettings = [
         // БЛОК 1: Контактная информация
         'name'    => $name,
@@ -471,13 +551,13 @@ function handleSaveSettings(): array {
         ],
         
         // БЛОК 4: Настройки хедера (БЕЗ theme_toggle_enabled)
-        'header_variant' => $_POST['header_variant'] ?? 'default',
+        'header_variant' => $headerVariant,
         'header_fixed' => post_flag('header_fixed'),
         'burger_enabled' => post_flag('burger_enabled'),
-        'burger_breakpoint' => trim($_POST['burger_breakpoint'] ?? 'md'),
+        'burger_breakpoint' => $burgerBreakpoint,
                 
         // БЛОК 5: Настройки футера
-        'footer_variant' => $_POST['footer_variant'] ?? 'default',
+        'footer_variant' => $footerVariant,
         'footer_copyright' => $footerCopyright,
         
         // БЛОК 6: SEO настройки
@@ -563,23 +643,17 @@ function handleSaveSettings(): array {
         // Плагины: настройки сохранены (SEO, кеш, .min и т.п.)
         do_action('settings_saved', $oldSettings, $newSettings);
 
+        // Настройки влияют на все страницы (контакты, логотип, custom_css,
+        // варианты хедера и футера, настройки ассетов) — сбрасываем кеш
+        // целиком, иначе он отдаёт старую вёрстку до истечения TTL.
+        clearPageCache();
+
         // === АВТОМАТИЧЕСКОЕ СОЗДАНИЕ .min ПРИ ВКЛЮЧЕНИИ ===
         $oldMinify = $oldSettings['assets_minify'] ?? false;
         $newMinify = $newSettings['assets_minify'] ?? false;
         
         if (!$oldMinify && $newMinify) {
             createMinFilesForAllModules($newSettings);
-        }
-    
-        // === ОЧИСТКА КЕША ПРИ ИЗМЕНЕНИИ НАСТРОЕК АССЕТОВ ===
-        $oldCombine = $oldSettings['assets_combine'] ?? false;
-        $newCombine = $newSettings['assets_combine'] ?? false;
-    
-        $oldExceptions = $oldSettings['minify_exceptions'] ?? [];
-        $newExceptions = $newSettings['minify_exceptions'] ?? [];
-
-        if ($oldMinify != $newMinify || $oldCombine != $newCombine || $oldExceptions != $newExceptions) {
-            clearPageCache();
         }
         
         setFlash('Настройки ' . $source . ' успешно сохранены!');
@@ -598,15 +672,49 @@ function handleSaveSettings(): array {
     return ['success' => '', 'error' => 'Ошибка записи на диск.'];
 }
 
+// ===== 3. ОБРАБОТКА ИЗМЕНЕНИЙ БЕЗОПАСНОСТИ, НАСТРОЕК БРУТФОРСА И IP-ЛОГОВ =====
+
 /**
- * 3. ОБРАБОТКА ИЗМЕНЕНИЙ БЕЗОПАСНОСТИ, НАСТРОЕК БРУТФОРСА И IP-ЛОГОВ
+ * Проверяет текущий пароль из модалки и выдаёт подтверждение действия.
+ *
+ * Вызывается AJAX-запросом (`security_confirm`) до отправки основной формы.
+ * Пароль никуда не сохраняется; при третьей ошибке возвращает `logout`,
+ * и клиент уводит администратора на страницу входа.
+ *
+ * @return array ['ok' => bool, 'error' => string, 'logout' => bool]
  */
+function handleSecurityConfirmation(): array {
+    header('Content-Type: application/json');
+
+    $action = (string)($_POST['confirm_action'] ?? '');
+    $allowed = ['save', 'unban', 'ban'];
+
+    if (!in_array($action, $allowed, true)) {
+        return ['ok' => false, 'error' => 'Неизвестное действие для подтверждения.', 'logout' => false];
+    }
+
+    $check = verifySecurityPassword((string)($_POST['sec_current_password'] ?? ''));
+    if (empty($check['ok'])) {
+        if (!empty($check['logout'])) {
+            endAdminSession();
+        }
+        return $check;
+    }
+
+    issueSecurityConfirmation($action);
+
+    return ['ok' => true, 'error' => '', 'logout' => false];
+}
+
 /**
  * Снимает блокировку IP из журнала попыток входа.
  *
  * @return array ['success' => string, 'error' => string]
  */
 function handleActionUnban(): array {
+    $confirmError = requireSecurityConfirmation('unban');
+    if ($confirmError !== null) { return $confirmError; }
+
     $unbanIp = trim($_POST['unban_ip'] ?? '');
     if ($unbanIp === '') { return ['success' => '', 'error' => '']; }
 
@@ -615,6 +723,7 @@ function handleActionUnban(): array {
     if (isset($bfData['attempts'][$unbanIp])) {
         unset($bfData['attempts'][$unbanIp]);
         if (safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
+            consumeSecurityConfirmation('unban');
             return ['success' => "IP-адрес {$unbanIp} успешно разблокирован!", 'error' => ''];
         }
     }
@@ -627,6 +736,9 @@ function handleActionUnban(): array {
  * @return array ['success' => string, 'error' => string]
  */
 function handleActionManualBan(): array {
+    $confirmError = requireSecurityConfirmation('ban');
+    if ($confirmError !== null) { return $confirmError; }
+
     $manualIp = trim($_POST['manual_ban_ip'] ?? '');
     if (!filter_var($manualIp, FILTER_VALIDATE_IP)) {
         return ['success' => '', 'error' => 'Некорректный формат IP-адреса!'];
@@ -648,6 +760,7 @@ function handleActionManualBan(): array {
     ];
     
     if (safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
+        consumeSecurityConfirmation('ban');
         return ['success' => "IP-адрес {$manualIp} успешно занесен в вечный черный список!", 'error' => ''];
     }
     return ['success' => '', 'error' => 'Ошибка при записи в черный список.'];
@@ -656,13 +769,16 @@ function handleActionManualBan(): array {
 /**
  * Сохраняет логин, пароль и параметры защиты от брутфорса.
  *
- * При смене логина или пароля завершает сессию и уводит на повторный вход.
+ * Сохранение формы требует текущий пароль: иначе украденная сессия поднимает
+ * `max_attempts` и ослабляет защиту входа. При смене логина или пароля
+ * завершает сессию и уводит на повторный вход.
  *
  * @return array ['success' => string, 'error' => string]
  */
 function handleSaveSecurity(): array {
-    $newLogin = trim($_POST['sec_login'] ?? '');
-    $newPass  = $_POST['sec_password'] ?? '';
+    $newLogin    = trim($_POST['sec_login'] ?? '');
+    $newPass     = $_POST['sec_password'] ?? '';
+    $currentPass = $_POST['sec_current_password'] ?? '';
     
     $pepper = file_exists(CMS_PEPPER_FILE) ? trim(file_get_contents(CMS_PEPPER_FILE)) : '';
     $currentCreds = file_exists(CMS_CREDS_FILE) ? (json_decode(file_get_contents(CMS_CREDS_FILE), true) ?? []) : [];
@@ -674,13 +790,38 @@ function handleSaveSecurity(): array {
         return ['success' => '', 'error' => 'Логин администратора не может быть пустым!']; 
     }
     
-    if ($newPass !== '') {
+    $currentLogin = (string)($currentCreds['login'] ?? '');
+    $loginChanged = $newLogin !== $currentLogin;
+    $passChanged  = $newPass !== '';
+    
+    if ($loginChanged && !$passChanged) {
+        return ['success' => '', 'error' => 'При изменении имени пользователя необходимо обязательно указать новый пароль!'];
+    }
+
+    // Настройки безопасности — это и учётные данные, и лимиты брутфорса.
+    // Сохранение формы всегда требует текущий пароль: иначе украденная сессия
+    // поднимает max_attempts и снимает блокировку входа.
+    $bfPosted = [
+        'max_attempts'             => max(1, intval($_POST['bf_max_attempts'] ?? 5)),
+        'lockout_time'             => max(1, intval($_POST['bf_lockout_time'] ?? 15)),
+        'permanent_trigger_count'  => max(1, intval($_POST['bf_perm_count'] ?? 3)),
+        'permanent_trigger_period' => max(1, intval($_POST['bf_perm_period'] ?? 24)),
+        'session_timeout'          => max(1, min(1440, intval($_POST['bf_session_timeout'] ?? 20)))
+    ];
+
+    // Пароль пришёл либо подтверждением из модалки, либо аварийным полем
+    // формы (JavaScript отключён). Ошибка валидации полей выше подтверждение
+    // не сжигает: его можно использовать после исправления.
+    $confirmError = requireSecurityConfirmation('save', (string)$currentPass);
+    if ($confirmError !== null) {
+        return $confirmError;
+    }
+
+    // Проверка пароля уже выполнена в requireSecurityConfirmation().
+    if ($passChanged) {
         $secureMix = hash_hmac('sha256', $newPass, $newLogin . $pepper);
         $finalHash = password_hash($secureMix, PASSWORD_DEFAULT);
     } else {
-        if ($newLogin !== $currentCreds['login']) {
-            return ['success' => '', 'error' => 'При изменении имени пользователя необходимо обязательно указать новый пароль!'];
-        }
         $finalHash = $currentCreds['password_hash'];
     }
     
@@ -690,17 +831,17 @@ function handleSaveSecurity(): array {
         return ['success' => '', 'error' => 'Ошибка системы при сохранении данных доступа.'];
     }
     logAction('security_save', 'Настройки учетной записи обновлены (логин: ' . $newLogin . ')', 'INFO');
-        
-    $bfData = file_exists(CMS_ATTEMPTS_FILE) ? (json_decode(file_get_contents(CMS_ATTEMPTS_FILE), true) ?? []) : [];
-    $bfData['settings'] = [
-        'max_attempts'             => max(1, intval($_POST['bf_max_attempts'] ?? 5)),
-        'lockout_time'             => max(1, intval($_POST['bf_lockout_time'] ?? 15)),
-        'permanent_trigger_count'  => max(1, intval($_POST['bf_perm_count'] ?? 3)),
-        'permanent_trigger_period' => max(1, intval($_POST['bf_perm_period'] ?? 24)),
-        'session_timeout'          => max(1, min(1440, intval($_POST['bf_session_timeout'] ?? 20)))
-    ];
+
+    // Лимиты уже проверены и нормализованы выше. Снимок читаем здесь, после
+    // подтверждения: в аварийном пути без JS оно снимает серию ошибок, и старый
+    // снимок вернул бы её обратно.
+    $bfData = getLoginAttemptsData();
+    $bfData['settings'] = $bfPosted;
     if (!isset($bfData['attempts'])) { $bfData['attempts'] = []; }
     safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+    // Действие выполнено — одноразовое подтверждение больше не нужно.
+    consumeSecurityConfirmation('save');
     
     $to = SITE_EMAIL;
     $subject = "=?utf-8?B?" . base64_encode("Оповещение безопасности | " . strip_tags(SITE_NAME)) . "?=";
@@ -710,9 +851,9 @@ function handleSaveSecurity(): array {
              . "Детали операции:\n"
              . "• Дата и время: {$date} (время сервера)\n"
              . "• IP-адрес: {$ip}\n"
-             . "• Изменение логина: " . ($newLogin !== $currentCreds['login'] ? "ДА (Новый логин: {$newLogin})" : "НЕТ") . "\n"
-             . "• Изменение пароля: " . ($newPass !== '' ? "ДА" : "НЕТ") . "\n"
-             . "• Лимиты брутфорса: ОБНОВЛЕНЫ\n\n";
+             . "• Изменение логина: " . ($loginChanged ? "ДА (Новый логин: {$newLogin})" : "НЕТ") . "\n"
+             . "• Изменение пароля: " . ($passChanged ? "ДА" : "НЕТ") . "\n"
+             . "• Лимиты брутфорса: СОХРАНЕНЫ\n\n";
     
     $safeHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
     if (!preg_match('#^[a-z0-9\-\.]+(:\d+)?$#i', $safeHost)) {
@@ -721,7 +862,7 @@ function handleSaveSecurity(): array {
     $headers = "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nFrom: security@" . $safeHost . "\r\n";
     @mail($to, $subject, $message, $headers);
 
-    if ($newPass !== '' || $newLogin !== $currentCreds['login']) {
+    if ($loginChanged || $passChanged) {
         $_SESSION['admin_auth'] = false;
         header('Location: index.php?msg=updated');
         exit;
@@ -2191,6 +2332,11 @@ function minifyJs($js) {
  * @return array Список созданных файлов относительно корня
  */
 function createMinFilesForModule($moduleId) {
+    // ID попадает в путь файла: невалидный (в т.ч. с ../) не обрабатываем.
+    if (!is_string($moduleId) || !isValidId($moduleId)) {
+        return [];
+    }
+
     $baseDir = APP_ROOT;
     $created = [];
     
@@ -2461,8 +2607,8 @@ function handleRebuildAllMin($excludeCss = [], $excludeJs = []): void {
  * @return void
  */
 function handleRebuildModuleMin($moduleId): void {
-    if (empty($moduleId)) {
-        echo json_encode(['success' => false, 'error' => 'Не указан модуль']);
+    if (!is_string($moduleId) || !isValidId($moduleId)) {
+        echo json_encode(['success' => false, 'error' => 'Не указан или неверный ID модуля']);
         exit;
     }
     

@@ -33,6 +33,14 @@ define('CMS_PEPPER_FILE',   $secureDir . DIRECTORY_SEPARATOR . '.pepper');
 define('CMS_CREDS_FILE',    $secureDir . DIRECTORY_SEPARATOR . 'credentials.json');
 define('CMS_ATTEMPTS_FILE', $secureDir . DIRECTORY_SEPARATOR . 'login_attempts.json');
 
+// Лимит подтверждения текущим паролем. Жёсткий, а не из настроек: украденная
+// сессия может поднять max_attempts и перебирать пароль без предела.
+define('SECURITY_FORM_MAX_ATTEMPTS', 3);
+define('SECURITY_FORM_LOCKOUT_MINUTES', 15);
+
+// Сколько секунд действует одноразовое подтверждение опасного действия.
+define('SECURITY_CONFIRM_TTL', 300);
+
 require_once __DIR__ . '/admin_controller.php';
 
 /**
@@ -167,8 +175,18 @@ function handleSuccessfulLogin(string $userIp, array $bfData): void {
     // Плагины: успешный вход (например, очистка временных preview-файлов).
     do_action('admin_login_success', $userIp);
     
+    // Пароль из формы входа подтверждён — снимаем и серию ошибок формы
+    // безопасности: владелец не должен ждать паузу после разлогина.
+    $attemptsChanged = false;
     if (isset($bfData['attempts'][$userIp])) {
         unset($bfData['attempts'][$userIp]);
+        $attemptsChanged = true;
+    }
+    if (isset($bfData['security_attempts'][$userIp])) {
+        unset($bfData['security_attempts'][$userIp]);
+        $attemptsChanged = true;
+    }
+    if ($attemptsChanged) {
         safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     }
     
@@ -224,6 +242,223 @@ function handleFailedLogin(string $userIp, array $bfData): void {
     
     safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     logAction('auth_failed', 'Неудачная попытка входа с IP ' . $userIp . ' (попытка #' . $bfData['attempts'][$userIp]['count'] . ')', 'WARNING');
+}
+
+/**
+ * Сколько минут осталось до конца паузы для формы настроек безопасности.
+ *
+ * Счётчик `security_attempts` отдельный от `attempts`: неверный текущий пароль
+ * не приближает бан IP и не мешает войти в панель. Лимит берётся из констант,
+ * а не из настроек: иначе украденная сессия поднимает `max_attempts`
+ * и перебирает текущий пароль без ограничений.
+ *
+ * @param string $userIp IP-адрес клиента
+ * @param array $bfData Данные попыток и настроек брутфорса
+ * @return int 0 — можно пробовать; иначе сколько минут ждать
+ */
+function getSecurityFormLockoutMinutes(string $userIp, array $bfData): int {
+    $entry = $bfData['security_attempts'][$userIp] ?? null;
+    if (!is_array($entry)) { return 0; }
+
+    $lockoutTime = SECURITY_FORM_LOCKOUT_MINUTES * 60;
+    $timePassed  = time() - intval($entry['last_time'] ?? 0);
+
+    if (intval($entry['count'] ?? 0) >= SECURITY_FORM_MAX_ATTEMPTS && $timePassed < $lockoutTime) {
+        return (int)ceil(($lockoutTime - $timePassed) / 60);
+    }
+    return 0;
+}
+
+/**
+ * Учитывает неверный текущий пароль при сохранении настроек безопасности.
+ *
+ * Пишет только `security_attempts` (по IP), не трогая `attempts` входа,
+ * историю банов и флаг `permanent`. Постоянного бана у формы нет. После
+ * паузы серия начинается заново.
+ *
+ * @param string $userIp IP-адрес клиента
+ * @param array $bfData Данные попыток и настроек брутфорса
+ * @return int Номер попытки в текущей серии
+ */
+function registerSecurityFormFailure(string $userIp, array $bfData): int {
+    $lockoutTime = SECURITY_FORM_LOCKOUT_MINUTES * 60;
+
+    if (!isset($bfData['security_attempts'])) { $bfData['security_attempts'] = []; }
+    $entry = $bfData['security_attempts'][$userIp] ?? ['count' => 0, 'last_time' => 0];
+
+    // Пауза прошла — начинаем серию заново, иначе копим счётчик.
+    if (time() - intval($entry['last_time'] ?? 0) >= $lockoutTime) {
+        $entry['count'] = 0;
+    }
+
+    $entry['count'] = intval($entry['count'] ?? 0) + 1;
+    $entry['last_time'] = time();
+
+    $bfData['security_attempts'][$userIp] = $entry;
+    safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    logAction(
+        'security_save',
+        'Неверный текущий пароль при сохранении настроек безопасности с IP ' . $userIp . ' (попытка #' . $entry['count'] . ')',
+        'WARNING'
+    );
+
+    return (int)$entry['count'];
+}
+
+/**
+ * Полностью завершает сессию администратора.
+ *
+ * Используется при исчерпании лимита неверных паролей и по idle timeout.
+ *
+ * @return void
+ */
+function endAdminSession(): void {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    }
+    session_destroy();
+}
+
+/**
+ * Проверяет текущий пароль для опасного действия.
+ *
+ * Не завершает запрос сам: вызывающий код решает, отдать ошибку JSON-ом
+ * (AJAX-модалка) или редиректом формы. Счётчик и правила те же, что у формы
+ * безопасности: пауза, три ошибки, затем разлогин.
+ *
+ * @param string $password Введённый текущий пароль
+ * @return array ['ok' => bool, 'error' => string, 'logout' => bool]
+ */
+function verifySecurityPassword(string $password): array {
+    $userIp = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $bfData = getLoginAttemptsData();
+
+    $waitMinutes = getSecurityFormLockoutMinutes($userIp, $bfData);
+    if ($waitMinutes > 0) {
+        return [
+            'ok' => false,
+            'error' => 'Слишком много неверных текущих паролей. Повторите через ' . $waitMinutes . ' мин.',
+            'logout' => false
+        ];
+    }
+
+    if ($password === '') {
+        logAction('security_save', 'Попытка подтвердить действие без текущего пароля', 'WARNING');
+        return ['ok' => false, 'error' => 'Введите текущий пароль.', 'logout' => false];
+    }
+
+    $currentCreds = file_exists(CMS_CREDS_FILE) ? (json_decode(file_get_contents(CMS_CREDS_FILE), true) ?? []) : [];
+    $currentLogin = (string)($currentCreds['login'] ?? '');
+    $passwordHash = (string)($currentCreds['password_hash'] ?? '');
+    $pepper = file_exists(CMS_PEPPER_FILE) ? trim(file_get_contents(CMS_PEPPER_FILE)) : '';
+
+    if ($currentLogin === '' || $passwordHash === '' || $pepper === '') {
+        return ['ok' => false, 'error' => 'Системная ошибка безопасности. Действие невозможно.', 'logout' => false];
+    }
+
+    $currentMix = hash_hmac('sha256', $password, $currentLogin . $pepper);
+    if (!password_verify($currentMix, $passwordHash)) {
+        $attempt = registerSecurityFormFailure($userIp, $bfData);
+
+        if ($attempt >= SECURITY_FORM_MAX_ATTEMPTS) {
+            logAction('security_save', 'Сессия завершена: исчерпан лимит неверных текущих паролей', 'WARNING');
+            return [
+                'ok' => false,
+                'error' => 'Неверный текущий пароль. Сессия завершена из соображений безопасности.',
+                'logout' => true
+            ];
+        }
+
+        return ['ok' => false, 'error' => 'Неверный текущий пароль.', 'logout' => false];
+    }
+
+    // Пароль подтверждён — снимаем серию ошибок формы.
+    if (isset($bfData['security_attempts'][$userIp])) {
+        unset($bfData['security_attempts'][$userIp]);
+        safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    }
+
+    return ['ok' => true, 'error' => '', 'logout' => false];
+}
+
+/**
+ * Выдаёт одноразовое подтверждение опасного действия.
+ *
+ * @param string $action Тип действия: save, unban или ban
+ * @return void
+ */
+function issueSecurityConfirmation(string $action): void {
+    $_SESSION['security_confirmation'] = [
+        'action' => $action,
+        'at'     => time()
+    ];
+}
+
+/**
+ * Проверяет, есть ли действующее подтверждение для действия.
+ *
+ * Подтверждение привязано к типу действия и живёт не дольше
+ * `SECURITY_CONFIRM_TTL`. Просроченное удаляется.
+ *
+ * @param string $action Тип действия: save, unban или ban
+ * @return bool
+ */
+function hasSecurityConfirmation(string $action): bool {
+    $confirm = $_SESSION['security_confirmation'] ?? null;
+    if (!is_array($confirm)) { return false; }
+    if ((string)($confirm['action'] ?? '') !== $action) { return false; }
+
+    if (time() - intval($confirm['at'] ?? 0) > SECURITY_CONFIRM_TTL) {
+        unset($_SESSION['security_confirmation']);
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Снимает подтверждение после успешного действия.
+ *
+ * @param string $action Тип действия: save, unban или ban
+ * @return void
+ */
+function consumeSecurityConfirmation(string $action): void {
+    if (hasSecurityConfirmation($action)) {
+        unset($_SESSION['security_confirmation']);
+    }
+}
+
+/**
+ * Требует подтверждение опасного действия для обычной POST-формы.
+ *
+ * Принимает действующий токен из модалки либо пароль из аварийного поля
+ * (когда JavaScript отключён). При третьей ошибке пароля завершает сессию
+ * и уводит на страницу входа.
+ *
+ * @param string $action Тип действия: save, unban или ban
+ * @param string $password Пароль из аварийного поля формы
+ * @return array|null Ошибка для флеша либо null, если действие разрешено
+ */
+function requireSecurityConfirmation(string $action, string $password = ''): ?array {
+    if (hasSecurityConfirmation($action)) {
+        return null;
+    }
+
+    if ($password !== '') {
+        $check = verifySecurityPassword($password);
+        if (!empty($check['ok'])) {
+            return null;
+        }
+        if (!empty($check['logout'])) {
+            endAdminSession();
+            header('Location: index.php?msg=security_failed');
+            exit;
+        }
+        return ['success' => '', 'error' => $check['error']];
+    }
+
+    return ['success' => '', 'error' => 'Подтвердите действие текущим паролем.'];
 }
 
 /**

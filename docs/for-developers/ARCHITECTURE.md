@@ -226,13 +226,38 @@ if (isPreviewEnabled() && $previewToken !== '' && preg_match('/^[a-f0-9]{32}$/i'
 - Если нашли и slug в URL неактуален — **301** на правильный URL.
 - Устанавливает `$isPreview = true` — это отключает кеш и включает жёлтую плашку.
 
+### 3.5. Кастомные маршруты плагинов
+
+```php
+if (!$isPreview && $slug !== '' && dispatch_custom_route($slug)) {
+    exit;
+}
+```
+
+- `add_route('/my-page', callback)` регистрирует маршрут при загрузке плагина
+  (`hooks.php`).
+- Совпадение точное, по slug без ведущего `/`; параметров и wildcard нет.
+- Проверка идёт **до** `loadPage()`, поэтому маршрут может занять путь, которого
+  нет среди страниц.
+- В preview не вызывается — `?preview=` продолжает открывать страницу.
+- Callback сам завершает запрос (`exit`), роутер после него тоже делает `exit`.
+
 ### 4. Обычный роутинг
 
 ```php
 if (!$isPreview) {
     $page = loadPage($slug);
 
-    if ($page && $page['status'] === 'published') {
+    $isPublished = $page && ($page['status'] ?? '') === 'published';
+
+    // loadPage('') идёт через loadPageById() и не проверяет unpublish_at —
+    // для главной дату снятия с публикации проверяем здесь.
+    if ($isPublished && $slug === '' && !empty($page['unpublish_at'])
+        && (int)$page['unpublish_at'] <= time()) {
+        $isPublished = false;
+    }
+
+    if ($isPublished) {
         $actualSlug = $page['slug'] ?? $page['id'] ?? '';
 
         // 301, если страница найдена по slug_history
@@ -242,11 +267,16 @@ if (!$isPreview) {
         }
 
         $isNewPage = true;
+        $cacheAllowed = true;
         $template = loadTemplate($page['template'] ?? 'full-width');
         $usedModules = getUsedModules($page);
     }
 }
 ```
+
+`resolve_route()` возвращает `cacheAllowed`: `true` только для опубликованной
+страницы. Заглушка главной (страницы нет, снята с публикации или наступил
+`unpublish_at`) получает `false` — её кеш не читается и не пишется.
 
 **Как работает `loadPage`:**
 1. **Прямой путь:** `data/pages/{slug}.json` — если файл есть, читаем.
@@ -282,6 +312,8 @@ if (!$isNewPage) {
 **Логика:**
 - **Несуществующий slug** (`/nonexistent`) → **301** на главную.
 - **Главная (`/`), но `home.json` отсутствует** → отдаётся заглушка.
+- **Главная снята с публикации** (`draft`/`archived` или наступил `unpublish_at`) →
+  тоже заглушка, кеш страницы не используется.
 
 ### 6. Настройки для хедера и футера
 
@@ -299,13 +331,19 @@ $cacheEnabled = $settings['cache_enabled'] ?? false;
 $cacheTTL = $settings['cache_ttl'] ?? 86400;
 $cacheFile = $cacheDir . ($slug ?: 'home') . '.html';
 
-// В preview-режиме кеш ОТКЛЮЧАЕМ
-if ($cacheEnabled && !$isPreview && file_exists($cacheFile)) {
+// CSRF-токен у каждого посетителя свой: в кеше лежит заглушка
+$csrfPlaceholder = '__ALPIN_CSRF_TOKEN__';
+
+// В preview-режиме кеш ОТКЛЮЧАЕМ; cacheAllowed = false — страница не опубликована
+if ($cacheEnabled && !$isPreview && $cacheAllowed && file_exists($cacheFile)) {
     $cacheAge = time() - filemtime($cacheFile);
     if ($cacheTTL === 0 || $cacheAge < $cacheTTL) {
         if (DEBUG_SITE) header('X-Cache: HIT');
-        readfile($cacheFile);
-        exit;
+        $cachedHtml = file_get_contents($cacheFile);
+        if ($cachedHtml !== false) {
+            echo str_replace($csrfPlaceholder, $token, $cachedHtml);
+            exit;
+        }
     }
 }
 
@@ -315,7 +353,12 @@ ob_start();  // начало буферизации
 **Ключевое:**
 - **Preview не читает кеш** (`!$isPreview`).
 - **Preview не пишет в кеш** — то же условие в конце.
+- **Неопубликованная страница не читает и не пишет кеш** (`$cacheAllowed`):
+  снятая с публикации или удалённая главная не отдаётся из старого `home.html`.
 - В preview `assets_combine` отключается — не создавать временные `cache/assets/{preview_id}.css`.
+- **CSRF-токен в кеше не хранится:** вместо него заглушка `__ALPIN_CSRF_TOKEN__`,
+  при выдаче она заменяется на токен текущей сессии. Иначе форма с закешированной
+  страницы не проходила бы проверку у других посетителей.
 
 ### 8. Мета-данные и OG
 
@@ -341,19 +384,40 @@ if (file_exists($templateFile)) {
 - **Ряды/колонки/модули** (`include modules/{type}.php`).
 - **Футер** (`templates/footers/{variant}/footer.php`).
 
+**Валидация перед `include`:**
+- Тип модуля из `rows_json` проходит `isValidId()`; иначе файл не подключается,
+  а в HTML выводится комментарий через `e()`.
+- `header_variant` / `footer_variant` подключаются, только если это валидный ID
+  существующего каталога `templates/headers|footers`. Иначе берётся `default`,
+  а если нет и его — `includes/header.php` / `includes/footer.php`.
+
 ### 10. Сохранение в кеш
 
 ```php
 $html = ob_get_clean();
 
-if ($cacheEnabled && !$isPreview) {
-    file_put_contents($cacheFile, $html);
+if ($cacheEnabled && !$isPreview && $cacheAllowed) {
+    // В кеш — заглушка вместо CSRF-токена (подмена при выдаче, см. п. 7)
+    $cacheHtml = str_replace($token, $csrfPlaceholder, $html);
+
+    // Временный файл + rename(): читатель не увидит недописанный HTML
+    $tmpCache = $cacheFile . '.' . bin2hex(random_bytes(4)) . '.tmp';
+    if (@file_put_contents($tmpCache, $cacheHtml, LOCK_EX) !== false) {
+        @rename($tmpCache, $cacheFile);
+    }
+} elseif ($cacheEnabled && !$isPreview && file_exists($cacheFile)) {
+    // Страница снята с публикации или удалена — старый кеш удаляем
+    @unlink($cacheFile);
 }
 
 echo $html;
 ```
 
 **Preview не сохраняется** в кеш — каждый раз генерируется заново.
+**Неопубликованная страница** тоже не пишется в кеш, а её старый файл удаляется.
+
+**Сброс кеша:** сохранение страницы чистит только её кеш
+(`clearPageCacheById()`), сохранение настроек — весь (`clearPageCache()`).
 
 ### Схема (кратко)
 
@@ -528,10 +592,10 @@ POST-форма ──► config/index.php ──► admin_controller.php ──
 | `validateHtml()` | Проверка HTML на опасные теги |
 | `sanitizeHtml()` | Очистка HTML (whitelist) |
 | `validateSvgContent()` | Проверка SVG перед сохранением (script, on*, внешние href) |
-| `safeFileWrite()` | Атомарная запись с flock |
+| `safeFileWrite()` | Атомарная запись: temp + rename (append — flock) |
 | `detectZipSlip()` | Защита от ZIP Slip |
 | `verifyCsrfToken()` | Сравнение CSRF-токена (`hash_equals`) |
-| `isValidId()` | Валидация ID (`[a-z0-9\-_]+`) |
+| `isValidId()` | Валидация ID (`[a-z0-9\-_]+`, регистр не важен) |
 
 **Правило:** файл **не** **стартует** **сессию**, **не** **ставит** **заголовки** **и**
 **ничего** **не** **пишет**. **Bootstrap** — **в** `config.php`, **авторизация** — **в**
@@ -684,6 +748,8 @@ config/modules/previews/{id}.png  # Превью
 `cache/pages/{slug}.html`:
 - **Рендер** **страницы** (**HTML**).
 - **При** **включённом** `cache_enabled`.
+- **Только** **для** **опубликованных** **страниц**: при снятии с публикации
+  старый файл удаляется, заглушка главной не кешируется.
 - **Очистка** **при** **сохранении**/**удалении**/**клонировании** **страницы**.
 
 ### Ассеты (объединённые)

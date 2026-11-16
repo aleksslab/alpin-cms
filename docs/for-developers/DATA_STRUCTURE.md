@@ -156,8 +156,8 @@
 |------|-----|----------|
 | `header_variant` | string | `default` / `centered` / `minimal` / `with-cta` |
 | `header_fixed` | bool | Фиксация хедера при скролле |
-| `burger_enabled` | bool | Мобильное бургер-меню |
-| `burger_breakpoint` | string | `sm` / `md` / `lg` / `xl` |
+| `burger_enabled` | bool | Мобильное бургер-меню; по умолчанию включено |
+| `burger_breakpoint` | string | `sm` / `md` / `lg` / `xl`; иное значение читается как `md` |
 
 **Футер:**
 
@@ -165,6 +165,13 @@
 |------|-----|----------|
 | `footer_variant` | string | `default` / `minimal` / `dark` / `light` |
 | `footer_copyright` | string | HTML разрешён. Если пусто — выводится `© {YEAR} {name}. Все права защищены.` |
+
+`header_variant` и `footer_variant` принимаются только при `isValidId()` и
+наличии каталога `templates/headers|footers/{variant}`. Иное значение при
+сохранении заменяется на `default`; при испорченном `settings.json` фронт тоже
+берёт `default`, а если его нет — `includes/header.php` / `includes/footer.php`.
+Список доступных вариантов определяется каталогами (`getHeaderVariants()` /
+`getFooterVariants()`), а не списком в коде.
 
 **SEO:**
 
@@ -792,9 +799,23 @@
             "bans_history": [1705320000],
             "permanent": false
         }
+    },
+    "security_attempts": {
+        "192.168.1.100": {
+            "count": 2,
+            "last_time": 1705321500
+        }
     }
 }
 ```
+
+`security_attempts` — счётчик подтверждения текущим паролем (сохранение
+настроек безопасности, разблокировка IP, ручной бан). Отдельный от
+`attempts`: неверный текущий пароль не приближает бан IP и не мешает входу.
+Лимит — константы `SECURITY_FORM_MAX_ATTEMPTS` (3) и
+`SECURITY_FORM_LOCKOUT_MINUTES` (15), настройки `settings` на него не влияют.
+После третьей ошибки сессия завершается, а ключ IP живёт до конца паузы.
+Успешный вход или верный текущий пароль ключ удаляют.
 
 ---
 

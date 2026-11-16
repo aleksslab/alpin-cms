@@ -40,6 +40,8 @@ function handle_admin_post_actions(): void {
     elseif (isset($_POST['clear_cache']))      { clearPageCache(); echo json_encode(['success' => true, 'message' => 'Кеш очищен']); exit; }
     
     // --- БЕЗОПАСНОСТЬ ---
+    // Подтверждение из модалки: проверка пароля и выдача одноразового токена.
+    elseif (isset($_POST['security_confirm']))   { echo json_encode(handleSecurityConfirmation()); exit; }
     elseif (isset($_POST['action_unban']))        { $res = handleActionUnban();      $securityRedirect = true; }
     elseif (isset($_POST['action_manual_ban']))   { $res = handleActionManualBan(); $securityRedirect = true; }
     elseif (isset($_POST['save_security']))       { $res = handleSaveSecurity();    $securityRedirect = true; }

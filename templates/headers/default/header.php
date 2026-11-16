@@ -6,13 +6,20 @@ $mainMenuHTML = renderMainMenu($menuItems);
 $burgerMenuHTML = renderMobileMenu($menuItems);
 
 $breakpoint = getBurgerBreakpoint();
+$burgerEnabled = isBurgerEnabled();
+
+// Свёрнутое меню выводим только когда есть чем его открыть. При выключенном
+// бургере навигация не прячется, а переносится на свою строку.
+$navClass = $burgerEnabled
+    ? 'hidden ' . $breakpoint . ':flex items-center gap-4 lg:gap-8 h-20'
+    : 'order-last w-full flex flex-wrap items-center justify-center gap-x-6 gap-y-2 md:order-none md:w-auto md:justify-start';
 
 // Есть ли контакты хоть какие-то
 $hasContacts = !empty($phone) || !empty($email);
 ?>
 
-<header class="<?php echo $headerFixed ? 'sticky top-0 z-50 ' : ''; ?>bg-white/90 backdrop-blur-xl border-b border-slate-100 shadow-sm h-20">
-    <div class="container mx-auto px-6 h-20 flex items-center justify-between">
+<header class="<?php echo $headerFixed ? 'sticky top-0 z-50 ' : ''; ?>bg-white/90 backdrop-blur-xl border-b border-slate-100 shadow-sm min-h-20">
+    <div class="container mx-auto px-6 min-h-20 flex flex-wrap items-center justify-between gap-y-2">
         <!-- Логотип -->
         <a href="/" class="flex items-center gap-3 group">
             <?php if (!empty($site_logo)): ?>
@@ -23,7 +30,7 @@ $hasContacts = !empty($phone) || !empty($email);
         </a>
 
         <!-- Меню для ПК -->
-        <nav class="hidden <?php echo $breakpoint; ?>:flex items-center gap-4 lg:gap-8 h-20">
+        <nav class="<?php echo e($navClass); ?>">
             <?php echo $mainMenuHTML; ?>
         </nav>
 
@@ -51,8 +58,8 @@ $hasContacts = !empty($phone) || !empty($email);
             </button>
             <?php endif; ?>
 
-            <?php if (isBurgerEnabled()): ?>
-            <div class="<?php echo $breakpoint; ?>:hidden">
+            <?php if ($burgerEnabled): ?>
+            <div class="<?php echo e($breakpoint); ?>:hidden">
                 <button onclick="toggleMobileMenu()" class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer">
                     <span id="burger-icon" class="icon-menu text-xl"></span>
                 </button>
@@ -62,8 +69,8 @@ $hasContacts = !empty($phone) || !empty($email);
     </div>
 
     <!-- Мобильное меню -->
-    <?php if (isBurgerEnabled()): ?>
-        <div class="<?php echo $breakpoint; ?>:hidden">
+    <?php if ($burgerEnabled): ?>
+        <div class="<?php echo e($breakpoint); ?>:hidden">
             <div id="mobile-menu" class="hidden fixed inset-0 top-20 h-[calc(100vh-80px)] w-screen z-50 flex-col">
                 <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity cursor-pointer" onclick="toggleMobileMenu()"></div>
                 <div class="relative z-10 bg-white border-b border-slate-100 shadow-xl py-4 px-6 flex flex-col max-h-[80vh] overflow-y-auto w-full animate-fade-in space-y-2">
