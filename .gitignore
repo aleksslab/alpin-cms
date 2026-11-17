@@ -13,6 +13,7 @@
 !.gitkeep
 !.htaccess
 /config/data/*.json
+/config/data/*.lock
 /config/data/.pepper
 !/config/data/modules.json
 !/config/data/templates.json

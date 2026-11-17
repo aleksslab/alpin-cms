@@ -89,6 +89,57 @@ function getLoginAttemptsData(): array {
 }
 
 /**
+ * Выполняет чтение-изменение-запись журнала попыток под эксклюзивной блокировкой.
+ *
+ * `getLoginAttemptsData()` и `safeFileWrite()` по отдельности не атомарны: два
+ * параллельных POST читали одинаковый `count` и оба писали `count + 1`, из-за
+ * чего лимит попыток обходился пачкой запросов. Блокировка сериализует весь
+ * цикл; сам JSON остаётся обычным файлом — его читают и другие модули.
+ *
+ * @param callable $mutator function(array &$bfData): bool — меняет данные
+ *                          и возвращает true, если их нужно записать
+ * @return bool true — данные записаны (или менять было нечего)
+ */
+function updateLoginAttempts(callable $mutator): bool {
+    $lockPath = CMS_ATTEMPTS_FILE . '.lock';
+
+    // Чтение и запись одним шагом: вызывается под блокировкой или без неё,
+    // если файл блокировки открыть не удалось.
+    $apply = function () use ($mutator): bool {
+        clearstatcache(true, CMS_ATTEMPTS_FILE);
+        $bfData = getLoginAttemptsData();
+
+        if (!$mutator($bfData)) {
+            return true;
+        }
+
+        return safeFileWrite(
+            CMS_ATTEMPTS_FILE,
+            json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        );
+    };
+
+    // Нет блокировки — работаем как раньше: потерять точность счётчика на
+    // редкой гонке лучше, чем заблокировать вход в панель.
+    $lock = @fopen($lockPath, 'c');
+    if ($lock === false) {
+        return $apply();
+    }
+
+    if (!flock($lock, LOCK_EX)) {
+        fclose($lock);
+        return $apply();
+    }
+
+    $written = $apply();
+
+    flock($lock, LOCK_UN);
+    fclose($lock);
+
+    return $written;
+}
+
+/**
  * Проверяет, заблокирован ли IP — постоянный бан или активный локаут.
  *
  * При блокировке фиксирует код ошибки через `admin_error()`.
@@ -164,7 +215,8 @@ function verifyAdminCredentials(string $login, string $password): bool {
  * Завершает успешный вход: обновляет сессию, чистит попытки и редиректит.
  *
  * @param string $userIp IP-адрес клиента
- * @param array $bfData Данные попыток и настроек брутфорса
+ * @param array  $bfData Снимок журнала (не используется: под блокировкой
+ *                       данные перечитываются заново)
  * @return void
  */
 function handleSuccessfulLogin(string $userIp, array $bfData): void {
@@ -177,18 +229,20 @@ function handleSuccessfulLogin(string $userIp, array $bfData): void {
     
     // Пароль из формы входа подтверждён — снимаем и серию ошибок формы
     // безопасности: владелец не должен ждать паузу после разлогина.
-    $attemptsChanged = false;
-    if (isset($bfData['attempts'][$userIp])) {
-        unset($bfData['attempts'][$userIp]);
-        $attemptsChanged = true;
-    }
-    if (isset($bfData['security_attempts'][$userIp])) {
-        unset($bfData['security_attempts'][$userIp]);
-        $attemptsChanged = true;
-    }
-    if ($attemptsChanged) {
-        safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    }
+    // Снимок перечитывается под блокировкой: параллельный запрос мог успеть
+    // записать новую попытку между чтением в index.php и этим местом.
+    updateLoginAttempts(function (array &$bfData) use ($userIp): bool {
+        $changed = false;
+        if (isset($bfData['attempts'][$userIp])) {
+            unset($bfData['attempts'][$userIp]);
+            $changed = true;
+        }
+        if (isset($bfData['security_attempts'][$userIp])) {
+            unset($bfData['security_attempts'][$userIp]);
+            $changed = true;
+        }
+        return $changed;
+    });
     
     logAction('auth_login', 'Успешный вход пользователя с IP ' . $userIp, 'INFO');
     header('Location: index.php');
@@ -202,46 +256,53 @@ function handleSuccessfulLogin(string $userIp, array $bfData): void {
  * Каждый бан пишется в историю, по её частоте включается постоянный бан.
  *
  * @param string $userIp IP-адрес клиента
- * @param array $bfData Данные попыток и настроек брутфорса
+ * @param array  $bfData Снимок журнала (не используется: под блокировкой
+ *                       данные перечитываются заново)
  * @return void
  */
 function handleFailedLogin(string $userIp, array $bfData): void {
-    $maxAttempts = intval($bfData['settings']['max_attempts'] ?? 5);
-    $lockoutTime = intval($bfData['settings']['lockout_time'] ?? 15);
-    $permCount   = intval($bfData['settings']['permanent_trigger_count'] ?? 3);
-    $permPeriod  = intval($bfData['settings']['permanent_trigger_period'] ?? 24);
-    
-    if (!isset($bfData['attempts'])) { $bfData['attempts'] = []; }
-    if (!isset($bfData['attempts'][$userIp])) {
-        $bfData['attempts'][$userIp] = ['count' => 0, 'last_time' => 0, 'bans_count' => 0, 'bans_history' => [], 'permanent' => false];
-    }
-    
-    // Запоминаем время прошлой попытки до того, как перезапишем last_time:
-    // без этого в ветке сброса timeDiff всегда равен ~0 и счётчик не обнуляется.
-    $lastTime = (int)($bfData['attempts'][$userIp]['last_time'] ?? 0);
+    $attemptCount = 0;
 
-    $bfData['attempts'][$userIp]['count']++;
-    $bfData['attempts'][$userIp]['last_time'] = time();
-    
-    if ($bfData['attempts'][$userIp]['count'] == $maxAttempts) {
-        $bfData['attempts'][$userIp]['bans_count']++;
-        $bfData['attempts'][$userIp]['bans_history'][] = time();
-        
-        $freshBansCount = 0;
-        $windowSeconds = $permPeriod * 3600;
-        foreach ($bfData['attempts'][$userIp]['bans_history'] as $banTime) {
-            if (time() - $banTime <= $windowSeconds) { $freshBansCount++; }
+    updateLoginAttempts(function (array &$bfData) use ($userIp, &$attemptCount): bool {
+        $maxAttempts = intval($bfData['settings']['max_attempts'] ?? 5);
+        $lockoutTime = intval($bfData['settings']['lockout_time'] ?? 15);
+        $permCount   = intval($bfData['settings']['permanent_trigger_count'] ?? 3);
+        $permPeriod  = intval($bfData['settings']['permanent_trigger_period'] ?? 24);
+
+        if (!isset($bfData['attempts'])) { $bfData['attempts'] = []; }
+        if (!isset($bfData['attempts'][$userIp])) {
+            $bfData['attempts'][$userIp] = ['count' => 0, 'last_time' => 0, 'bans_count' => 0, 'bans_history' => [], 'permanent' => false];
         }
-        
-        if ($freshBansCount >= $permCount) { $bfData['attempts'][$userIp]['permanent'] = true; }
-    } 
-    elseif ($bfData['attempts'][$userIp]['count'] > $maxAttempts) {
-        $timeDiff = time() - $lastTime;
-        if ($timeDiff >= ($lockoutTime * 60)) { $bfData['attempts'][$userIp]['count'] = 1; }
-    }
-    
-    safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    logAction('auth_failed', 'Неудачная попытка входа с IP ' . $userIp . ' (попытка #' . $bfData['attempts'][$userIp]['count'] . ')', 'WARNING');
+
+        // Запоминаем время прошлой попытки до того, как перезапишем last_time:
+        // без этого в ветке сброса timeDiff всегда равен ~0 и счётчик не обнуляется.
+        $lastTime = (int)($bfData['attempts'][$userIp]['last_time'] ?? 0);
+
+        $bfData['attempts'][$userIp]['count']++;
+        $bfData['attempts'][$userIp]['last_time'] = time();
+
+        if ($bfData['attempts'][$userIp]['count'] == $maxAttempts) {
+            $bfData['attempts'][$userIp]['bans_count']++;
+            $bfData['attempts'][$userIp]['bans_history'][] = time();
+
+            $freshBansCount = 0;
+            $windowSeconds = $permPeriod * 3600;
+            foreach ($bfData['attempts'][$userIp]['bans_history'] as $banTime) {
+                if (time() - $banTime <= $windowSeconds) { $freshBansCount++; }
+            }
+
+            if ($freshBansCount >= $permCount) { $bfData['attempts'][$userIp]['permanent'] = true; }
+        }
+        elseif ($bfData['attempts'][$userIp]['count'] > $maxAttempts) {
+            $timeDiff = time() - $lastTime;
+            if ($timeDiff >= ($lockoutTime * 60)) { $bfData['attempts'][$userIp]['count'] = 1; }
+        }
+
+        $attemptCount = (int)$bfData['attempts'][$userIp]['count'];
+        return true;
+    });
+
+    logAction('auth_failed', 'Неудачная попытка входа с IP ' . $userIp . ' (попытка #' . $attemptCount . ')', 'WARNING');
 }
 
 /**
@@ -277,32 +338,39 @@ function getSecurityFormLockoutMinutes(string $userIp, array $bfData): int {
  * паузы серия начинается заново.
  *
  * @param string $userIp IP-адрес клиента
- * @param array $bfData Данные попыток и настроек брутфорса
+ * @param array  $bfData Снимок журнала (не используется: под блокировкой
+ *                       данные перечитываются заново)
  * @return int Номер попытки в текущей серии
  */
 function registerSecurityFormFailure(string $userIp, array $bfData): int {
-    $lockoutTime = SECURITY_FORM_LOCKOUT_MINUTES * 60;
+    $attemptCount = 0;
 
-    if (!isset($bfData['security_attempts'])) { $bfData['security_attempts'] = []; }
-    $entry = $bfData['security_attempts'][$userIp] ?? ['count' => 0, 'last_time' => 0];
+    updateLoginAttempts(function (array &$bfData) use ($userIp, &$attemptCount): bool {
+        $lockoutTime = SECURITY_FORM_LOCKOUT_MINUTES * 60;
 
-    // Пауза прошла — начинаем серию заново, иначе копим счётчик.
-    if (time() - intval($entry['last_time'] ?? 0) >= $lockoutTime) {
-        $entry['count'] = 0;
-    }
+        if (!isset($bfData['security_attempts'])) { $bfData['security_attempts'] = []; }
+        $entry = $bfData['security_attempts'][$userIp] ?? ['count' => 0, 'last_time' => 0];
 
-    $entry['count'] = intval($entry['count'] ?? 0) + 1;
-    $entry['last_time'] = time();
+        // Пауза прошла — начинаем серию заново, иначе копим счётчик.
+        if (time() - intval($entry['last_time'] ?? 0) >= $lockoutTime) {
+            $entry['count'] = 0;
+        }
 
-    $bfData['security_attempts'][$userIp] = $entry;
-    safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        $entry['count'] = intval($entry['count'] ?? 0) + 1;
+        $entry['last_time'] = time();
+
+        $bfData['security_attempts'][$userIp] = $entry;
+        $attemptCount = (int)$entry['count'];
+        return true;
+    });
+
     logAction(
         'security_save',
-        'Неверный текущий пароль при сохранении настроек безопасности с IP ' . $userIp . ' (попытка #' . $entry['count'] . ')',
+        'Неверный текущий пароль при сохранении настроек безопасности с IP ' . $userIp . ' (попытка #' . $attemptCount . ')',
         'WARNING'
     );
 
-    return (int)$entry['count'];
+    return $attemptCount;
 }
 
 /**
@@ -374,11 +442,15 @@ function verifySecurityPassword(string $password): array {
         return ['ok' => false, 'error' => 'Неверный текущий пароль.', 'logout' => false];
     }
 
-    // Пароль подтверждён — снимаем серию ошибок формы.
-    if (isset($bfData['security_attempts'][$userIp])) {
+    // Пароль подтверждён — снимаем серию ошибок формы. Под блокировкой:
+    // параллельный запрос мог успеть записать новую попытку после чтения выше.
+    updateLoginAttempts(function (array &$bfData) use ($userIp): bool {
+        if (!isset($bfData['security_attempts'][$userIp])) {
+            return false;
+        }
         unset($bfData['security_attempts'][$userIp]);
-        safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    }
+        return true;
+    });
 
     return ['ok' => true, 'error' => '', 'logout' => false];
 }

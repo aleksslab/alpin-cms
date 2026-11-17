@@ -718,14 +718,21 @@ function handleActionUnban(): array {
     $unbanIp = trim($_POST['unban_ip'] ?? '');
     if ($unbanIp === '') { return ['success' => '', 'error' => '']; }
 
-    $bfData = file_exists(CMS_ATTEMPTS_FILE) ? (json_decode(file_get_contents(CMS_ATTEMPTS_FILE), true) ?? []) : [];
-    
-    if (isset($bfData['attempts'][$unbanIp])) {
-        unset($bfData['attempts'][$unbanIp]);
-        if (safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
-            consumeSecurityConfirmation('unban');
-            return ['success' => "IP-адрес {$unbanIp} успешно разблокирован!", 'error' => ''];
+    // Под блокировкой: параллельная неудачная попытка не должна затереться
+    // при перезаписи файла.
+    $found = false;
+    $saved = updateLoginAttempts(function (array &$bfData) use ($unbanIp, &$found): bool {
+        if (!isset($bfData['attempts'][$unbanIp])) {
+            return false;
         }
+        $found = true;
+        unset($bfData['attempts'][$unbanIp]);
+        return true;
+    });
+
+    if ($found && $saved) {
+        consumeSecurityConfirmation('unban');
+        return ['success' => "IP-адрес {$unbanIp} успешно разблокирован!", 'error' => ''];
     }
     return ['success' => '', 'error' => 'Ошибка при сохранении лога блокировок.'];
 }
@@ -744,22 +751,23 @@ function handleActionManualBan(): array {
         return ['success' => '', 'error' => 'Некорректный формат IP-адреса!'];
     }
 
-    $bfData = file_exists(CMS_ATTEMPTS_FILE) ? (json_decode(file_get_contents(CMS_ATTEMPTS_FILE), true) ?? []) : [];
-    
-    if (!isset($bfData['attempts'])) { $bfData['attempts'] = []; }
-    if (!isset($bfData['settings'])) { 
-        $bfData['settings'] = ['max_attempts' => 5, 'lockout_time' => 15, 'permanent_trigger_count' => 3, 'permanent_trigger_period' => 24]; 
-    }
-    
-    $bfData['attempts'][$manualIp] = [
-        'count'        => intval($bfData['settings']['max_attempts']),
-        'last_time'    => time(),
-        'bans_count'   => intval($bfData['attempts'][$manualIp]['bans_count'] ?? 0) + 1,
-        'bans_history' => $bfData['attempts'][$manualIp]['bans_history'] ?? [],
-        'permanent'    => true
-    ];
-    
-    if (safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT))) {
+    $saved = updateLoginAttempts(function (array &$bfData) use ($manualIp): bool {
+        if (!isset($bfData['attempts'])) { $bfData['attempts'] = []; }
+        if (!isset($bfData['settings'])) {
+            $bfData['settings'] = ['max_attempts' => 5, 'lockout_time' => 15, 'permanent_trigger_count' => 3, 'permanent_trigger_period' => 24];
+        }
+
+        $bfData['attempts'][$manualIp] = [
+            'count'        => intval($bfData['settings']['max_attempts']),
+            'last_time'    => time(),
+            'bans_count'   => intval($bfData['attempts'][$manualIp]['bans_count'] ?? 0) + 1,
+            'bans_history' => $bfData['attempts'][$manualIp]['bans_history'] ?? [],
+            'permanent'    => true
+        ];
+        return true;
+    });
+
+    if ($saved) {
         consumeSecurityConfirmation('ban');
         return ['success' => "IP-адрес {$manualIp} успешно занесен в вечный черный список!", 'error' => ''];
     }
@@ -834,11 +842,13 @@ function handleSaveSecurity(): array {
 
     // Лимиты уже проверены и нормализованы выше. Снимок читаем здесь, после
     // подтверждения: в аварийном пути без JS оно снимает серию ошибок, и старый
-    // снимок вернул бы её обратно.
-    $bfData = getLoginAttemptsData();
-    $bfData['settings'] = $bfPosted;
-    if (!isset($bfData['attempts'])) { $bfData['attempts'] = []; }
-    safeFileWrite(CMS_ATTEMPTS_FILE, json_encode($bfData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    // снимок вернул бы её обратно. Запись под блокировкой, чтобы не затереть
+    // параллельно записанную попытку входа.
+    updateLoginAttempts(function (array &$bfData) use ($bfPosted): bool {
+        $bfData['settings'] = $bfPosted;
+        if (!isset($bfData['attempts'])) { $bfData['attempts'] = []; }
+        return true;
+    });
 
     // Действие выполнено — одноразовое подтверждение больше не нужно.
     consumeSecurityConfirmation('save');

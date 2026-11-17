@@ -34,6 +34,12 @@ $copyrightText = !empty($settings['footer_copyright']) ? trim($settings['footer_
 $customCss = $settings['custom_css'] ?? SITE_CUSTOM_CSS;
 $customJs = $settings['custom_js'] ?? SITE_CUSTOM_JS;
 
+// Значения вставляются в <style>/<script> как есть. Закрывающий тег внутри
+// кода закрыл бы блок раньше времени и открыл HTML-инъекцию, поэтому
+// экранируем его (в CSS/JS обратный слэш перед «/» допустим).
+$customCss = is_string($customCss) ? str_ireplace('</style', '<\/style', $customCss) : '';
+$customJs  = is_string($customJs) ? str_ireplace('</script', '<\/script', $customJs) : '';
+
 // ===== КЕШИРОВАНИЕ СТРАНИЦ =====
 $cacheEnabled = $settings['cache_enabled'] ?? false;
 $cacheTTL = $settings['cache_ttl'] ?? 86400;

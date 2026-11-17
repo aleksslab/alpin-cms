@@ -541,6 +541,8 @@ function downloadModuleZip(string $url, string $id): ?string {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_FILE, $fp);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        // Редирект только на http(s): иначе 30x уводит cURL на file:// и т.п.
+        curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_MAXFILESIZE, $maxSize);
         curl_setopt($ch, CURLOPT_USERAGENT, 'AlPin-CMS-Updater/1.0');
