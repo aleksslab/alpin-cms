@@ -200,7 +200,7 @@
             "type": "plugin",
             "name": "Резервное копирование",
             "description": "Создание, восстановление и скачивание резервных копий",
-            "version": "1.0.4",
+            "version": "1.0.5",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_backups.zip"
         },
         "cookie-banner": {
@@ -221,28 +221,28 @@
             "type": "plugin",
             "name": "Тёмная тема",
             "description": "Добавляет возможность переключать тёмную тему на сайте.",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_dark-theme.zip"
         },
         "filemanager": {
             "type": "plugin",
             "name": "Проводник (Файлы)",
             "description": "Файловый менеджер: структура проекта, загрузка медиа, правка кода, CHMOD.",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_filemanager.zip"
         },
         "history": {
             "type": "plugin",
             "name": "История изменений",
             "description": "Снапшоты версий страниц, откат только контента, лимит версий и автоочистка при удалении страницы.",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_history.zip"
         },
         "logs": {
             "type": "plugin",
             "name": "Логи системы",
             "description": "Просмотр и настройка журнала действий администратора",
-            "version": "1.0.3",
+            "version": "1.0.4",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_logs.zip"
         },
         "maintenance": {
@@ -291,7 +291,7 @@
             "type": "plugin",
             "name": "Корзина",
             "description": "Мягкое удаление страниц и меню: восстановление, окончательное удаление и очистка корзины.",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_trash.zip"
         },
         "updates": {
