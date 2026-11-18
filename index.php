@@ -138,9 +138,9 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
         <link rel="image_src" href="/<?php echo e($site_logo); ?>">
     <?php endif; ?>
     
-    <link href="css/style.css" rel="stylesheet" type="text/css"/>
-    <link href="css/theme.css" rel="stylesheet" type="text/css"/>
-    <link href="fonts/lucide.css" rel="stylesheet" type="text/css"/>
+    <link href="css/style.css?v=<?php echo @filemtime(APP_ROOT . '/css/style.css'); ?>" rel="stylesheet" type="text/css"/>
+    <link href="css/theme.css?v=<?php echo @filemtime(APP_ROOT . '/css/theme.css'); ?>" rel="stylesheet" type="text/css"/>
+    <link href="fonts/lucide.css?v=<?php echo @filemtime(APP_ROOT . '/fonts/lucide.css'); ?>" rel="stylesheet" type="text/css"/>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <?php
@@ -215,7 +215,7 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
         <script><?php echo $customJs; ?></script>
     <?php endif; ?>
     
-    <script src="js/script.js" type="text/javascript"></script>
+    <script src="js/script.js?v=<?php echo @filemtime(APP_ROOT . '/js/script.js'); ?>" type="text/javascript"></script>
     <?php do_action('render_body_end'); ?>
     <?php foreach ($assets['js'] as $jsUrl): ?>
         <script src="<?php echo $jsUrl; ?>"></script>

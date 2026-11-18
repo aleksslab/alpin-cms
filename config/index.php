@@ -168,7 +168,7 @@ if ($isAuth) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Конфигурация системы | <?php echo e(strip_tags(SITE_NAME)); ?></title>
     <link href="css/config.css?v=<?php echo filemtime('css/config.css'); ?>" rel="stylesheet" type="text/css"/>
-    <link href="/fonts/lucide.css" rel="stylesheet" type="text/css"/>
+    <link href="/fonts/lucide.css?v=<?php echo @filemtime(APP_ROOT . '/fonts/lucide.css'); ?>" rel="stylesheet" type="text/css"/>
     <script src="js/tailwindcss.js" type="text/javascript"></script>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">

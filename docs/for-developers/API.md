@@ -455,6 +455,18 @@ $assets = getModuleAssets(['hero', 'faq'], $settings, 'home');
 // ['css' => [...], 'js' => [...]]
 ```
 
+**Важно:** в возвращённых URL уже подставлен `?v=filemtime(...)`. В корневом
+`.htaccess` для CSS/JS включён годовой `immutable`, поэтому свои ассеты (плагин,
+модуль, шаблон) подключайте только с версией:
+
+```php
+$v = @filemtime(APP_ROOT . '/css/my.css');
+echo '<link href="css/my.css?v=' . $v . '" rel="stylesheet" type="text/css"/>';
+```
+
+Без `?v=` правка файла не дойдёт до посетителя с прогретым кешем. Админские
+ресурсы (`config/`) перекрыты в `config/.htaccess` — там час и `must-revalidate`.
+
 ---
 
 ### `getCombinedAssets(array $moduleIds, array $settings, string $pageId): array`
