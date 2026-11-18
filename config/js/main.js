@@ -307,7 +307,74 @@
         });
     }
 
-    // ===== 5. ТЁМНАЯ ТЕМА =====
+    // ===== 5. СВОРАЧИВАНИЕ САЙДБАРА (ДЕСКТОП) =====
+    function initSidebarCollapse() {
+        var root = document.documentElement;
+        var toggleBtn = document.getElementById('js-sidebar-collapse');
+        var icon = document.getElementById('js-sidebar-collapse-icon');
+        var sidebar = document.getElementById('js-admin-sidebar');
+        var storageKey = 'admin-sidebar-collapsed';
+
+        if (!toggleBtn || !icon || !sidebar) {
+            return;
+        }
+
+        var isCollapsed = root.classList.contains('admin-sidebar-collapsed');
+        var desktopQuery = window.matchMedia('(min-width: 768px)');
+
+        // В узкой колонке нет подписей — переносим их в title как подсказки.
+        // На мобилке подписи видны, там title не нужен.
+        function syncLinkTitles(collapsed) {
+            var links = sidebar.querySelectorAll('.sidebar-menu-link');
+            var useTitles = collapsed && desktopQuery.matches;
+
+            links.forEach(function (link) {
+                if (!useTitles) {
+                    link.removeAttribute('title');
+                    return;
+                }
+
+                var label = link.querySelector('span:not([class^="icon-"])');
+                var text = label ? label.textContent.trim() : '';
+
+                if (text) {
+                    link.setAttribute('title', text);
+                }
+            });
+        }
+
+        function applyState(collapsed) {
+            root.classList.toggle('admin-sidebar-collapsed', collapsed);
+            icon.className = collapsed ? 'icon-panel-left-open' : 'icon-panel-left-close';
+            toggleBtn.title = collapsed ? 'Развернуть меню' : 'Свернуть меню';
+            toggleBtn.setAttribute('aria-label', toggleBtn.title);
+            toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            syncLinkTitles(collapsed);
+        }
+
+        applyState(isCollapsed);
+
+        toggleBtn.addEventListener('click', function () {
+            isCollapsed = !root.classList.contains('admin-sidebar-collapsed');
+            applyState(isCollapsed);
+
+            try {
+                localStorage.setItem(storageKey, isCollapsed ? '1' : '0');
+            } catch (e) {}
+        });
+
+        // При переходе через 768px подсказки пора убрать или вернуть.
+        function handleBreakpointChange() {
+            syncLinkTitles(root.classList.contains('admin-sidebar-collapsed'));
+        }
+        if (desktopQuery.addEventListener) {
+            desktopQuery.addEventListener('change', handleBreakpointChange);
+        } else if (desktopQuery.addListener) {
+            desktopQuery.addListener(handleBreakpointChange);
+        }
+    }
+
+    // ===== 6. ТЁМНАЯ ТЕМА =====
     function initThemeToggle() {
         var storageKey = 'admin-theme';
         var toggleBtn = document.getElementById('js-theme-toggle');
@@ -339,7 +406,7 @@
         }
     }
 
-    // ===== 6. ТАЙМЕР СЕССИИ =====
+    // ===== 7. ТАЙМЕР СЕССИИ =====
     function initSessionTimer() {
         var notice = document.getElementById('js-session-notice');
         if (!notice) {
@@ -569,6 +636,7 @@
             initSecurityConfirm();
             initBurgerMenu();
             initSidebarAccordion();
+            initSidebarCollapse();
             initThemeToggle();
             initSessionTimer();
         });
@@ -578,6 +646,7 @@
         initSecurityConfirm();
         initBurgerMenu();
         initSidebarAccordion();
+        initSidebarCollapse();
         initThemeToggle();
         initSessionTimer();
     }

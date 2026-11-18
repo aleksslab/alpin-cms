@@ -170,6 +170,16 @@ if ($isAuth) {
     <link href="css/config.css?v=<?php echo filemtime('css/config.css'); ?>" rel="stylesheet" type="text/css"/>
     <link href="/fonts/lucide.css?v=<?php echo @filemtime(APP_ROOT . '/fonts/lucide.css'); ?>" rel="stylesheet" type="text/css"/>
     <script src="js/tailwindcss.js" type="text/javascript"></script>
+    <script>
+        // Свёрнутое меню включаем до первой отрисовки, иначе сайдбар «прыгает».
+        (function () {
+            try {
+                if (localStorage.getItem('admin-sidebar-collapsed') === '1') {
+                    document.documentElement.classList.add('admin-sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
 
@@ -230,7 +240,14 @@ if ($isAuth) {
             
             <!-- ЛЕВЫЙ САЙДБАР (ПАНЕЛЬ НАВИГАЦИИ С ПОДДЕРЖКОЙ СВОРАЧИВАНИЯ) -->
             <aside id="js-admin-sidebar" class="admin-sidebar-panel">
-                
+
+                <!-- СВОРАЧИВАНИЕ МЕНЮ (ДЕСКТОП) -->
+                <button type="button" id="js-sidebar-collapse" class="sidebar-collapse-btn"
+                        title="Свернуть меню" aria-label="Свернуть меню"
+                        aria-controls="js-admin-sidebar" aria-expanded="true">
+                    <span class="icon-panel-left-close" id="js-sidebar-collapse-icon"></span>
+                </button>
+
                 <!-- БЛОК 1: МОДУЛИ САЙТА -->
                 <?php 
                 $isModulesActive = false;

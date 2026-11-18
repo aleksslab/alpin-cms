@@ -972,8 +972,44 @@ input[type="checkbox"]:disabled {
     display: flex !important;
     flex-direction: column !important;
     gap: 4px !important;
-    transition: transform 0.3s ease-in-out !important;
+    transition: transform 0.3s ease-in-out, width 0.2s ease-in-out,
+                min-width 0.2s ease-in-out, padding 0.2s ease-in-out !important;
     z-index: 40 !important;
+}
+
+/* Кнопка сворачивания меню: только на десктопе */
+.sidebar-collapse-btn {
+    display: none;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin: 0 0 8px auto;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background-color: #f8fafc;
+    color: #64748b;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+.sidebar-collapse-btn:hover {
+    background-color: #f1f5f9;
+    color: #1e293b;
+}
+.sidebar-collapse-btn:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+[data-theme="dark"] .sidebar-collapse-btn {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #94a3b8;
+}
+[data-theme="dark"] .sidebar-collapse-btn:hover {
+    background-color: #334155;
+    color: #e2e8f0;
 }
 
 /* Мелкие аккуратные заголовки групп меню */
@@ -1109,6 +1145,60 @@ input[type="checkbox"]:disabled {
 @media (min-width: 768px) {
     #js-burger-trigger {
         display: none !important;
+    }
+
+    .sidebar-collapse-btn {
+        display: flex !important;
+    }
+
+    /* --- СВЁРНУТЫЙ САЙДБАР: УЗКАЯ КОЛОНКА С ИКОНКАМИ --- */
+    html.admin-sidebar-collapsed .admin-sidebar-panel {
+        width: 76px !important;
+        min-width: 76px !important;
+        padding: 1.5rem 0.5rem !important;
+    }
+    html.admin-sidebar-collapsed .sidebar-collapse-btn {
+        margin: 0 auto 8px auto !important;
+    }
+
+    /* Заголовки групп не нужны, пункты показываем всегда */
+    html.admin-sidebar-collapsed .sidebar-group-title,
+    html.admin-sidebar-collapsed .sidebar-group-chevron {
+        display: none !important;
+    }
+    html.admin-sidebar-collapsed .sidebar-group-content {
+        display: block !important;
+        margin-top: 0 !important;
+    }
+
+    /* Пункт — только иконка по центру */
+    html.admin-sidebar-collapsed .sidebar-menu-link {
+        justify-content: center !important;
+        gap: 0 !important;
+        padding: 0.75rem 0 !important;
+    }
+    html.admin-sidebar-collapsed .sidebar-menu-link > div {
+        justify-content: center !important;
+        gap: 0 !important;
+        width: 100% !important;
+    }
+    /* Подпись пункта — это span без класса icon-* (структура у групп разная) */
+    html.admin-sidebar-collapsed .sidebar-menu-link span:not([class^="icon-"]) {
+        display: none !important;
+    }
+
+    /* Кнопка «Справка» и метка скрытого модуля в узкой колонке не помещаются */
+    html.admin-sidebar-collapsed .sidebar-tab-help,
+    html.admin-sidebar-collapsed .sidebar-menu-link .icon-eye-off {
+        display: none !important;
+    }
+    html.admin-sidebar-collapsed .sidebar-tab-row {
+        justify-content: center !important;
+    }
+
+    /* Разделитель между группами — компактнее */
+    html.admin-sidebar-collapsed .admin-sidebar-panel > .border-t {
+        margin: 0.5rem 0 !important;
     }
 }
 /* ==========================================================================
