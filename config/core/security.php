@@ -299,6 +299,30 @@ function detectZipSlip(ZipArchive $zip): ?string {
 }
 
 /**
+ * Сверяет SHA-256-хеш архива с ожидаемым значением из каталога.
+ *
+ * Сравнение через hash_equals. Хеш неверного формата считается
+ * несовпадением, а не поводом пропустить проверку.
+ *
+ * @param string $path     Путь к локальному файлу
+ * @param string $expected Ожидаемый хеш (hex, 64 символа)
+ * @return bool
+ */
+function verifyArchiveChecksum(string $path, string $expected): bool {
+    $expected = strtolower(trim($expected));
+    if (preg_match('/^[a-f0-9]{64}$/', $expected) !== 1) {
+        return false;
+    }
+
+    $actual = @hash_file('sha256', $path);
+    if ($actual === false) {
+        return false;
+    }
+
+    return hash_equals($expected, strtolower($actual));
+}
+
+/**
  * Проверяет CSRF-токен из запроса.
  *
  * Сравнение через hash_equals, поэтому токен должен быть строкой.

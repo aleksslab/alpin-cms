@@ -150,7 +150,7 @@ uasort($modules, function ($a, $b) {
 
                 <div class="flex items-center gap-2 flex-shrink-0">
                     <?php if ($updateInfo): ?>
-                        <button type="button" onclick="installModuleFromCatalog('<?php echo e(escapeJsString(is_string($updateInfo['url'] ?? null) ? $updateInfo['url'] : '')); ?>', '<?php echo e(escapeJsString($id)); ?>', this)"
+                        <button type="button" onclick="installModuleFromCatalog('<?php echo e(escapeJsString(is_string($updateInfo['url'] ?? null) ? $updateInfo['url'] : '')); ?>', '<?php echo e(escapeJsString($id)); ?>', '<?php echo e(escapeJsString(is_string($updateInfo['sha256'] ?? null) ? $updateInfo['sha256'] : '')); ?>', this)"
                                 class="text-[10px] text-amber-600 hover:text-amber-800 transition-colors cursor-pointer flex items-center gap-1 font-bold">
                             <span class="icon-download text-xs"></span> Обновить
                         </button>
@@ -224,7 +224,7 @@ uasort($modules, function ($a, $b) {
                                     v<?php echo e($module['version'] ?? '1.0.0'); ?>
                                 </td>
                                 <td class="py-3 text-right px-4">
-                                    <button type="button" onclick="installModuleFromCatalog('<?php echo e(escapeJsString(is_string($module['url'] ?? null) ? $module['url'] : '')); ?>', '<?php echo e(escapeJsString($id)); ?>', this)" class="px-3 py-1.5 bg-[var(--primary-color)] text-white text-xs font-bold rounded-lg hover:bg-[var(--primary-dark)] transition-all flex items-center gap-1 ml-auto">
+                                    <button type="button" onclick="installModuleFromCatalog('<?php echo e(escapeJsString(is_string($module['url'] ?? null) ? $module['url'] : '')); ?>', '<?php echo e(escapeJsString($id)); ?>', '<?php echo e(escapeJsString(is_string($module['sha256'] ?? null) ? $module['sha256'] : '')); ?>', this)" class="px-3 py-1.5 bg-[var(--primary-color)] text-white text-xs font-bold rounded-lg hover:bg-[var(--primary-dark)] transition-all flex items-center gap-1 ml-auto">
                                         <span class="icon-download text-sm"></span> Установить
                                     </button>
                                 </td>
@@ -247,7 +247,7 @@ uasort($modules, function ($a, $b) {
                     </div>
                     <p class="text-xs text-slate-500 mb-3"><?php echo e($module['description'] ?? ''); ?></p>
 
-                    <button type="button" onclick="installModuleFromCatalog('<?php echo e(escapeJsString(is_string($module['url'] ?? null) ? $module['url'] : '')); ?>', '<?php echo e(escapeJsString($id)); ?>', this)" class="w-full h-10 bg-[var(--primary-color)] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all">
+                    <button type="button" onclick="installModuleFromCatalog('<?php echo e(escapeJsString(is_string($module['url'] ?? null) ? $module['url'] : '')); ?>', '<?php echo e(escapeJsString($id)); ?>', '<?php echo e(escapeJsString(is_string($module['sha256'] ?? null) ? $module['sha256'] : '')); ?>', this)" class="w-full h-10 bg-[var(--primary-color)] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all">
                         <span class="icon-download text-sm"></span> Установить
                     </button>
                 </div>
@@ -296,7 +296,7 @@ function unpackModule(moduleId, btn) {
 /**
  * Установка или обновление модуля из каталога
  */
-function installModuleFromCatalog(url, id, btn) {
+function installModuleFromCatalog(url, id, sha256, btn) {
     if (!confirm('Установить или обновить модуль "' + id + '"?')) return;
 
     const originalText = btn.innerHTML;
@@ -306,6 +306,7 @@ function installModuleFromCatalog(url, id, btn) {
     const formData = new FormData();
     formData.append('url', url);
     formData.append('id', id);
+    formData.append('sha256', sha256 || '');
     formData.append('csrf_token', '<?php echo escapeJsString($token); ?>');
 
     fetch('index.php?tab=modules&ajax=module_install_from_url', {

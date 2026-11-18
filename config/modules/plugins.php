@@ -213,7 +213,7 @@ uasort($plugins, function($a, $b) {
                                     v<?php echo e($plugin['version']); ?>
                                 </td>
                                 <td class="py-3 text-right px-4">
-                                    <button type="button" onclick="installPluginFromCatalog('<?php echo e($plugin['url']); ?>', '<?php echo e($id); ?>', this)" class="px-3 py-1.5 bg-[var(--primary-color)] text-white text-xs font-bold rounded-lg hover:bg-[var(--primary-dark)] transition-all flex items-center gap-1 ml-auto">
+                                    <button type="button" onclick="installPluginFromCatalog('<?php echo e($plugin['url']); ?>', '<?php echo e($id); ?>', '<?php echo e($plugin['sha256'] ?? ''); ?>', this)" class="px-3 py-1.5 bg-[var(--primary-color)] text-white text-xs font-bold rounded-lg hover:bg-[var(--primary-dark)] transition-all flex items-center gap-1 ml-auto">
                                         <span class="icon-download text-sm"></span> Установить
                                     </button>
                                 </td>
@@ -236,7 +236,7 @@ uasort($plugins, function($a, $b) {
                     </div>
                     <p class="text-xs text-slate-500 mb-3"><?php echo e($plugin['description'] ?? ''); ?></p>
                     
-                    <button type="button" onclick="installPluginFromCatalog('<?php echo e($plugin['url']); ?>', '<?php echo e($id); ?>', this)" class="w-full h-10 bg-[var(--primary-color)] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all">
+                    <button type="button" onclick="installPluginFromCatalog('<?php echo e($plugin['url']); ?>', '<?php echo e($id); ?>', '<?php echo e($plugin['sha256'] ?? ''); ?>', this)" class="w-full h-10 bg-[var(--primary-color)] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all">
                         <span class="icon-download text-sm"></span> Установить
                     </button>
                 </div>
@@ -252,7 +252,7 @@ include __DIR__ . '/plugin_upload.php';
 </div>
 
 <script>
-function installPluginFromCatalog(url, id, btn) {
+function installPluginFromCatalog(url, id, sha256, btn) {
     if (!confirm('Установить плагин "' + id + '"?')) return;
     
     const originalText = btn.innerHTML;
@@ -262,6 +262,7 @@ function installPluginFromCatalog(url, id, btn) {
     const formData = new FormData();
     formData.append('url', url);
     formData.append('id', id);
+    formData.append('sha256', sha256 || '');
     formData.append('csrf_token', '<?php echo e($token); ?>');
     
     fetch('index.php?tab=plugins&ajax=plugin_install_from_url', {

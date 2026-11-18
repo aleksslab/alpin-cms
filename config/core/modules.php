@@ -513,17 +513,24 @@ function reinstallModule(string $moduleId): array {
 /**
  * Скачивает ZIP-архив модуля по URL во временный файл.
  *
- * @param string $url URL архива
- * @param string $id  ID модуля (для имени файла)
+ * Если передан ожидаемый SHA-256 (из каталога), архив сверяется после
+ * скачивания. Пустая строка означает «хеша нет, проверять нечего».
+ *
+ * @param string      $url            URL архива
+ * @param string      $id             ID модуля (для имени файла)
+ * @param string      $expectedSha256 Ожидаемый SHA-256 из каталога ('' — без проверки)
+ * @param string|null $error          Причина ошибки (заполняется при неудаче)
  * @return string|null Путь к временному файлу или null
  */
-function downloadModuleZip(string $url, string $id): ?string {
+function downloadModuleZip(string $url, string $id, string $expectedSha256 = '', ?string &$error = null): ?string {
     if (!isValidId($id)) {
+        $error = 'Недопустимый ID модуля.';
         return null;
     }
 
     $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
     if (!in_array($scheme, ['http', 'https'], true)) {
+        $error = 'Разрешены только адреса http:// и https://.';
         return null;
     }
 
@@ -535,6 +542,7 @@ function downloadModuleZip(string $url, string $id): ?string {
     if (function_exists('curl_init')) {
         $fp = fopen($tempFile, 'w');
         if ($fp === false) {
+            $error = 'Не удалось создать временный файл.';
             return null;
         }
 
@@ -555,6 +563,14 @@ function downloadModuleZip(string $url, string $id): ?string {
 
     if (!$success || !file_exists($tempFile) || filesize($tempFile) === 0 || filesize($tempFile) > $maxSize) {
         @unlink($tempFile);
+        $error = 'Не удалось скачать архив по указанному адресу.';
+        return null;
+    }
+
+    // Хеша нет — ставим как раньше. Хеш есть — архив обязан совпасть.
+    if ($expectedSha256 !== '' && !verifyArchiveChecksum($tempFile, $expectedSha256)) {
+        @unlink($tempFile);
+        $error = 'Контрольная сумма архива не совпала с каталогом. Установка отменена.';
         return null;
     }
 

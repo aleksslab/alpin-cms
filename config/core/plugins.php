@@ -268,18 +268,25 @@ function _settings_path_set(array &$data, string $path, $value): void {
 /**
  * Скачивает ZIP-архив плагина по URL во временный файл.
  *
- * @param string $url
- * @param string $id ID плагина (для имени файла)
+ * Если передан ожидаемый SHA-256 (из каталога), архив сверяется после
+ * скачивания. Пустая строка означает «хеша нет, проверять нечего».
+ *
+ * @param string      $url            URL архива
+ * @param string      $id             ID плагина (для имени файла)
+ * @param string      $expectedSha256 Ожидаемый SHA-256 из каталога ('' — без проверки)
+ * @param string|null $error          Причина ошибки (заполняется при неудаче)
  * @return string|null Путь к временному файлу или null
  */
-function downloadPluginZip(string $url, string $id): ?string {
+function downloadPluginZip(string $url, string $id, string $expectedSha256 = '', ?string &$error = null): ?string {
     // ID приходит из запроса и участвует в пути: не даём выйти за data/
     if (!isValidId($id)) {
+        $error = 'Недопустимый ID плагина.';
         return null;
     }
 
     // Только http(s): file://, php://, ftp:// и прочие схемы недопустимы
     if (!in_array(strtolower((string)parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+        $error = 'Разрешены только адреса http:// и https://.';
         return null;
     }
 
@@ -289,6 +296,7 @@ function downloadPluginZip(string $url, string $id): ?string {
     ];
     
     if (!$env['curl'] && !$env['fopen']) {
+        $error = 'На сервере недоступны ни cURL, ни allow_url_fopen.';
         return null;
     }
     
@@ -299,6 +307,7 @@ function downloadPluginZip(string $url, string $id): ?string {
     if ($env['curl']) {
         $fp = fopen($tempFile, 'w');
         if ($fp === false) {
+            $error = 'Не удалось создать временный файл.';
             return null;
         }
 
@@ -319,6 +328,14 @@ function downloadPluginZip(string $url, string $id): ?string {
     
     if (!$success || !file_exists($tempFile) || filesize($tempFile) === 0 || filesize($tempFile) > $maxSize) {
         @unlink($tempFile);
+        $error = 'Не удалось скачать архив по указанному адресу.';
+        return null;
+    }
+
+    // Хеша нет — ставим как раньше. Хеш есть — архив обязан совпасть.
+    if ($expectedSha256 !== '' && !verifyArchiveChecksum($tempFile, $expectedSha256)) {
+        @unlink($tempFile);
+        $error = 'Контрольная сумма архива не совпала с каталогом. Установка отменена.';
         return null;
     }
     
@@ -506,6 +523,8 @@ function refresh_updates_cache(string $catalogUrl, ?string &$error = null) {
             $latestVersion = $extInfo['version'] ?? '0.0.0';
             $url = $extInfo['download_url'] ?? '#';
             $name = $extInfo['name'] ?? $extId;
+            // Хеш может отсутствовать: старые каталоги его не отдают.
+            $sha256 = is_string($extInfo['sha256'] ?? null) ? $extInfo['sha256'] : '';
             
             $installedVersion = null;
             if ($type === 'module') {
@@ -529,7 +548,8 @@ function refresh_updates_cache(string $catalogUrl, ?string &$error = null) {
                     'description' => $extInfo['description'] ?? '',
                     'version' => $latestVersion,
                     'type' => $type,
-                    'url' => $url
+                    'url' => $url,
+                    'sha256' => $sha256
                 ];
             } elseif (version_compare($latestVersion, $installedVersion, '>')) {
                 $updates[$extId] = [
@@ -537,7 +557,8 @@ function refresh_updates_cache(string $catalogUrl, ?string &$error = null) {
                     'current' => $installedVersion,
                     'latest' => $latestVersion,
                     'type' => $type,
-                    'url' => $url
+                    'url' => $url,
+                    'sha256' => $sha256
                 ];
             }
         }

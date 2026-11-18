@@ -10,6 +10,7 @@
             "description": "Слайдер для сравнения двух изображений",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_before-after.zip",
+            "sha256": "083c20764ed4f98a8f124f696c240f4ea62f95d68424be5f58212c193fbb7b40",
             "icon": "icon-split"
         },
         "brands-marquee": {
@@ -18,6 +19,7 @@
             "description": "Бесконечная лента с логотипами партнеров и клиентов",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_brands-marquee.zip",
+            "sha256": "3eff55f08f7317da28d72b0d66a3d00f4f860c3c4f223d033b514f0ab7099c99",
             "icon": "icon-images"
         },
         "calculator": {
@@ -26,6 +28,7 @@
             "description": "Интерактивный калькулятор подбора порции для собак и кошек",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_calculator.zip",
+            "sha256": "591d3bf1641c24139da9db9d7d915b192aa06f996155baf277268edc38555211",
             "icon": "icon-calculator"
         },
         "cards": {
@@ -34,6 +37,7 @@
             "description": "Сетка карточек с изображением, названием и ссылкой",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_cards.zip",
+            "sha256": "d64a6f29e2c5bb96f420aa1cb48edd20f3fa9136b1da3ea86a0b798ba3091bde",
             "icon": "icon-award"
         },
         "carousel": {
@@ -42,6 +46,7 @@
             "description": "Слайдер с изображениями и текстом",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_carousel.zip",
+            "sha256": "aaac9142dda1ce544c5d9003eea99f1ac616405175b66feed17e3042df03d97b",
             "icon": "icon-image"
         },
         "contacts": {
@@ -50,6 +55,7 @@
             "description": "Контактная информация, форма обратной связи и карта",
             "version": "1.0.5",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_contacts.zip",
+            "sha256": "6cb49fcddb344aa4b18641497119df70929a25b2c1c0e05b29f46d3fb8c0b8e1",
             "icon": "icon-phone"
         },
         "countdown": {
@@ -58,6 +64,7 @@
             "description": "Таймер до указанной даты с визуальным оформлением",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_countdown.zip",
+            "sha256": "f3c0d43f95015489a285636a7a26e34c25affa2d8b59e1e82f8ee3fd77033fc1",
             "icon": "icon-clock"
         },
         "faq": {
@@ -66,6 +73,7 @@
             "description": "Аккордеон с вопросами и ответами",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_faq.zip",
+            "sha256": "815af21a282cebfafed6dd933b630103a1a765ac1b9e5ca28d6e4c9deb4945a0",
             "icon": "icon-help-circle"
         },
         "hero-landing": {
@@ -74,6 +82,7 @@
             "description": "Hero для лендинга: две кнопки, визуал, микро-факты, split-раскладка",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_hero-landing.zip",
+            "sha256": "30616e10652618219cf180e7ac18904bdec494aded504bbb0b7a9ac37b58ea57",
             "icon": "icon-layout-panel-top"
         },
         "hero": {
@@ -82,6 +91,7 @@
             "description": "Полноэкранный баннер с заголовком и кнопкой",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_hero.zip",
+            "sha256": "516cddee5100da51c3e8c2d76810d6429a83312789a222f75d2e3aeab0ed4a8d",
             "icon": "icon-layout-dashboard"
         },
         "icons-list": {
@@ -90,6 +100,7 @@
             "description": "Элементы с иконкой, заголовком и описанием",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_icons-list.zip",
+            "sha256": "ae396cf0f799d8abb168bc88d812b63d45d6bf07f86e52f89689f3b397d1f5b2",
             "icon": "icon-list"
         },
         "lead-form": {
@@ -98,6 +109,7 @@
             "description": "Готовая форма обратной связи с настройками полей",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_lead-form.zip",
+            "sha256": "ebd633994f6e0827e26042340dba90af70c7e45daa07cf55c434429ef0309347",
             "icon": "icon-mail"
         },
         "map-advanced": {
@@ -106,6 +118,7 @@
             "description": "Интерактивная карта с кастомными метками",
             "version": "1.0.5",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_map-advanced.zip",
+            "sha256": "1fde4944f898003528d0b33146bf073902515e56eb8f2fe8a93340350bce13cc",
             "icon": "icon-map-pin"
         },
         "portfolio": {
@@ -114,6 +127,7 @@
             "description": "Сетка портфолио с фильтрацией по категориям",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_portfolio.zip",
+            "sha256": "e8affd86541f6e54cac0b826b3d4afc8d331ff050cd14c84b0f0f2453293b9e0",
             "icon": "icon-grid"
         },
         "pricing": {
@@ -122,6 +136,7 @@
             "description": "Тарифы с переключателем месячной\/годовой оплаты",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_pricing.zip",
+            "sha256": "c7e76c7308f121ec7072f7ff1d393628f88c5b21bf1673dafd77bae64e9523bb",
             "icon": "icon-credit-card"
         },
         "quiz": {
@@ -130,6 +145,7 @@
             "description": "Интерактивный квиз для сбора данных и квалификации лидов",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_quiz.zip",
+            "sha256": "194f7c5fde1a2760a58a64233e849ac568b5f99df333e9952181c34cadffaf1b",
             "icon": "icon-message-square"
         },
         "site-menu": {
@@ -138,6 +154,7 @@
             "description": "Выводит любое созданное в системе меню в виде списка ссылок",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_site-menu.zip",
+            "sha256": "4bdf9db6aabb98d06a967728cdc1b51f6a4096d32c30a08403c52a92a9c1382f",
             "icon": "icon-menu"
         },
         "slider-advanced": {
@@ -146,6 +163,7 @@
             "description": "Полноэкранный слайдер с эффектами перехода",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_slider-advanced.zip",
+            "sha256": "162e43b600f8ecd4a39e3b1b70596de4be4e96465da4cd6915a5c0b36a65b0c7",
             "icon": "icon-images"
         },
         "social-icons": {
@@ -154,6 +172,7 @@
             "description": "Иконки социальных сетей из настроек сайта",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_social-icons.zip",
+            "sha256": "99fe7d77c937c04378a5e9d67d9525c674641ade9826535990e6a2db7ce8267f",
             "icon": "icon-share-2"
         },
         "stats": {
@@ -162,6 +181,7 @@
             "description": "Блок со счетчиками и анимацией при скролле",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_stats.zip",
+            "sha256": "ebf510e2bdfa0d16ad36cd0eff080979392a21ed0947cc78d2224a2f06643231",
             "icon": "icon-trending-up"
         },
         "testimonials": {
@@ -170,6 +190,7 @@
             "description": "Отзывы клиентов с фото, видео и рейтингом",
             "version": "1.0.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_testimonials.zip",
+            "sha256": "73d74d8a1221c9ee6bd68ba92c2901c19064e876ac5aa33750745d8ab02edcc2",
             "icon": "icon-message-square"
         },
         "text-media": {
@@ -178,6 +199,7 @@
             "description": "Блок с текстом и изображением, особенностями и статистикой",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_text-media.zip",
+            "sha256": "87afaf6aa4e0f7a210e698385ae92d7f0d4b3902ec6f054a30f4a7182466a0f2",
             "icon": "icon-file-text"
         },
         "text": {
@@ -186,6 +208,7 @@
             "description": "Блок с произвольным HTML\/текстом",
             "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_text.zip",
+            "sha256": "df3fef918e9fe7a6cc3aacc93081697bc5dc0bdb7cf079927e5edcfd91be76b2",
             "icon": "icon-file-text"
         },
         "timeline": {
@@ -194,6 +217,7 @@
             "description": "Отображение этапов работы, истории или плана действий",
             "version": "1.0.0",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_timeline.zip",
+            "sha256": "1f4e7429fb0eb89b361bd157f7362c3b5d123caf8e7f3b135b4cc8e97454e0fc",
             "icon": "icon-timeline"
         },
         "backups": {
@@ -201,105 +225,120 @@
             "name": "Резервное копирование",
             "description": "Создание, восстановление и скачивание резервных копий",
             "version": "1.0.5",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_backups.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_backups.zip",
+            "sha256": "7bf54feda3e51e6eae325ab0577b3793a5b0a00dd7b0232395082eae85fade44"
         },
         "cookie-banner": {
             "type": "plugin",
             "name": "Cookie-баннер",
             "description": "Настраиваемое уведомление о cookies: текст, ссылки на политику и условия, срок согласия.",
-            "version": "1.1.0",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-banner.zip"
+            "version": "1.1.1",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-banner.zip",
+            "sha256": "906f568a6adb065f12b1d777c4261fa1a0140a7944e5c659787b58800cb87d8c"
         },
         "cookie-consent": {
             "type": "plugin",
             "name": "Cookie-согласие",
             "description": "Категории cookie, баннер с выбором и активация скриптов только после явного согласия посетителя.",
-            "version": "1.0.5",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-consent.zip"
+            "version": "1.0.6",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-consent.zip",
+            "sha256": "b824f123ef00e49b4d5c9c1fc225943f84bcbdc27cb887a35fa73d0f0b68fa28"
         },
         "dark-theme": {
             "type": "plugin",
             "name": "Тёмная тема",
             "description": "Добавляет возможность переключать тёмную тему на сайте.",
             "version": "1.0.2",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_dark-theme.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_dark-theme.zip",
+            "sha256": "5a7a22c801e7131ea44ce5c418a631fa569be125f4e22f1f1f03c3e5f1eceffd"
         },
         "filemanager": {
             "type": "plugin",
             "name": "Проводник (Файлы)",
             "description": "Файловый менеджер: структура проекта, загрузка медиа, правка кода, CHMOD.",
             "version": "1.0.2",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_filemanager.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_filemanager.zip",
+            "sha256": "e80e26d1ed5e888bb7fc6d96f1215727d1081a3696977f8e6d4a9a199eefce4d"
         },
         "history": {
             "type": "plugin",
             "name": "История изменений",
             "description": "Снапшоты версий страниц, откат только контента, лимит версий и автоочистка при удалении страницы.",
             "version": "1.0.1",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_history.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_history.zip",
+            "sha256": "bd7637da973a03c30734cfb207b51f930261c722cad9abdafb0793d834a51cb9"
         },
         "logs": {
             "type": "plugin",
             "name": "Логи системы",
             "description": "Просмотр и настройка журнала действий администратора",
             "version": "1.0.4",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_logs.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_logs.zip",
+            "sha256": "82d06951490b06338f6932facc8cbbc31a64a861e23bd7ec273ad5d766353f45"
         },
         "maintenance": {
             "type": "plugin",
             "name": "Технические работы",
             "description": "Заглушка 503 для посетителей, bypass-ссылка, автоснятие.",
             "version": "0.9.2",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_maintenance.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_maintenance.zip",
+            "sha256": "91cbb88ec8ce518d25d899c987f45efe00de084b102f336bd81c0e0df92bf9dd"
         },
         "media-optimization": {
             "type": "plugin",
             "name": "Медиа (WebP)",
             "description": "Конвертация изображений в WebP, статистика и массовая обработка.",
             "version": "1.0.2",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_media-optimization.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_media-optimization.zip",
+            "sha256": "2a2d1d09d6896213bb2ffc6d43823a1a4c37e3ce001abdc8205b36326a11d7f3"
         },
         "preview": {
             "type": "plugin",
             "name": "Предпросмотр",
             "description": "Временный предпросмотр из конструктора и постоянные preview-ссылки для согласования страниц.",
             "version": "1.0.0",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_preview.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_preview.zip",
+            "sha256": "e4f82f285c6d58bfec510fe464fcfa439c03b718c617d037adbad26cd5e00482"
         },
         "publish": {
             "type": "plugin",
             "name": "Автопубликация страниц",
             "description": "Cron-публикация и архивация страниц по расписанию (publish_at \/ unpublish_at).",
             "version": "1.0.4",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_publish.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_publish.zip",
+            "sha256": "d7445aa88b9efb8dfef46fb91ac29ec418ae8e731238ae9e4d7b308b0c09dde8"
         },
         "scheduler": {
             "type": "plugin",
             "name": "Планировщик задач",
             "description": "Секция «Интеграция с планировщиком» в Настройках сайта: токен крона и список URL крон-задач.",
             "version": "1.0.3",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_scheduler.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_scheduler.zip",
+            "sha256": "b811857d9437cdc082cfb6c9fc09a6d7d95a4696441304389badd64bd724e92f"
         },
         "seo-tools": {
             "type": "plugin",
             "name": "SEO-инструменты",
             "description": "Генерация sitemap.xml и robots.txt: автообновление при изменении страниц, ручная пересборка и cron-задача.",
             "version": "1.0.1",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_seo-tools.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_seo-tools.zip",
+            "sha256": "f6fa53c12bf7827d11228256cc18d3dc3df5ecfbad34adfd95c649873176b83c"
         },
         "trash": {
             "type": "plugin",
             "name": "Корзина",
             "description": "Мягкое удаление страниц и меню: восстановление, окончательное удаление и очистка корзины.",
             "version": "1.0.1",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_trash.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_trash.zip",
+            "sha256": "ed2260189cf7d2aa8a03845750578dbe462081620ccb4b9b8ce1562c19ad7d5a"
         },
         "updates": {
             "type": "plugin",
             "name": "Обновления",
             "description": "Проверка новых версий ядра, модулей и плагинов",
             "version": "0.9.0",
-            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_updates.zip"
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_updates.zip",
+            "sha256": "956505adab1ce8e8def97b51a4459b7183be16eb2d41c7fb1c5f301c30786408"
         }
     }
 }

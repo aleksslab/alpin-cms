@@ -93,9 +93,16 @@ function handle_admin_ajax_actions(): void {
 
         $url = $_POST['url'] ?? '';
         $id = $_POST['id'] ?? '';
+        $sha256 = is_string($_POST['sha256'] ?? null) ? strtolower(trim($_POST['sha256'])) : '';
         
         if (!filter_var($url, FILTER_VALIDATE_URL) || !isValidId($id)) {
             echo json_encode(['success' => false, 'error' => 'Неверные параметры запроса.']);
+            exit;
+        }
+
+        // Хеш необязателен, но если пришёл — формат должен быть строгим.
+        if ($sha256 !== '' && preg_match('/^[a-f0-9]{64}$/', $sha256) !== 1) {
+            echo json_encode(['success' => false, 'error' => 'Неверный формат контрольной суммы.']);
             exit;
         }
         
@@ -106,10 +113,11 @@ function handle_admin_ajax_actions(): void {
             exit;
         }
 
-        $zipPath = downloadPluginZip($url, $id);
+        $downloadError = null;
+        $zipPath = downloadPluginZip($url, $id, $sha256, $downloadError);
         
         if (!$zipPath) {
-            echo json_encode(['success' => false, 'error' => 'Не удалось скачать архив.']);
+            echo json_encode(['success' => false, 'error' => $downloadError ?: 'Не удалось скачать архив.']);
             exit;
         }
         
@@ -126,11 +134,17 @@ function handle_admin_ajax_actions(): void {
                     safeFileWrite($cacheFile, json_encode($cache, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
                 }
             }
+
+            // Без HTTPS и без хеша целостность архива проверить нечем.
+            $note = '';
+            if ($sha256 === '' && strtolower((string)parse_url($url, PHP_URL_SCHEME)) === 'http') {
+                $note = ' Архив получен по http без контрольной суммы — целостность не проверена.';
+            }
             
             // Ставим флеш
-            setFlash($result['message']);
+            setFlash($result['message'] . $note);
             
-            echo json_encode(['success' => true, 'message' => $result['message']]);
+            echo json_encode(['success' => true, 'message' => $result['message'] . $note]);
         } else {
             setFlash($result['message'], 'error');
             echo json_encode(['success' => false, 'error' => $result['message']]);
@@ -150,9 +164,16 @@ function handle_admin_ajax_actions(): void {
 
         $url = $_POST['url'] ?? '';
         $id = $_POST['id'] ?? '';
+        $sha256 = is_string($_POST['sha256'] ?? null) ? strtolower(trim($_POST['sha256'])) : '';
 
         if (!filter_var($url, FILTER_VALIDATE_URL) || !isValidId($id)) {
             echo json_encode(['success' => false, 'error' => 'Неверные параметры запроса.']);
+            exit;
+        }
+
+        // Хеш необязателен, но если пришёл — формат должен быть строгим.
+        if ($sha256 !== '' && preg_match('/^[a-f0-9]{64}$/', $sha256) !== 1) {
+            echo json_encode(['success' => false, 'error' => 'Неверный формат контрольной суммы.']);
             exit;
         }
 
@@ -161,9 +182,10 @@ function handle_admin_ajax_actions(): void {
             exit;
         }
 
-        $zipPath = downloadModuleZip($url, $id);
+        $downloadError = null;
+        $zipPath = downloadModuleZip($url, $id, $sha256, $downloadError);
         if (!$zipPath) {
-            echo json_encode(['success' => false, 'error' => 'Не удалось скачать архив модуля.']);
+            echo json_encode(['success' => false, 'error' => $downloadError ?: 'Не удалось скачать архив модуля.']);
             exit;
         }
 
@@ -188,8 +210,14 @@ function handle_admin_ajax_actions(): void {
                 }
             }
 
-            setFlash($result['message']);
-            echo json_encode(['success' => true, 'message' => $result['message']]);
+            // Без HTTPS и без хеша целостность архива проверить нечем.
+            $note = '';
+            if ($sha256 === '' && strtolower((string)parse_url($url, PHP_URL_SCHEME)) === 'http') {
+                $note = ' Архив получен по http без контрольной суммы — целостность не проверена.';
+            }
+
+            setFlash($result['message'] . $note);
+            echo json_encode(['success' => true, 'message' => $result['message'] . $note]);
         } else {
             setFlash($result['message'], 'error');
             echo json_encode(['success' => false, 'error' => $result['message']]);

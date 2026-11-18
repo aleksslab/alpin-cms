@@ -233,7 +233,9 @@ my-module.zip
 3. Пересобери `catalog.json` (`catalog-builder.php`, локальный скрипт, в
    репозиторий не входит).
 4. Проверь запись: `type: "module"`, `download_url` заканчивается на
-   `mod_{id}.zip`.
+   `mod_{id}.zip`, `sha256` — 64 hex-символа (его пишет `catalog-builder.php`).
+5. Ядро сверяет `sha256` после скачивания: подменённый или оборванный архив
+   отклоняется.
 
 Поля записи `catalog.json`:
 
@@ -244,6 +246,7 @@ my-module.zip
     "description": "Полноэкранный блок с заголовком",
     "version": "1.0.0",
     "download_url": "https://raw.githubusercontent.com/AlekSSLab/alpin-cms/.../catalog/mod_hero.zip",
+    "sha256": "9f2c…",
     "icon": "icon-layout-dashboard"
 }
 ```
