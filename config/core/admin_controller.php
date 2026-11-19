@@ -1791,6 +1791,21 @@ function handleModuleAction(): array {
         $modules = getModulesData();
         $isUpdate = isset($modules[$moduleId]);
 
+        // Повторная загрузка той же версии не должна трогать рабочий код:
+        // иначе он удаляется как «ненужный» и модуль пропадает со страниц.
+        if ($isUpdate && _moduleHasCode($moduleId)) {
+            $currentVersion = (string)($modules[$moduleId]['version'] ?? '0.0.0');
+            $uploadedVersion = (string)($manifest['version'] ?? '1.0.0');
+
+            if (version_compare($uploadedVersion, $currentVersion, '==')) {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Модуль "' . ($manifest['name'] ?? $moduleId) . '" уже установлен (версия ' . $currentVersion . '). Обновление не требуется.'
+                ]);
+                exit;
+            }
+        }
+
         if ($isUpdate) {
             // === ОБНОВЛЕНИЕ МОДУЛЯ ===
             // Старый код не удаляем: распаковка уберёт его в резервную копию

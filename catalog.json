@@ -248,9 +248,9 @@
             "type": "plugin",
             "name": "Тёмная тема",
             "description": "Добавляет возможность переключать тёмную тему на сайте.",
-            "version": "1.0.2",
+            "version": "1.0.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_dark-theme.zip",
-            "sha256": "5a7a22c801e7131ea44ce5c418a631fa569be125f4e22f1f1f03c3e5f1eceffd"
+            "sha256": "b7652ea176590b5347e77ae5054d286ef94907128c67e32884a454db2203d92b"
         },
         "filemanager": {
             "type": "plugin",
