@@ -1,6 +1,6 @@
 {
     "core": {
-        "version": "2.0.0",
+        "version": "2.1.0",
         "download_url": "https:\/\/github.com\/AlekSSLab\/alpin-cms\/releases\/latest"
     },
     "extensions": {
@@ -224,17 +224,17 @@
             "type": "plugin",
             "name": "Резервное копирование",
             "description": "Создание, восстановление и скачивание резервных копий",
-            "version": "1.0.5",
+            "version": "1.0.6",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_backups.zip",
-            "sha256": "7bf54feda3e51e6eae325ab0577b3793a5b0a00dd7b0232395082eae85fade44"
+            "sha256": "a34ab82798c8c2ecbcd27e97b2d05103fbd4a7ac734070a21ce00a92c95f43d1"
         },
         "cookie-banner": {
             "type": "plugin",
             "name": "Cookie-баннер",
             "description": "Настраиваемое уведомление о cookies: текст, ссылки на политику и условия, срок согласия.",
-            "version": "1.1.1",
+            "version": "1.1.2",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-banner.zip",
-            "sha256": "906f568a6adb065f12b1d777c4261fa1a0140a7944e5c659787b58800cb87d8c"
+            "sha256": "f640451c324df481d867e3fc149c8ad5dfb3cfc667b3a4905624938959f6ac77"
         },
         "cookie-consent": {
             "type": "plugin",
@@ -248,97 +248,97 @@
             "type": "plugin",
             "name": "Тёмная тема",
             "description": "Добавляет возможность переключать тёмную тему на сайте.",
-            "version": "1.0.3",
+            "version": "1.0.4",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_dark-theme.zip",
-            "sha256": "b7652ea176590b5347e77ae5054d286ef94907128c67e32884a454db2203d92b"
+            "sha256": "d40a15941c7010df00973815ea26e1f800a9e8a3efa6b9ecace11fd293add31d"
         },
         "filemanager": {
             "type": "plugin",
             "name": "Проводник (Файлы)",
             "description": "Файловый менеджер: структура проекта, загрузка медиа, правка кода, CHMOD.",
-            "version": "1.0.2",
+            "version": "1.0.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_filemanager.zip",
-            "sha256": "e80e26d1ed5e888bb7fc6d96f1215727d1081a3696977f8e6d4a9a199eefce4d"
+            "sha256": "2720301568408df7011e14aef09a36bd277a351f7e10bf43775966facffad0d2"
         },
         "history": {
             "type": "plugin",
             "name": "История изменений",
             "description": "Снапшоты версий страниц, откат только контента, лимит версий и автоочистка при удалении страницы.",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_history.zip",
-            "sha256": "bd7637da973a03c30734cfb207b51f930261c722cad9abdafb0793d834a51cb9"
+            "sha256": "40a36e31b55a6bd571c6560aee5f518b8d3c002d355308ed097e7162e6cd1b17"
         },
         "logs": {
             "type": "plugin",
             "name": "Логи системы",
             "description": "Просмотр и настройка журнала действий администратора",
-            "version": "1.0.4",
+            "version": "1.0.5",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_logs.zip",
-            "sha256": "82d06951490b06338f6932facc8cbbc31a64a861e23bd7ec273ad5d766353f45"
+            "sha256": "074381d4182d97ac6497d8645ee8a6d27f129b3db249fbdd4f9ee65086f46f59"
         },
         "maintenance": {
             "type": "plugin",
             "name": "Технические работы",
             "description": "Заглушка 503 для посетителей, bypass-ссылка, автоснятие.",
-            "version": "0.9.2",
+            "version": "0.9.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_maintenance.zip",
-            "sha256": "91cbb88ec8ce518d25d899c987f45efe00de084b102f336bd81c0e0df92bf9dd"
+            "sha256": "125236c4785c40a71ca38aad955d98ee529bd6f5c47ed4a6c763607fa6f59529"
         },
         "media-optimization": {
             "type": "plugin",
             "name": "Медиа (WebP)",
             "description": "Конвертация изображений в WebP, статистика и массовая обработка.",
-            "version": "1.0.2",
+            "version": "1.0.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_media-optimization.zip",
-            "sha256": "2a2d1d09d6896213bb2ffc6d43823a1a4c37e3ce001abdc8205b36326a11d7f3"
+            "sha256": "4f73518d3b2aa234375947bc1248aef2aaf2dfad5756ef044efdf4a0a1ab0b20"
         },
         "preview": {
             "type": "plugin",
             "name": "Предпросмотр",
             "description": "Временный предпросмотр из конструктора и постоянные preview-ссылки для согласования страниц.",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_preview.zip",
-            "sha256": "e4f82f285c6d58bfec510fe464fcfa439c03b718c617d037adbad26cd5e00482"
+            "sha256": "0fd445e39b29af8c57bdf3afe86923396eb66d0a936a5056cb48d699d6d96769"
         },
         "publish": {
             "type": "plugin",
             "name": "Автопубликация страниц",
             "description": "Cron-публикация и архивация страниц по расписанию (publish_at \/ unpublish_at).",
-            "version": "1.0.4",
+            "version": "1.0.5",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_publish.zip",
-            "sha256": "d7445aa88b9efb8dfef46fb91ac29ec418ae8e731238ae9e4d7b308b0c09dde8"
+            "sha256": "72d7140ec0baefe67cb33ae54c6ff1f1b0098618df378ceafd9ed8b0d3b47473"
         },
         "scheduler": {
             "type": "plugin",
             "name": "Планировщик задач",
             "description": "Секция «Интеграция с планировщиком» в Настройках сайта: токен крона и список URL крон-задач.",
-            "version": "1.0.3",
+            "version": "1.0.4",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_scheduler.zip",
-            "sha256": "b811857d9437cdc082cfb6c9fc09a6d7d95a4696441304389badd64bd724e92f"
+            "sha256": "c1fd798d29d342a40ac1a804b3a671a1729ddb5d6f126b94a2879b728945db84"
         },
         "seo-tools": {
             "type": "plugin",
             "name": "SEO-инструменты",
             "description": "Генерация sitemap.xml и robots.txt: автообновление при изменении страниц, ручная пересборка и cron-задача.",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_seo-tools.zip",
-            "sha256": "f6fa53c12bf7827d11228256cc18d3dc3df5ecfbad34adfd95c649873176b83c"
+            "sha256": "621cb5318fb8b7c49d9a968a721baf8e951a9131c4fec43a4634827cd5a3d62d"
         },
         "trash": {
             "type": "plugin",
             "name": "Корзина",
             "description": "Мягкое удаление страниц и меню: восстановление, окончательное удаление и очистка корзины.",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_trash.zip",
-            "sha256": "ed2260189cf7d2aa8a03845750578dbe462081620ccb4b9b8ce1562c19ad7d5a"
+            "sha256": "05ae6a7ea9a8dc496638f5873c7af4ee926823363728ad153d3249f4e3ec5871"
         },
         "updates": {
             "type": "plugin",
             "name": "Обновления",
             "description": "Проверка новых версий ядра, модулей и плагинов",
-            "version": "0.9.0",
+            "version": "0.9.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_updates.zip",
-            "sha256": "956505adab1ce8e8def97b51a4459b7183be16eb2d41c7fb1c5f301c30786408"
+            "sha256": "b1e27baa2d38bf138e9e258c48639816aefb540523cd99695b090718e9ef0ce0"
         }
     }
 }

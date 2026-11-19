@@ -675,6 +675,23 @@ function installModuleFromZip(string $zipPath, string $id, bool $replace = false
         return ['success' => false, 'message' => 'Модуль уже установлен. Для обновления используйте обновление.', 'version' => ''];
     }
 
+    // Повторная установка той же версии поверх рабочего кода ничего не меняет:
+    // иначе обновление неиспользуемого модуля удалит код и модуль пропадёт
+    // со страниц до следующего добавления. Барьер тот же, что при загрузке
+    // ZIP вручную (admin_controller).
+    if ($wasInstalled && _moduleHasCode($id)) {
+        $installedVersion = (string)(getModulesData()[$id]['version'] ?? '');
+        $archiveVersion = (string)($validation['manifest']['version'] ?? '1.0.0');
+
+        if ($installedVersion !== '' && version_compare($archiveVersion, $installedVersion, '==')) {
+            return [
+                'success' => false,
+                'message' => 'Модуль "' . ($validation['manifest']['name'] ?? $id) . '" уже установлен (версия ' . $installedVersion . '). Обновление не требуется.',
+                'version' => $installedVersion
+            ];
+        }
+    }
+
     // Сохраняем архив в библиотеку
     $archiveDir = dirname(getModuleArchivePath($id));
     if (!is_dir($archiveDir)) {
