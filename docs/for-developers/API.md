@@ -56,7 +56,7 @@ $error = validateHtml('<script>alert(1)</script>');
 // 'Обнаружено недопустимое содержимое: тег <script>'
 ```
 
-**Проверяет** **после** `html_entity_decode` (**защита** **от** **обфускации**):
+**Проверяет после** `html_entity_decode` (**защита от обфускации**):
 - `<script>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<meta>`, `<link>`
 - `on*="..."` (**события**)
 - `javascript:`, `vbscript:`, `data:text/html`
@@ -67,7 +67,7 @@ $error = validateHtml('<script>alert(1)</script>');
 
 ### `sanitizeHtml(string $html): string`
 
-**Очистка HTML** — **whitelist** **тегов**.
+**Очистка HTML** — **whitelist тегов**.
 
 ```php
 $clean = sanitizeHtml('<p>OK</p><script>bad</script>');
@@ -75,7 +75,7 @@ $clean = sanitizeHtml('<p>OK</p><script>bad</script>');
 ```
 
 **Разрешает:** `b, i, u, strong, em, span, ul, ol, li, p, br, a, h1-h4`.  
-**Убирает** **опасные** **атрибуты** (`on*`, `style`, `srcdoc`, `formaction`).
+**Убирает опасные атрибуты** (`on*`, `style`, `srcdoc`, `formaction`).
 
 ---
 
@@ -90,7 +90,7 @@ if ($error !== null) {
 }
 ```
 
-**Проверяет** **после** `html_entity_decode`:
+**Проверяет после** `html_entity_decode`:
 - `<script>`, `on*="..."`, `<foreignObject>`
 - встроенные HTML-элементы: `iframe`, `object`, `embed`, `frame`, `audio`, `video`, `canvas`
 - `<!ENTITY>`, `<?xml-stylesheet?>`
@@ -103,7 +103,7 @@ if ($error !== null) {
 
 ### `formatPhone(string $phone): string`
 
-**Форматирует** **номер** **в** **читаемый** **вид**.
+**Форматирует номер в читаемый вид**.
 
 ```php
 echo formatPhone('79001234567');  // +7 (900) 123-45-67
@@ -135,8 +135,8 @@ safeFileWrite($logFile, $line, true);  // append
 
 ### `verifyCsrfToken(?string $token): bool`
 
-**Сравнение** **CSRF-токена** **из** **запроса** **с** `$_SESSION['csrf_token']`
-**через** `hash_equals()`. **Пустая** **сессия** **или** **пустой** **токен** →
+**Сравнение CSRF-токена из запроса с** `$_SESSION['csrf_token']`
+**через** `hash_equals()`. **Пустая сессия или пустой токен** →
 `false`.
 
 ```php
@@ -149,9 +149,9 @@ if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
 
 ### `isValidId(string $id): bool`
 
-**Проверка** **ID** (**модуль**, **плагин**, **страница**, **файл**) — **только**
-`[a-z0-9\-_]+` **в** **любом** **регистре**: **без** **точек** **и** **слэшей**.
-**Защищает** **от** **path traversal**.
+**Проверка ID** (**модуль**, **плагин**, **страница**, **файл**) — **только**
+`[a-z0-9\-_]+` **в любом регистре**: **без точек и слэшей**.
+**Защищает от path traversal**.
 
 ```php
 isValidId('hero');        // true
@@ -163,10 +163,10 @@ isValidId('Hero');        // true
 
 ### `detectZipSlip(ZipArchive $zip): ?string`
 
-**Проверка** **имён** **файлов** **в** **ZIP** **до** `extractTo()`. **Возвращает**
-**имя** **опасной** **записи** **или** `null`.
+**Проверка имён файлов в ZIP до** `extractTo()`. **Возвращает**
+**имя опасной записи или** `null`.
 
-**Блокирует:** `..`, **абсолютные** **пути** (`/`, `C:\`), **NUL-байты**.
+**Блокирует:** `..`, **абсолютные пути** (`/`, `C:\`), **NUL-байты**.
 
 ```php
 $entry = detectZipSlip($zip);
@@ -176,18 +176,19 @@ if ($entry !== null) {
 }
 ```
 
-`verifyCsrfToken()`, `isValidId()`, `detectZipSlip()` и
-`verifyArchiveChecksum()` **живут** **в**
-`config/core/security.php`. **Файл** **подключается** **из** `config.php` **и**
-`functions.php`; **сессию** **и** **заголовки** **он** **не** **трогает**, **только**
-**чистые** **помощники**.
+`verifyCsrfToken()`, `isValidId()`, `detectZipSlip()`,
+`verifyArchiveChecksum()`, `cms_encrypt_secret()` и `cms_decrypt_secret()`
+**живут в**
+`config/core/security.php`. **Файл подключается из** `config.php` **и**
+`functions.php`; **сессию и заголовки он не трогает**, **только**
+**чистые помощники**.
 
 ---
 
 ### `verifyArchiveChecksum(string $path, string $expected): bool`
 
-**Сверка** **SHA-256** **скачанного** **архива** **с** **хешем** **из**
-`catalog.json`. **Сравнение** — `hash_equals()`, **ожидаемый** **формат** —
+**Сверка SHA-256 скачанного архива с хешем из**
+`catalog.json`. **Сравнение** — `hash_equals()`, **ожидаемый формат** —
 `^[a-f0-9]{64}$`.
 
 ```php
@@ -197,14 +198,46 @@ if (!verifyArchiveChecksum($zipPath, $sha256)) {
 }
 ```
 
-**Неверный** **формат** **хеша**, **нечитаемый** **файл** **и** **несовпадение** —
-`false`. **Хеш** **неверного** **формата** **не** **означает** «проверку**
-**пропустить»**.
+**Неверный формат хеша**, **нечитаемый файл и несовпадение** —
+`false`. **Хеш неверного формата не означает** «проверку
+пропустить».
 
-**Пустая** **строка** **означает** «**в** **каталоге** **хеша** **нет**»:
-**вызывающий** **код** **проверку** **пропускает** **и** **ставит** **архив**
-**как** **раньше** (`http`-источники, **старые** **каталоги**). **Решение**
-**принимает** **загрузчик**, **а** **не** **эта** **функция**.
+**Пустая строка означает** «**в каталоге хеша нет**»:
+**вызывающий код проверку пропускает и ставит архив**
+**как раньше** (`http`-источники, **старые каталоги**). **Решение**
+**принимает загрузчик**, **а не эта функция**.
+
+---
+
+### `cms_encrypt_secret(string $plain, string $context = 'cms_secret'): string`
+
+**Обратимое шифрование секрета**: AES-256-CBC, ключ —
+`hash_hmac('sha256', $context, pepper)`, IV на каждое сохранение. Формат —
+`base64(IV . base64(шифртекст))`, совместим с прежним форматом паролей
+бэкапов. `$context` — соль: значение, зашифрованное одним контекстом, не
+расшифруется другим.
+
+```php
+$enc = cms_encrypt_secret($smtpPassword, 'cms_mail_smtp');
+// в JSON пишем только $enc
+```
+
+Pepper лежит в `config/data/.pepper` и создаётся при необходимости. Это
+защита от случайной утечки (экспорт, файловый менеджер, бэкап), а не от
+чтения всего диска: pepper хранится рядом с конфигом.
+
+### `cms_decrypt_secret(string $encoded, string $context = 'cms_secret'): string`
+
+**Расшифровка** значения, созданного `cms_encrypt_secret()`. **Пустая**
+**строка** — при **неверном контексте**, **повреждённых данных**,
+**отсутствии pepper или ошибке OpenSSL**.
+
+```php
+$password = cms_decrypt_secret($config['password_enc'], 'cms_mail_smtp');
+if ($password === '') {
+    // секрет недоступен — отправка отменяется
+}
+```
 
 ---
 
@@ -212,14 +245,14 @@ if (!verifyArchiveChecksum($zipPath, $sha256)) {
 
 ### `getData(string $fileName, bool $refresh = false): array`
 
-**Читает** JSON **из** `data/{fileName}.json` **с** **кешем** **в** **памяти**.
+**Читает** JSON **из** `data/{fileName}.json` **с кешем в памяти**.
 
 ```php
 $settings = getData('settings');
 $pages = getData('pages');
 ```
 
-**Кеш** — **`$GLOBALS['DATA_CACHE']`** (**сброс** **при** `$refresh = true`).
+**Кеш** — **`$GLOBALS['DATA_CACHE']`** (**сброс при** `$refresh = true`).
 
 ---
 
@@ -252,7 +285,7 @@ $themeDark = getThemePalette($settingsData, 'dark');
 
 ### `getModulesData(): array`
 
-**Читает** `config/data/modules.json` (**список** **модулей**).
+**Читает** `config/data/modules.json` (**список модулей**).
 
 ---
 
@@ -264,7 +297,7 @@ $themeDark = getThemePalette($settingsData, 'dark');
 
 ### `loadModule(string $id): ?array`
 
-**Загружает** **описание** **модуля** **из** `config/data/modules.json`.
+**Загружает описание модуля из** `config/data/modules.json`.
 
 ---
 
@@ -272,13 +305,13 @@ $themeDark = getThemePalette($settingsData, 'dark');
 
 ### `loadPage(string $slug): ?array`
 
-**Загружает** **страницу** **по** **slug**.
+**Загружает страницу по slug**.
 
 ```php
 $page = loadPage('about');
 ```
 
-**Валидация** **slug** (**regex**, **без** `..`).  
+**Валидация slug** (**regex**, **без** `..`).  
 **Проверка** `status === 'published'`.  
 **Проверка** `unpublish_at`: если задан и уже наступил — возвращает `null` (подстраховка от задержки cron).
 
@@ -286,19 +319,19 @@ $page = loadPage('about');
 
 ### `loadPageById(string $id): ?array`
 
-**Загружает** **страницу** **по** **ID** (**без** **проверки** **статуса**).
+**Загружает страницу по ID** (**без проверки статуса**).
 
 ---
 
 ### `loadTemplate(string $id): ?array`
 
-**Загружает** **шаблон** **из** `templates.json`.
+**Загружает шаблон из** `templates.json`.
 
 ---
 
 ### `getTemplateZones(string $templateId): array` (устарела)
 
-**Зоны** **шаблона** (**main**, **sidebar-left**, **sidebar-right**, **hero**).
+**Зоны шаблона** (**main**, **sidebar-left**, **sidebar-right**, **hero**).
 
 Не используется ядром и модулями. Оставлена для совместимости.
 
@@ -306,13 +339,13 @@ $page = loadPage('about');
 
 ### `getPagesList(): array`
 
-**Все** **страницы** (**для** **меню**, **селектов**).
+**Все страницы** (**для меню**, **селектов**).
 
 ---
 
 ### `getPagesListPaginated(int $page, int $perPage): array`
 
-**С** **пагинацией**.
+**С пагинацией**.
 
 ```php
 $result = getPagesListPaginated(1, 25);
@@ -323,49 +356,49 @@ $result = getPagesListPaginated(1, 25);
 
 ### `getMenusList(): array`
 
-**Все** **меню** **из** `data/menus/*.json`.
+**Все меню из** `data/menus/*.json`.
 
 ---
 
 ### `loadMenu(string $id): ?array`
 
-**Загружает** **меню** **по** **ID**.
+**Загружает меню по ID**.
 
 ---
 
 ### `getMenuItems(string $menuId): array`
 
-**Пункты** **меню**.
+**Пункты меню**.
 
 ---
 
 ### `getMainMenuId(): ?string`
 
-**ID** **главного** **меню**.
+**ID главного меню**.
 
 ---
 
 ### `getHomePageId(): string`
 
-**ID** **главной** **страницы**.
+**ID главной страницы**.
 
 ---
 
 ### `getUsedModules(array $page): array`
 
-**Уникальные** **ID** **модулей** **на** **странице**.
+**Уникальные ID модулей на странице**.
 
 ---
 
 ### `isModuleInstalled(string $id): bool`
 
-**Установлен** **ли** **модуль** (**распакован**).
+**Установлен ли модуль** (**распакован**).
 
 ---
 
 ### `findModuleUsage(string $id): array`
 
-**Где** **используется** **модуль** (**список** **страниц**).
+**Где используется модуль** (**список страниц**).
 
 ---
 
@@ -447,19 +480,19 @@ echo renderBreadcrumbs($page);
 
 ### `render_module(string $moduleId, array $moduleData = [], array $settings = []): string`
 
-**Рендерит** **модуль** **на** **фронте**.
+**Рендерит модуль на фронте**.
 
 ```php
 echo render_module('hero', ['title' => 'Hello']);
 ```
 
-**`include`** **файла** `modules/{moduleId}.php` **с** **буферизацией**.
+**`include` файла** `modules/{moduleId}.php` **с буферизацией**.
 
 ---
 
 ### `renderMainMenu(array $items): string`
 
-**HTML** **главного** **меню** (**desktop**).
+**HTML главного меню** (**desktop**).
 
 **Использует** `safeUrl()` **и** `e()`.
 
@@ -467,13 +500,13 @@ echo render_module('hero', ['title' => 'Hello']);
 
 ### `renderMobileMenu(array $items): string`
 
-**HTML** **мобильного** **меню** (**бургер**).
+**HTML мобильного меню** (**бургер**).
 
 ---
 
 ### `getModuleAssets(array $moduleIds, ?array $settings, string $pageId): array`
 
-**URLs** **CSS**/**JS** **модулей** (**или** **объединённых**).
+**URLs CSS**/**JS модулей** (**или объединённых**).
 
 ```php
 $assets = getModuleAssets(['hero', 'faq'], $settings, 'home');
@@ -496,7 +529,7 @@ echo '<link href="css/my.css?v=' . $v . '" rel="stylesheet" type="text/css"/>';
 
 ### `getCombinedAssets(array $moduleIds, array $settings, string $pageId): array`
 
-**Объединённые** **CSS**/**JS** **в** `/cache/assets/{pageId}.{css,js}`.
+**Объединённые CSS**/**JS в** `/cache/assets/{pageId}.{css,js}`.
 
 ---
 
@@ -510,13 +543,13 @@ echo '<link href="css/my.css?v=' . $v . '" rel="stylesheet" type="text/css"/>';
 
 ### `savePageData(string $id, array $data): bool`
 
-**Сохраняет** **страницу**.
+**Сохраняет страницу**.
 
 ---
 
 ### `saveMenu(string $id, array $data): bool`
 
-**Сохраняет** **меню**.
+**Сохраняет меню**.
 
 ---
 
@@ -524,7 +557,7 @@ echo '<link href="css/my.css?v=' . $v . '" rel="stylesheet" type="text/css"/>';
 
 **Сохраняет** `config/data/modules.json` **через** `safeFileWrite()`.
 
-**Формат** — **объект**, **ключ** — **ID** **модуля**:
+**Формат** — **объект**, **ключ** — **ID модуля**:
 
 ```json
 {
@@ -540,15 +573,15 @@ echo '<link href="css/my.css?v=' . $v . '" rel="stylesheet" type="text/css"/>';
 }
 ```
 
-**Порядок** **ключей** — **порядок** **вывода** **в** **админке**.
-`syncModulesData()` **сохраняет** **его** **и** **добавляет** **новые** **модули**
-**в** **конец**.
+**Порядок ключей** — **порядок вывода в админке**.
+`syncModulesData()` **сохраняет его и добавляет новые модули**
+**в конец**.
 
 ---
 
 ### `handleSaveSettings(): array`
 
-**Сохраняет** **настройки** **сайта**.
+**Сохраняет настройки сайта**.
 
 ```php
 $res = handleSaveSettings();
@@ -571,7 +604,7 @@ $res = handleSaveSettings();
 
 ### `handleSavePage(): array`
 
-**Сохраняет** **страницу** (**создание**/**редактирование**).
+**Сохраняет страницу** (**создание**/**редактирование**).
 
 **Валидация** `title`, `slug`, `template`, `status` (4 значения: `draft` / `scheduled` / `published` / `archived`).  
 **Валидация дат:**
@@ -590,43 +623,43 @@ $res = handleSaveSettings();
 
 ### `handleDeletePage(): void`
 
-**Удаляет** **страницу**. **Редирект** **на** **список**.
+**Удаляет страницу**. **Редирект на список**.
 
 ---
 
 ### `handleClonePage(): void`
 
-**Клонирует** **страницу** **в** `{id}-copy`.
+**Клонирует страницу в** `{id}-copy`.
 
 ---
 
 ### `handleSetHomePage(): void`
 
-**Назначает** **главную** **страницу**.
+**Назначает главную страницу**.
 
 ---
 
 ### `handleSaveMenu(): array`
 
-**Сохраняет** **меню**.
+**Сохраняет меню**.
 
 ---
 
 ### `handleDeleteMenu(): void`
 
-**Удаляет** **меню**.
+**Удаляет меню**.
 
 ---
 
 ### `handleSetMainMenu(): void`
 
-**Назначает** **главное** **меню**.
+**Назначает главное меню**.
 
 ---
 
 ### `handleModuleAction(): array`
 
-**Управление** **модулями** (POST `module_action`):
+**Управление модулями** (POST `module_action`):
 - `upload` — загрузка ZIP из формы.
 - `delete` — удалить **только код** (архив и запись в реестре остаются).
 - `purge` — удалить **полностью**: код, архив, превью и запись в
@@ -636,7 +669,7 @@ $res = handleSaveSettings();
 `unpackModule()`).
 
 **Валидация** `manifest.id` и `isValidId()`.  
-**`detectZipSlip`** **перед** **распаковкой**.  
+**`detectZipSlip` перед распаковкой**.  
 **Проверка** `findModuleUsage()`: используемый на страницах модуль удалить
 нельзя.  
 **Flash** — через `setFlash()`/`renderFlash()`.
@@ -645,52 +678,52 @@ $res = handleSaveSettings();
 
 ### `unpackModule(string $moduleId): array`
 
-**Распаковывает** **модуль** **из** `config/modules/archives/{id}.zip`
+**Распаковывает модуль из** `config/modules/archives/{id}.zip`
 **в** `config/modules/{id}/`, `modules/{id}.php`, `css/{id}.css`,
 `js/{id}.js`.
 
 **Валидация** `$moduleId` (**`isValidId`**).  
 **`detectZipSlip`**.
 
-`unpackModule()` **доступна** **на** **фронте**: **определена** **в**
-`config/core/modules.php`, **подключается** **через** `functions.php`.
+`unpackModule()` **доступна на фронте**: **определена в**
+`config/core/modules.php`, **подключается через** `functions.php`.
 
 ---
 
 ### `unpackModuleArchive(string $zipPath, string $moduleId): array`
 
-**Внутренняя** **распаковка** **произвольного** **ZIP** **во** **временную**
-**папку** `config/modules/_temp/{id}/`, **затем** **копирование** `admin/` **и**
-`site/` **по** **местам**.
+**Внутренняя распаковка произвольного ZIP во временную**
+**папку** `config/modules/_temp/{id}/`, **затем копирование** `admin/` **и**
+`site/` **по местам**.
 
-**Перед** **копированием** **старый** **код** **переносится** **в**
-`config/modules/_backup/` (`_moduleStashCode()`). **Если** **копирование**
-**сорвалось**, **новые** **файлы** **удаляются**, **старый** **код**
-**возвращается** (`_moduleRestoreCode()`). **При** **успехе** **резервная**
-**копия** **удаляется**.
+**Перед копированием старый код переносится в**
+`config/modules/_backup/` (`_moduleStashCode()`). **Если копирование**
+**сорвалось**, **новые файлы удаляются**, **старый код**
+**возвращается** (`_moduleRestoreCode()`). **При успехе резервная**
+**копия удаляется**.
 
-**`.min`-файлы** **и** **кеш** **обновляются** **только** **в** **админке**
-(**через** `function_exists()`). **Остатки** **прерванных** **распаковок**
-**в** `config/modules/_backup/` **и** `_temp/` **старше** **часа** **удаляются**
+**`.min`-файлы и кеш обновляются только в админке**
+(**через** `function_exists()`). **Остатки прерванных распаковок**
+**в** `config/modules/_backup/` **и** `_temp/` **старше часа удаляются**
 `_moduleCleanupRuntime()`.
 
 ---
 
 ### `removeModuleFiles(string $moduleId): array`
 
-**Удаляет** **распакованный** **код** **модуля**: `config/modules/{id}/`,
+**Удаляет распакованный код модуля**: `config/modules/{id}/`,
 `modules/{id}.php`, `css/{id}.css`, `css/{id}.min.css`, `js/{id}.js`,
 `js/{id}.min.js`.
 
 **Возвращает:** `['success' => bool, 'message' => string, 'deleted' => int]`.  
-**Архив** **и** **запись** **в** `modules.json` **остаются** — **для** **этого**
+**Архив и запись в** `modules.json` **остаются** — **для этого**
 **есть** `purgeModule()`.
 
 ---
 
 ### `purgeModule(string $moduleId): array`
 
-**Полное** **удаление**: `removeModuleFiles()` + архив
+**Полное удаление**: `removeModuleFiles()` + архив
 `config/modules/archives/{id}.zip` + превью
 `config/modules/previews/{id}.png` + запись в `modules.json`.
 
@@ -698,20 +731,20 @@ $res = handleSaveSettings();
 
 ### `reinstallModule(string $moduleId): array`
 
-**Удаляет** **код** **и** **распаковывает** **архив** **заново**.
+**Удаляет код и распаковывает архив заново**.
 
 ---
 
 ### `validateModuleArchive(string $zipPath, string $moduleId): array`
 
-**Проверка** **ZIP** **перед** **установкой**:
+**Проверка ZIP перед установкой**:
 
-- `manifest.json` **в** **корне**;
-- `id` **в** **манифесте** **совпадает** **с** `$moduleId`;
-- **нет** `plugin.json` (**это** **не** **плагин**);
+- `manifest.json` **в корне**;
+- `id` **в манифесте совпадает с** `$moduleId`;
+- **нет** `plugin.json` (**это не плагин**);
 - **есть** `site/module.php`;
-- **версия** **не** **ниже** **установленной** (**запрет** **даунгрейда**);
-- **нет** **ZIP Slip**.
+- **версия не ниже установленной** (**запрет даунгрейда**);
+- **нет ZIP Slip**.
 
 **Возвращает:** `['success' => bool, 'message' => string, 'manifest' => array]`.
 
@@ -719,102 +752,102 @@ $res = handleSaveSettings();
 
 ### `installModuleFromZip(string $zipPath, string $id, bool $replace = false, bool $unpack = true): array`
 
-**Установка** **или** **обновление** **модуля** **из** **ZIP**:
+**Установка или обновление модуля из ZIP**:
 
 1. `validateModuleArchive()`;
-2. **если** **модуль** **уже** **установлен** **и** `$replace = false` — **отказ**;
-3. **копия** **архива** **в** `config/modules/archives/{id}.zip`;
-4. **превью** **из** `preview.png` **в** `config/modules/previews/{id}.png`;
-5. **если** `$unpack = true` — `unpackModuleArchive()` **с** **резервной**
-   **копией** **старого** **кода**;
-6. **если** `$unpack = false` **и** **модуль** **был** **установлен** —
-   `removeModuleFiles()`: **старый** **код** **не** **должен** **отдаваться**
-   **вместо** **нового**, **он** **распакуется** **при** **добавлении** **на**
+2. **если модуль уже установлен и** `$replace = false` — **отказ**;
+3. **копия архива в** `config/modules/archives/{id}.zip`;
+4. **превью из** `preview.png` **в** `config/modules/previews/{id}.png`;
+5. **если** `$unpack = true` — `unpackModuleArchive()` **с резервной**
+   **копией старого кода**;
+6. **если** `$unpack = false` **и модуль был установлен** —
+   `removeModuleFiles()`: **старый код не должен отдаваться**
+   **вместо нового**, **он распакуется при добавлении на**
    **страницу**;
-7. **запись** **в** `modules.json`.
+7. **запись в** `modules.json`.
 
-**Порядок** **вызова**:
+**Порядок вызова**:
 
-- **новый** **модуль** **из** **каталога** — `$unpack = false` (**код** **не**
-  **нужен**, **пока** **модуль** **не** **добавлен**);
-- **обновление** **из** **каталога** — `$unpack = isModuleInstalled($id) &&
+- **новый модуль из каталога** — `$unpack = false` (**код не**
+  **нужен**, **пока модуль не добавлен**);
+- **обновление из каталога** — `$unpack = isModuleInstalled($id) &&
   !empty(findModuleUsage($id))`;
-- **ручная** **загрузка** **ZIP** — **решает** `admin_controller.php`:
-  `auto_unpack` **или** **использование** **на** **страницах**.
+- **ручная загрузка ZIP** — **решает** `admin_controller.php`:
+  `auto_unpack` **или использование на страницах**.
 
-**Используется** **вкладкой** «Модули», **AJAX**
-`module_install_from_url` **и** **плагином** `updates`.
+**Используется вкладкой** «Модули», **AJAX**
+`module_install_from_url` **и плагином** `updates`.
 
 ---
 
 ### `downloadModuleZip(string $url, string $id, string $expectedSha256 = '', ?string &$error = null): ?string`
 
-**Скачивает** **архив** **модуля** **во** **временный** **файл**
+**Скачивает архив модуля во временный файл**
 `data/module_{id}.zip`.
 
-**Ограничения:** **только** `http(s)://`, **не** **более** **10 МБ**, **таймаут**
-**30 с**. **Возвращает** `null` **при** **ошибке** — **файл** **удаляется**,
-**причина** **кладётся** **в** `$error`.
+**Ограничения: только** `http(s)://`, **не более 10 МБ**, **таймаут**
+**30 с**. **Возвращает** `null` **при ошибке** — **файл удаляется**,
+**причина кладётся в** `$error`.
 
-**Если** `$expectedSha256` **не** **пуст**, **архив** **сверяется** **через**
-`verifyArchiveChecksum()`; **несовпадение** **удаляет** **файл** **и**
-**отменяет** **установку**. **Пустая** **строка** — **проверки** **нет**
-(**старые** **каталоги**, **ручная** **установка**).
+**Если** `$expectedSha256` **не пуст**, **архив сверяется через**
+`verifyArchiveChecksum()`; **несовпадение удаляет файл и**
+**отменяет установку**. **Пустая строка** — **проверки нет**
+(**старые каталоги**, **ручная установка**).
 
-**Та** **же** **сигнатура** **у** `downloadPluginZip()`**.**
+**Та же сигнатура у** `downloadPluginZip()`**.**
 
 ---
 
 ### `syncModulesData(): array`
 
-**Синхронизирует** `config/data/modules.json` **с** **архивами** **в**
+**Синхронизирует** `config/data/modules.json` **с архивами в**
 `config/modules/archives/`.
 
-- **существующие** **записи** **обновляются** **на** **месте**, **порядок**
+- **существующие записи обновляются на месте**, **порядок**
   **сохраняется**;
-- **новые** **архивы** **добавляются** **в** **конец**;
-- **записи** **без** **архива** **удаляются**.
+- **новые архивы добавляются в конец**;
+- **записи без архива удаляются**.
 
-**Возвращает** **актуальный** **список** **модулей**.
+**Возвращает актуальный список модулей**.
 
 ---
 
 ### `handleSaveSecurity(): array`
 
-**Сохраняет** **настройки** **безопасности.**
+**Сохраняет настройки безопасности.**
 
-**Валидация** `From:` (**Host** **Header** **Injection**).
+**Валидация** `From:` (**Host Header Injection**).
 
-**Сохранение** **формы** **требует** **текущий** **пароль** **всегда,** **даже** **если**
-**меняются** **только** **лимиты** **брутфорса** **или** **таймаут** **сессии.**
-**Пароль** **приходит** **одноразовым** **подтверждением** **из** **модалки**
-(`requireSecurityConfirmation('save', ...)`) **либо** **аварийным** **полем**
-`sec_current_password`, **если** **JavaScript** **отключён.** **Сверка** **идёт**
-**с** **текущим** **логином** **из** `credentials.json` (**пароль** **привязан**
-**к** **логину** **через** `hash_hmac`).
+**Сохранение формы требует текущий пароль всегда, даже если**
+**меняются только лимиты брутфорса или таймаут сессии.**
+**Пароль приходит одноразовым подтверждением из модалки**
+(`requireSecurityConfirmation('save', ...)`) **либо аварийным полем**
+`sec_current_password`, **если JavaScript отключён. Сверка идёт**
+**с текущим логином из** `credentials.json` (**пароль привязан**
+**к логину через** `hash_hmac`).
 
-**Неверный** **пароль** **учитывается** **отдельным** **счётчиком**
+**Неверный пароль учитывается отдельным счётчиком**
 (`security_attempts`, **лимит** — **константы** `SECURITY_FORM_MAX_ATTEMPTS`
-**и** `SECURITY_FORM_LOCKOUT_MINUTES`), **а** **не** **счётчиком** **входа.**
-**После** **третьей** **ошибки** **сессия** **уничтожается** **и** **выполняется**
-**переход** **на** `index.php?msg=security_failed`. **До** **окончания** **паузы**
-**действие** **возвращает** **ошибку** **с** **числом** **минут.** **Верный** **текущий**
-**пароль** **снимает** **серию** **ошибок.** **При** **успехе** **подтверждение**
+**и** `SECURITY_FORM_LOCKOUT_MINUTES`), **а не счётчиком входа.**
+**После третьей ошибки сессия уничтожается и выполняется**
+**переход на** `index.php?msg=security_failed`. **До окончания паузы**
+**действие возвращает ошибку с числом минут. Верный текущий**
+**пароль снимает серию ошибок. При успехе подтверждение**
 **снимается** `consumeSecurityConfirmation('save')`.
 
 Вызывается диспетчером `handle_admin_post_actions()` по схеме
 Post/Redirect/Get: флеш ставится там же, затем редирект на
 `index.php?tab=security`. Так же обрабатываются `action_unban` и
-`action_manual_ban` — **оба** **требуют** **подтверждения** **своего** **типа**
-(`unban` / `ban`). **При** **успешной** **смене** **логина** **или** **пароля** — **выход,**
-**редирект** **на** `index.php?msg=updated`.
+`action_manual_ban` — **оба требуют подтверждения своего типа**
+(`unban` / `ban`). **При успешной смене логина или пароля** — **выход,**
+**редирект на** `index.php?msg=updated`.
 
 ---
 
 ### `handleSecurityConfirmation(): array`
 
-**AJAX-действие** `security_confirm=1` (`POST`). **Проверяет** **текущий** **пароль**
-**из** **модалки** **и** **выдаёт** **одноразовое** **подтверждение:**
+**AJAX-действие** `security_confirm=1` (`POST`). **Проверяет текущий пароль**
+**из модалки и выдаёт одноразовое подтверждение:**
 
 ```php
 $_POST = [
@@ -828,50 +861,50 @@ $_POST = [
 // {"ok": false, "error": "...", "logout": true} — третья ошибка, сессия уничтожена
 ```
 
-**Тип** **действия** **проверяется** **по** **белому** **списку**; `requireSecurityConfirmation()`
-**принимает** **только** **токен** **своего** **типа.** **Поле** **пароля** **нигде**
-**не** **сохраняется.**
+**Тип действия проверяется по белому списку**; `requireSecurityConfirmation()`
+**принимает только токен своего типа. Поле пароля нигде**
+**не сохраняется.**
 
 ---
 
 ### `verifySecurityPassword(string $password): array`
 
-**Общая** **проверка** **текущего** **пароля** **для** **модалки** **и** **аварийного**
-**поля.** **Порядок:** **пауза** → **пустой** **пароль** → `hash_hmac` + `password_verify`
-**с** **текущим** **логином.** **Возвращает** `['ok' => bool, 'error' => string,
-'logout' => bool]`. **Счётчик** `security_attempts` **и** **лимит** — **те** **же,**
-**что** **у** **формы.**
+**Общая проверка текущего пароля для модалки и аварийного**
+**поля. Порядок: пауза** → **пустой пароль** → `hash_hmac` + `password_verify`
+**с текущим логином. Возвращает** `['ok' => bool, 'error' => string,
+'logout' => bool]`. **Счётчик** `security_attempts` **и лимит** — **те же,**
+**что у формы.**
 
 ---
 
 ### `issueSecurityConfirmation(string $action): void`
 
-**Кладёт** **в** **сессию** `security_confirmation` **вида** `{action, at}`.
-**Срок** **жизни** — `SECURITY_CONFIRM_TTL` (300 **секунд**).
+**Кладёт в сессию** `security_confirmation` **вида** `{action, at}`.
+**Срок жизни** — `SECURITY_CONFIRM_TTL` (300 **секунд**).
 
 ---
 
 ### `hasSecurityConfirmation(string $action): bool`
 
-**Проверяет** **тип** **действия** **и** **срок.** **Просроченное** **подтверждение**
+**Проверяет тип действия и срок. Просроченное подтверждение**
 **удаляет.**
 
 ---
 
 ### `consumeSecurityConfirmation(string $action): void`
 
-**Снимает** **подтверждение** **после** **успешного** **действия.** **Ошибка**
-**валидации** **(например,** **кривой** **IP)** **подтверждение** **не** **сжигает.**
+**Снимает подтверждение после успешного действия. Ошибка**
+**валидации (например, кривой IP) подтверждение не сжигает.**
 
 ---
 
 ### `requireSecurityConfirmation(string $action, string $password = ''): ?array`
 
-**Требует** **подтверждение** **для** **обычной** **POST-формы.** **Возвращает**
-`null`, **если** **действие** **разрешено,** **или** **массив** **ошибки** **для** **флеша.**
-**Принимает** **токен** **из** **модалки** **либо** **пароль** **из** `sec_current_password`
-**(аварийный** **путь** **без** **JavaScript).** **Третья** **ошибка** **пароля** —
-`endAdminSession()` **и** **редирект** **на** `index.php?msg=security_failed`.
+**Требует подтверждение для обычной POST-формы. Возвращает**
+`null`, **если действие разрешено, или массив ошибки для флеша.**
+**Принимает токен из модалки либо пароль из** `sec_current_password`
+**(аварийный путь без JavaScript). Третья ошибка пароля** —
+`endAdminSession()` **и редирект на** `index.php?msg=security_failed`.
 
 ---
 
@@ -886,7 +919,7 @@ $_POST = [
 
 ### `clearPageCache(): void`
 
-**Очистка** **кеша** **страниц** + **объединённых** **ассетов**.
+**Очистка кеша страниц** + **объединённых ассетов**.
 
 Вызывается при любом успешном сохранении настроек сайта или плагина
 (`handleSaveSettings()`): настройки влияют на все страницы, поэтому кеш
@@ -1312,11 +1345,90 @@ $newToken = regenerateCronToken();
 
 ---
 
+## 📧 Почта
+
+Почтовый агент — ядро (`config/core/mail.php`). Конфиг хранится отдельно от
+`settings.json`: `config/data/mail_config.json`, пароль — только в
+зашифрованном виде (`password_enc`, контекст `cms_mail_smtp`). Эндпоинт
+`includes/mailer.php` принимает POST от модулей и вызывает `send_site_mail()`.
+
+### `get_mail_config(bool $refresh = false): array`
+
+Возвращает конфиг с подстановкой значений по умолчанию: `enabled`, `host`,
+`port`, `encryption` (`tls` / `ssl` / `none`), `auth`, `username`,
+`password_enc`, `from_email`, `from_name`, `to_email`, `timeout`,
+`last_test_at`, `last_error`.
+
+```php
+$config = get_mail_config();
+```
+
+### `save_mail_config(array $config): bool`
+
+Пишет `config/data/mail_config.json` через `safeFileWrite()`.
+
+### `mail_agent_is_configured(?array $config = null): bool`
+
+`true`, если агент включён, задан хост, порт и есть e-mail отправителя
+(пустой `from_email` заменяется e-mail сайта при проверке).
+
+```php
+if (!mail_agent_is_configured()) {
+    // формы, которым нужна только почта, на сайте не выводим
+}
+```
+
+### `mail_dependent_modules(): array`
+
+Список модулей, которым нужен почтовый агент, — читается из реестра
+`config/data/modules.json`. Туда флаг `requires_mail` из `manifest.json`
+модуля попадает при установке и обновлении: `form` — без почты скрывается
+только форма, `module` — модуль не выводится целиком.
+
+```php
+$modules = mail_dependent_modules();
+// ['contacts' => 'form', 'lead-form' => 'module', ...]
+
+if (isset($modules[$id]) && !mail_agent_is_configured()) {
+    // предупреждение в админке
+}
+```
+
+Ядро использует её на вкладке «Модули» и в `handleGetModuleSettings()`.
+
+**Фильтр `mail_dependent_modules`** — для расширений, которым нужно объявить
+зависимость без установки модуля через каталог:
+
+```php
+add_filter('mail_dependent_modules', function (array $modules): array {
+    $modules['my-form'] = 'module';
+    return $modules;
+});
+```
+
+### `send_site_mail(string $subject, string $htmlBody, string $replyToEmail = '', string $replyToName = '', ?array $config = null): array`
+
+Отправляет письмо через SMTP. Пятый аргумент — конфиг для проверки или
+тестового письма без сохранения.
+
+```php
+$result = send_site_mail('Заявка с сайта', '<p>Текст письма</p>', 'user@mail.ru', 'Имя');
+if (!$result['success']) {
+    // $result['error'] — причина для админки
+}
+```
+
+**Возвращает** `['success' => bool, 'error' => string]`. Посетителю текст
+ошибки не показывается: `includes/mailer.php` отдаёт общее сообщение,
+детали остаются в админке и журнале (`mail_test`).
+
+---
+
 ## 🔐 Безопасность
 
 ### `verifyAdminCredentials(string $login, string $password): bool`
 
-**Проверка** **логина**/**пароля** (**с** **`hash_equals`** **и** **`password_verify`**).
+**Проверка логина**/**пароля** (**с `hash_equals` и `password_verify`**).
 
 ```php
 if (verifyAdminCredentials($login, $password)) { ... }
@@ -1326,51 +1438,51 @@ if (verifyAdminCredentials($login, $password)) { ... }
 
 ### `checkIpBlockStatus(string $userIp, array $bfData): bool`
 
-**Проверка** **бана** **IP**.
+**Проверка бана IP**.
 
 ---
 
 ### `handleSuccessfulLogin(string $userIp, array $bfData): void`
 
-**Успешный** **вход** (**regenerate** **session**, **очистка** **attempts**).
+**Успешный вход** (**regenerate session**, **очистка attempts**).
 
 ---
 
 ### `handleFailedLogin(string $userIp, array $bfData): void`
 
-**Неудачная** **попытка** (**инкремент** **счётчика**, **бан**).
+**Неудачная попытка** (**инкремент счётчика**, **бан**).
 
 ---
 
 ### `getSecurityFormLockoutMinutes(string $userIp, array $bfData): int`
 
-**Сколько** **минут** **осталось** **до** **конца** **паузы** **подтверждения**
-**текущим** **паролем.** **0** — **можно** **пробовать.** **Считает** **по**
-`security_attempts` **и** **жёстким** **константам** `SECURITY_FORM_MAX_ATTEMPTS` /
-`SECURITY_FORM_LOCKOUT_MINUTES`, **настройки** **брутфорса** **не** **использует.**
+**Сколько минут осталось до конца паузы подтверждения**
+**текущим паролем. 0** — **можно пробовать. Считает по**
+`security_attempts` **и жёстким константам** `SECURITY_FORM_MAX_ATTEMPTS` /
+`SECURITY_FORM_LOCKOUT_MINUTES`, **настройки брутфорса не использует.**
 
 ---
 
 ### `endAdminSession(): void`
 
-**Полностью** **завершает** **сессию** **администратора:** **очищает** `$_SESSION`,
-**удаляет** **cookie** **сессии** **и** **вызывает** `session_destroy()`. **Используется**
-**при** **третьей** **ошибке** **пароля** **и** **по** **idle timeout.**
+**Полностью завершает сессию администратора: очищает** `$_SESSION`,
+**удаляет cookie сессии и вызывает** `session_destroy()`. **Используется**
+**при третьей ошибке пароля и по idle timeout.**
 
 ---
 
 ### `registerSecurityFormFailure(string $userIp, array $bfData): int`
 
-**Учитывает** **неверный** **текущий** **пароль.** **Пишет** **только**
-`security_attempts[$ip]`, **не** **трогая** `attempts`, **историю** **банов** **и**
-`permanent`. **Возвращает** **номер** **попытки** **в** **серии;** **на**
-`SECURITY_FORM_MAX_ATTEMPTS` **вызывающий** **код** **завершает** **сессию.**
+**Учитывает неверный текущий пароль. Пишет только**
+`security_attempts[$ip]`, **не трогая** `attempts`, **историю банов и**
+`permanent`. **Возвращает номер попытки в серии; на**
+`SECURITY_FORM_MAX_ATTEMPTS` **вызывающий код завершает сессию.**
 
 ---
 
 ### `handleLiveHashGeneration(string $newPassword): string`
 
-**Генерация** **хеша** **пароля** (**только** **до** **первой** **настройки**).
+**Генерация хеша пароля** (**только до первой настройки**).
 
 ---
 
@@ -1419,7 +1531,7 @@ GET-эндпоинт таймера. Продлевает сессию и отд
 
 ### `logAction(string $action, string $message, string $level = 'INFO', ?string $user = null): void`
 
-**Запись** **в** `config/logs/admin.log` (**по умолчанию**; путь настраивается в плагине `logs`).
+**Запись в** `config/logs/admin.log` (**по умолчанию**; путь настраивается в плагине `logs`).
 
 ```php
 logAction('page_save', 'Страница сохранена', 'INFO');
@@ -1436,7 +1548,7 @@ logAction('auth_failed', 'Неудачная попытка', 'WARNING');
 
 ### `rotateLog(string $logDir): void`
 
-**Ротация** **лога** **при** **превышении** **размера**.
+**Ротация лога при превышении размера**.
 
 ---
 
@@ -1485,7 +1597,7 @@ register_log_action('backup_create', 'Создание бэкапа', 'Бэка�
 
 ### `isBurgerEnabled(): bool`
 
-**Включён** **ли** **бургер**. Если ключа `burger_enabled` в настройках нет,
+**Включён ли бургер**. Если ключа `burger_enabled` в настройках нет,
 считается включённым: иначе меню на мобильных прячется, а открыть его нечем.
 Выключение — осознанный выбор пользователя.
 
@@ -1493,7 +1605,7 @@ register_log_action('backup_create', 'Создание бэкапа', 'Бэка�
 
 ### `getBurgerBreakpoint(): string`
 
-**Брейкпоинт** **бургера**: `sm`, `md`, `lg`, `xl`. Значение вне списка
+**Брейкпоинт бургера**: `sm`, `md`, `lg`, `xl`. Значение вне списка
 (и пустое) заменяется на `md` — оно подставляется в классы Tailwind.
 
 ```php
@@ -1507,7 +1619,7 @@ $breakpoint = getBurgerBreakpoint();
 
 ### `getPlainText(): string`
 
-**Название** **сайта** **без** **HTML-тегов**.
+**Название сайта без HTML-тегов**.
 
 ---
 

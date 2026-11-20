@@ -96,6 +96,7 @@ function _register_core_log_actions(): void {
         'Настройки' => ['icon' => 'settings', 'actions' => [
             'settings_save'     => 'Сохранение настроек сайта',
             'security_save'     => 'Сохранение настроек безопасности',
+            'mail_test'         => 'Проверка почтового агента',
         ]],
         'Файлы' => ['icon' => 'folder', 'actions' => [
             'file_upload'       => 'Загрузка файлов',

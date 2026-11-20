@@ -67,11 +67,11 @@ this.modules = JSON.parse(this.app.dataset.modules || '{}');
 this.data = JSON.parse(document.getElementById('constructor-data')?.value || '[]');
 ```
 
-**`this.data`** — **массив** **рядов** **из** `constructor-data` (**JSON**).
+**`this.data`** — **массив рядов из** `constructor-data` (**JSON**).
 
 ### `_jsId` — временный ID
 
-**Для** **каждого** **элемента** **генерируется** **уникальный** `_jsId`:
+**Для каждого элемента генерируется уникальный** `_jsId`:
 
 ```js
 function generateJsId(prefix) {
@@ -79,9 +79,9 @@ function generateJsId(prefix) {
 }
 ```
 
-**`_jsId`** **не** **сохраняется** **в** `pages/{id}.json` — **только** **для** **DOM**.
+**`_jsId` не сохраняется в** `pages/{id}.json` — **только для DOM**.
 
-**Валидация** **при** `init()`:
+**Валидация при** `init()`:
 ```js
 var idPattern = /^(row|col|mod)_\d+_[a-z0-9]+$/;
 if (!row._jsId || !idPattern.test(row._jsId)) {
@@ -91,7 +91,7 @@ if (!row._jsId || !idPattern.test(row._jsId)) {
 
 ### Рендеринг
 
-**`render()`** **проходит** **по** **зонам** (`constructor-zone`) **и** **рендерит** **ряды**:
+**`render()` проходит по зонам** (`constructor-zone`) **и рендерит ряды**:
 
 ```js
 const zones = document.querySelectorAll('.constructor-zone');
@@ -103,11 +103,11 @@ zones.forEach(zoneEl => {
 });
 ```
 
-**`renderRow()`** → **`renderColumn()`** → **`renderModule()`** — **шаблонные** **строки** **с** `escapeHtml()`.
+**`renderRow()`** → **`renderColumn()`** → **`renderModule()`** — **шаблонные строки с** `escapeHtml()`.
 
 ### Обновление данных
 
-**`updateFormData()`** — **синхронизирует** `this.data` **с** **скрытыми** **полями**:
+**`updateFormData()`** — **синхронизирует** `this.data` **с скрытыми полями**:
 
 ```js
 const rowsInput = document.getElementById('rows-json-input');
@@ -117,8 +117,8 @@ const dataEl = document.getElementById('constructor-data');
 if (dataEl) dataEl.value = JSON.stringify(this.data);
 ```
 
-**`rows-json-input`** — **скрытое** **поле** **формы** **страницы** (**идёт** **на** **сервер**).
-**`constructor-data`** — **для** **JS** (**при** **переключении** **шаблона**).
+**`rows-json-input`** — **скрытое поле формы страницы** (**идёт на сервер**).
+**`constructor-data`** — **для JS** (**при переключении шаблона**).
 
 ### Действия
 
@@ -140,7 +140,7 @@ if (dataEl) dataEl.value = JSON.stringify(this.data);
 - **`#module-select-modal`** — выбор модуля.
 - **`#module-settings-modal`** — настройки модуля.
 
-**Открытие** **настроек** — **AJAX** **на** `handleGetModuleSettings()`:
+**Открытие настроек** — **AJAX на** `handleGetModuleSettings()`:
 
 ```js
 const formData = new FormData();
@@ -164,10 +164,10 @@ fetch('index.php?tab=pages&action=edit&id=' + this.pageId + '&tab_edit=construct
 
 1. **CSRF-проверка** (**для** POST).
 2. **Валидация** `$moduleType` (**regex**).
-3. **Проверка** **существования** `config/modules/{id}/module.php`.
-4. **Подключение** **CSS**/**JS** **модуля**.
-5. **`include`** **файла** **module.php** **с** **буферизацией**.
-6. **Возврат** **HTML** **в** **JSON**.
+3. **Проверка существования** `config/modules/{id}/module.php`.
+4. **Подключение CSS**/**JS модуля**.
+5. **`include` файла module.php с буферизацией**.
+6. **Возврат HTML в JSON**.
 
 ```php
 if (!preg_match('~^[a-z0-9\-_]+$~i', $moduleType)) {
@@ -201,15 +201,15 @@ echo json_encode(['success' => true, 'html' => $html]);
 
 ### `handleSavePage()`
 
-**Сохранение** **страницы:**
+**Сохранение страницы:**
 
 1. **Валидация** `title`, `slug`, `template`, `status`.
-2. **Проверка** **уникальности** `slug`.
-3. **Сохранение** **в** `data/pages/{id}.json`.
-4. **Очистка** **кеша** **страницы**.
+2. **Проверка уникальности** `slug`.
+3. **Сохранение в** `data/pages/{id}.json`.
+4. **Очистка кеша страницы**.
 5. **Логирование**.
 
-**`rows`** **приходят** **в** `$_POST['rows_json']` (**JSON-строка**):
+**`rows` приходят в** `$_POST['rows_json']` (**JSON-строка**):
 
 ```php
 $rowsJson = $_POST['rows_json'] ?? '';
@@ -302,22 +302,22 @@ render() с сохранёнными данными
 
 ### Desktop + Mobile
 
-**В** **админке** — **две** **версии** **вывода** (`.desktop-only`, `.mobile-only`).
-**JS** **работает** **с** **обеими** (**одинаковые** **data-атрибуты**).
+**В админке** — **две версии вывода** (`.desktop-only`, `.mobile-only`).
+**JS работает с обеими** (**одинаковые data-атрибуты**).
 
-**Дублирование** **HTML** — **цена** **за** **адаптивность** **без** **JS** (**если** **JS** **отключён**).
+**Дублирование HTML** — **цена за адаптивность без JS** (**если JS отключён**).
 
 ### Кеш
 
-**После** **сохранения** **страницы** — **`clearPageCache()`** **очищает**:
+**После сохранения страницы** — **`clearPageCache()` очищает**:
 - `cache/pages/{slug}.html`.
 - `cache/assets/{pageId}.css`, `.js`.
 
 ### Валидация ID
 
-**`_jsId`** — **генерируется** **JS**, **валидируется** **regex** **при** **init**.
+**`_jsId`** — **генерируется JS**, **валидируется regex при init**.
 
-**`id`** (**постоянный**) — **от** **пользователя**, **экранируется** `e()`.
+**`id`** (**постоянный**) — **от пользователя**, **экранируется** `e()`.
 
 ---
 

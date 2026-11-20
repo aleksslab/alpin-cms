@@ -59,8 +59,9 @@
         "description": "Контактная информация, форма обратной связи и карта",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.5",
-        "author": "AlekSSLab"
+        "version": "1.0.7",
+        "author": "AlekSSLab",
+        "requires_mail": "form"
     },
     "faq": {
         "name": "FAQ (Вопрос-Ответ)",
@@ -76,9 +77,10 @@
         "icon": "icon-mail",
         "description": "Готовая форма обратной связи с настройками полей",
         "has_settings": true,
-        "version": "1.0.1",
+        "version": "1.0.3",
         "author": "AlekSSLab",
-        "auto_unpack": false
+        "auto_unpack": false,
+        "requires_mail": "module"
     },
     "stats": {
         "name": "Счетчики (Статистика)",
@@ -176,8 +178,9 @@
         "description": "Интерактивный квиз для сбора данных и квалификации лидов",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.1",
-        "author": "AlekSSLab"
+        "version": "1.0.3",
+        "author": "AlekSSLab",
+        "requires_mail": "module"
     },
     "social-icons": {
         "name": "Социальные иконки",

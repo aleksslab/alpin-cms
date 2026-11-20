@@ -53,9 +53,9 @@
             "type": "module",
             "name": "Контакты",
             "description": "Контактная информация, форма обратной связи и карта",
-            "version": "1.0.5",
+            "version": "1.0.7",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_contacts.zip",
-            "sha256": "6cb49fcddb344aa4b18641497119df70929a25b2c1c0e05b29f46d3fb8c0b8e1",
+            "sha256": "6c0ed1dae7e3b10d71f06ffe848cfe01d6103cdc3687056fd2a6d1c55b5e715b",
             "icon": "icon-phone"
         },
         "countdown": {
@@ -107,9 +107,9 @@
             "type": "module",
             "name": "Форма захвата лидов",
             "description": "Готовая форма обратной связи с настройками полей",
-            "version": "1.0.1",
+            "version": "1.0.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_lead-form.zip",
-            "sha256": "ebd633994f6e0827e26042340dba90af70c7e45daa07cf55c434429ef0309347",
+            "sha256": "f2a1dded2d3f68bb76d2bc2893037db8694a6d60d11b4bffd4e4f1703f770042",
             "icon": "icon-mail"
         },
         "map-advanced": {
@@ -143,9 +143,9 @@
             "type": "module",
             "name": "Квиз",
             "description": "Интерактивный квиз для сбора данных и квалификации лидов",
-            "version": "1.0.1",
+            "version": "1.0.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_quiz.zip",
-            "sha256": "194f7c5fde1a2760a58a64233e849ac568b5f99df333e9952181c34cadffaf1b",
+            "sha256": "296c34a7e50c2edbead7b468f62a30f057bf116262e3e1811e56d7695e5547e6",
             "icon": "icon-message-square"
         },
         "site-menu": {
@@ -224,9 +224,9 @@
             "type": "plugin",
             "name": "Резервное копирование",
             "description": "Создание, восстановление и скачивание резервных копий",
-            "version": "1.0.6",
+            "version": "1.0.7",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_backups.zip",
-            "sha256": "a34ab82798c8c2ecbcd27e97b2d05103fbd4a7ac734070a21ce00a92c95f43d1"
+            "sha256": "28bbe00bac37bb3a2331349f7858f29fa14983974917bf4f278ea73e72efced5"
         },
         "cookie-banner": {
             "type": "plugin",
@@ -256,9 +256,9 @@
             "type": "plugin",
             "name": "Проводник (Файлы)",
             "description": "Файловый менеджер: структура проекта, загрузка медиа, правка кода, CHMOD.",
-            "version": "1.0.3",
+            "version": "1.0.4",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_filemanager.zip",
-            "sha256": "2720301568408df7011e14aef09a36bd277a351f7e10bf43775966facffad0d2"
+            "sha256": "94c9c964ef04285adbf5f14d662b8dc3ba698c96845ff2f195c7b1a2010f840a"
         },
         "history": {
             "type": "plugin",

@@ -347,3 +347,106 @@ function verifyCsrfToken(?string $token): bool {
 function isValidId(string $id): bool {
     return $id !== '' && preg_match('/^[a-z0-9\-_]+$/i', $id) === 1;
 }
+
+/**
+ * Возвращает pepper-ключ для обратимого шифрования секретов.
+ *
+ * Файл `config/data/.pepper` общий с паролями администратора: он создаётся
+ * при необходимости и закрыт `.htaccess` вместе с каталогом. Без pepper
+ * шифрование и расшифровка недоступны — возвращается пустая строка.
+ *
+ * @return string Pepper или пустая строка при ошибке
+ */
+function cms_secret_pepper(): string {
+    $path = defined('CMS_PEPPER_FILE')
+        ? CMS_PEPPER_FILE
+        : APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . '.pepper';
+
+    if (!is_file($path)) {
+        try {
+            $random = bin2hex(random_bytes(32));
+        } catch (Exception $e) {
+            return '';
+        }
+
+        if (@file_put_contents($path, $random, LOCK_EX) === false) {
+            return '';
+        }
+
+        @chmod($path, 0600);
+    }
+
+    $pepper = @file_get_contents($path);
+
+    return $pepper === false ? '' : trim($pepper);
+}
+
+/**
+ * Обратимо шифрует секрет (AES-256-CBC + pepper).
+ *
+ * Формат совместим с прежним шифрованием паролей бэкапов:
+ * `base64(IV . base64(шифртекст))`. Контекст задаёт соль, поэтому разные
+ * секреты нельзя расшифровать чужим контекстом. Это защита от случайной
+ * утечки (экспорт, файловый менеджер, бэкап), а не от чтения всего диска:
+ * pepper лежит рядом с конфигом.
+ *
+ * @param string $plain   Открытое значение
+ * @param string $context Соль-контекст (например, 'cms_backup_secure_salt')
+ * @return string Base64-строка или пустая строка при ошибке
+ */
+function cms_encrypt_secret(string $plain, string $context = 'cms_secret'): string {
+    if ($plain === '') {
+        return '';
+    }
+
+    $pepper = cms_secret_pepper();
+    if ($pepper === '') {
+        return '';
+    }
+
+    $key = hash_hmac('sha256', $context, $pepper);
+    $ivLength = openssl_cipher_iv_length('aes-256-cbc');
+    $iv = openssl_random_pseudo_bytes($ivLength);
+    $encrypted = openssl_encrypt($plain, 'aes-256-cbc', $key, 0, $iv);
+
+    if ($encrypted === false) {
+        return '';
+    }
+
+    return base64_encode($iv . $encrypted);
+}
+
+/**
+ * Расшифровывает секрет, созданный cms_encrypt_secret().
+ *
+ * @param string $encoded Base64-строка из конфига
+ * @param string $context Соль-контекст, тот же, что при шифровании
+ * @return string Открытое значение или пустая строка при ошибке
+ */
+function cms_decrypt_secret(string $encoded, string $context = 'cms_secret'): string {
+    if ($encoded === '') {
+        return '';
+    }
+
+    $pepper = cms_secret_pepper();
+    if ($pepper === '') {
+        return '';
+    }
+
+    $data = base64_decode($encoded, true);
+    if ($data === false) {
+        return '';
+    }
+
+    $ivLength = openssl_cipher_iv_length('aes-256-cbc');
+    if (strlen($data) <= $ivLength) {
+        return '';
+    }
+
+    $key = hash_hmac('sha256', $context, $pepper);
+    $iv = substr($data, 0, $ivLength);
+    $encrypted = substr($data, $ivLength);
+    $result = openssl_decrypt($encrypted, 'aes-256-cbc', $key, 0, $iv);
+
+    return $result === false ? '' : $result;
+}

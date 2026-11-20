@@ -26,6 +26,34 @@ function handle_admin_ajax_actions(): void {
         handleGetModuleSettings();
         exit;
     }
+
+    // --- ПОЧТА: ТЕСТОВОЕ ПИСЬМО ---
+    if (isset($_GET['ajax']) && $_GET['ajax'] === 'mail_test' && isset($_GET['tab']) && $_GET['tab'] === 'config_vars') {
+        header('Content-Type: application/json; charset=utf-8');
+
+        if (!verifyCsrfToken($_POST['csrf_token'] ?? null)) {
+            echo json_encode(['success' => false, 'error' => 'Ошибка безопасности: CSRF-токен невалиден.']);
+            exit;
+        }
+
+        $now = time();
+        $lastTest = (int)($_SESSION['mail_test_at'] ?? 0);
+        if ($now - $lastTest < 5) {
+            echo json_encode(['success' => false, 'error' => 'Подождите несколько секунд перед повторной проверкой.']);
+            exit;
+        }
+        $_SESSION['mail_test_at'] = $now;
+
+        $result = mail_test_from_post($_POST);
+        logAction(
+            'mail_test',
+            $result['success'] ? 'Тестовое письмо отправлено' : 'Ошибка теста почты: ' . $result['error'],
+            $result['success'] ? 'INFO' : 'ERROR'
+        );
+
+        echo json_encode(['success' => $result['success'], 'error' => $result['error']]);
+        exit;
+    }
     
     // --- КОНСТРУКТОР ---
     if (isset($_GET['ajax']) && $_GET['ajax'] == 1 && isset($_GET['tab_edit']) && $_GET['tab_edit'] === 'constructor') {

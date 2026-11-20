@@ -1,6 +1,6 @@
 # Документация AlPin CMS
 
-Полный индекс документации. **Выбери** **раздел** **под** **свою** **роль**.
+Полный индекс документации. **Выбери раздел под свою роль**.
 
 ---
 
@@ -8,65 +8,65 @@
 
 | Я — ... | Мне нужно | Раздел |
 |---------|-----------|--------|
-| **Владелец** **сайта** | Установить, настроить, работать | [Для пользователей](#-для-пользователей) |
+| **Владелец сайта** | Установить, настроить, работать | [Для пользователей](#-для-пользователей) |
 | **Разработчик** | Понять архитектуру, писать модули | [Для разработчиков](#-для-разработчиков) |
 | **DevOps** | Настроить **безопасность**, **бэкапы** | [SECURITY_SETUP.md](for-users/SECURITY_SETUP.md) |
-| **Новичок** | Начать **с** **нуля** | [INSTALL.md](for-users/INSTALL.md) → [ADMIN_GUIDE.md](for-users/ADMIN_GUIDE.md) |
+| **Новичок** | Начать **с нуля** | [INSTALL.md](for-users/INSTALL.md) → [ADMIN_GUIDE.md](for-users/ADMIN_GUIDE.md) |
 
 ---
 
 ## 📚 Для пользователей
 
-**Документация** **для** **тех**, **кто** **работает** **с** **CMS** **через** **админку**.
+**Документация для тех**, **кто работает с CMS через админку**.
 
 | # | Файл | О чём |
 |---|------|-------|
-| 1 | [INSTALL.md](for-users/INSTALL.md) | Установка на хостинг (**требования**, **права**, **первый** **вход**) |
+| 1 | [INSTALL.md](for-users/INSTALL.md) | Установка на хостинг (**требования**, **права**, **первый вход**) |
 | 2 | [ADMIN_GUIDE.md](for-users/ADMIN_GUIDE.md) | Обзор **админки** (**вкладки**, **действия**) |
-| 3 | [CONSTRUCTOR_GUIDE.md](for-users/CONSTRUCTOR_GUIDE.md) | Работа **с** **конструктором** (**ряды**, **колонки**, **модули**) |
+| 3 | [CONSTRUCTOR_GUIDE.md](for-users/CONSTRUCTOR_GUIDE.md) | Работа **с конструктором** (**ряды**, **колонки**, **модули**) |
 | 4 | [SETTINGS_GUIDE.md](for-users/SETTINGS_GUIDE.md) | Настройки **сайта** (**цвета**, **хедер**, **футер**, **SEO**) |
 | 5 | [BACKUPS.md](for-users/BACKUPS.md) | Резервное **копирование**, **восстановление** |
-| 6 | [SECURITY_SETUP.md](for-users/SECURITY_SETUP.md) | Настройка **безопасности** **на** **проде** (**HTTPS**, **CHMOD**, **DEBUG**) |
-| 7 | [FAQ.md](for-users/FAQ.md) | Частые **проблемы** **и** **решения** |
+| 6 | [SECURITY_SETUP.md](for-users/SECURITY_SETUP.md) | Настройка **безопасности на проде** (**HTTPS**, **CHMOD**, **DEBUG**) |
+| 7 | [FAQ.md](for-users/FAQ.md) | Частые **проблемы и решения** |
 
 ### С чего начать
 
-**Если** **ты** **только** **что** **скачал** **CMS:**
+**Если ты только что скачал CMS:**
 
 1. **Прочитай** [INSTALL.md](for-users/INSTALL.md) — **установи**.
 2. **Прочитай** [ADMIN_GUIDE.md](for-users/ADMIN_GUIDE.md) — **осмотрись**.
-3. **Прочитай** [CONSTRUCTOR_GUIDE.md](for-users/CONSTRUCTOR_GUIDE.md) — **создай** **первую** **страницу**.
-4. **Настрой** **сайт** — [SETTINGS_GUIDE.md](for-users/SETTINGS_GUIDE.md).
-5. **Настрой** **безопасность** — [SECURITY_SETUP.md](for-users/SECURITY_SETUP.md).
+3. **Прочитай** [CONSTRUCTOR_GUIDE.md](for-users/CONSTRUCTOR_GUIDE.md) — **создай первую страницу**.
+4. **Настрой сайт** — [SETTINGS_GUIDE.md](for-users/SETTINGS_GUIDE.md).
+5. **Настрой безопасность** — [SECURITY_SETUP.md](for-users/SECURITY_SETUP.md).
 
 ---
 
 ## 💻 Для разработчиков
 
-**Документация** **для** **тех**, **кто** **пишет** **код** (**модули**, **шаблоны**, **ядро**).
+**Документация для тех**, **кто пишет код** (**модули**, **шаблоны**, **ядро**).
 
 | # | Файл | О чём |
 |---|------|-------|
-| 1 | [ARCHITECTURE.md](for-developers/ARCHITECTURE.md) | Общая **архитектура**, **поток** **запроса**, **структура** **папок** |
-| 2 | [API.md](for-developers/API.md) | Все **функции** **ядра** (**чтение**, **запись**, **безопасность**) |
-| 3 | [MODULES.md](for-developers/MODULES.md) | Как **писать** **модуль** (**структура** **ZIP**, `manifest.json`) |
-| 4 | [PLUGINS.md](for-developers/PLUGINS.md) | Как **писать** **плагин** (**хуки**, **манифест**, `admin-page.php`) |
-| 5 | [TEMPLATES.md](for-developers/TEMPLATES.md) | Как **добавить** **хедер**/**футер**/**шаблон** |
-| 6 | [CONSTRUCTOR.md](for-developers/CONSTRUCTOR.md) | Как **работает** **конструктор** **внутри** |
+| 1 | [ARCHITECTURE.md](for-developers/ARCHITECTURE.md) | Общая **архитектура**, **поток запроса**, **структура папок** |
+| 2 | [API.md](for-developers/API.md) | Все **функции ядра** (**чтение**, **запись**, **безопасность**) |
+| 3 | [MODULES.md](for-developers/MODULES.md) | Как **писать модуль** (**структура ZIP**, `manifest.json`) |
+| 4 | [PLUGINS.md](for-developers/PLUGINS.md) | Как **писать плагин** (**хуки**, **манифест**, `admin-page.php`) |
+| 5 | [TEMPLATES.md](for-developers/TEMPLATES.md) | Как **добавить хедер**/**футер**/**шаблон** |
+| 6 | [CONSTRUCTOR.md](for-developers/CONSTRUCTOR.md) | Как **работает конструктор внутри** |
 | 7 | [DATA_STRUCTURE.md](for-developers/DATA_STRUCTURE.md) | Все **JSON-структуры** |
-| 8 | [SECURITY.md](for-developers/SECURITY.md) | Меры **безопасности**, **чек-лист** **при** **добавлении** **кода** |
+| 8 | [SECURITY.md](for-developers/SECURITY.md) | Меры **безопасности**, **чек-лист при добавлении кода** |
 | 9 | [CHANGELOG.md](for-developers/CHANGELOG.md) | История **версий** |
 
 ### С чего начать
 
-**Если** **ты** **только** **что** **присоединился** **к** **проекту:**
+**Если ты только что присоединился к проекту:**
 
-1. **Прочитай** [ARCHITECTURE.md](for-developers/ARCHITECTURE.md) — **пойми** **каркас**.
-2. **Прочитай** [API.md](for-developers/API.md) — **изучи** **функции**.
-3. **Прочитай** [DATA_STRUCTURE.md](for-developers/DATA_STRUCTURE.md) — **разберись** **с** **данными**.
-4. **Если** **пишешь** **модуль** — [MODULES.md](for-developers/MODULES.md).
-5. **Если** **пишешь** **шаблон** — [TEMPLATES.md](for-developers/TEMPLATES.md).
-6. **Перед** **коммитом** — **проверь** **чек-лист** **в** [SECURITY.md](for-developers/SECURITY.md).
+1. **Прочитай** [ARCHITECTURE.md](for-developers/ARCHITECTURE.md) — **пойми каркас**.
+2. **Прочитай** [API.md](for-developers/API.md) — **изучи функции**.
+3. **Прочитай** [DATA_STRUCTURE.md](for-developers/DATA_STRUCTURE.md) — **разберись с данными**.
+4. **Если пишешь модуль** — [MODULES.md](for-developers/MODULES.md).
+5. **Если пишешь шаблон** — [TEMPLATES.md](for-developers/TEMPLATES.md).
+6. **Перед коммитом** — **проверь чек-лист в** [SECURITY.md](for-developers/SECURITY.md).
 
 ---
 
@@ -151,9 +151,9 @@ docs/
 
 ## 📞 Помощь
 
-- **Не нашёл** **ответ** — [FAQ.md](for-users/FAQ.md).
+- **Не нашёл ответ** — [FAQ.md](for-users/FAQ.md).
 - **Баг** — [GitHub Issues](https://github.com/AlekSSLab/alpin-cms/issues).
-- **Идея** — **создай** **issue** **с** **меткой** `enhancement`.
+- **Идея** — **создай issue с меткой** `enhancement`.
 
 ---
 
@@ -161,19 +161,19 @@ docs/
 
 - **Язык:** русский.
 - **Формат:** Markdown.
-- **Структура:** один **файл** = **одна** **тема**.
-- **Ссылки:** относительные (**между** **документами**).
-- **Примеры:** **реальные** **сниппеты** **кода**.
-- **Эмодзи:** **для** **наглядности** (**не** **для** **украшения**).
+- **Структура:** один **файл** = **одна тема**.
+- **Ссылки:** относительные (**между документами**).
+- **Примеры: реальные сниппеты кода**.
+- **Эмодзи: для наглядности** (**не для украшения**).
 
 ---
 
 ## 🤝 Вклад в документацию
 
-**Нашёл** **ошибку** **или** **опечатку?**
+**Нашёл ошибку или опечатку?**
 
-1. **Форкни** **репозиторий**.
-2. **Внеси** **правку**.
-3. **Создай** **PR** **с** **описанием**.
+1. **Форкни репозиторий**.
+2. **Внеси правку**.
+3. **Создай PR с описанием**.
 
 **Подробнее:** [CONTRIBUTING.md](../CONTRIBUTING.md).

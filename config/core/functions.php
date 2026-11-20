@@ -16,6 +16,9 @@ $GLOBALS['DATA_CACHE'] = [];
 // Безопасность кода: экранирование, запись файлов, ZIP, CSRF, ID
 require_once __DIR__ . '/security.php';
 
+// Почтовый агент: SMTP-конфиг и отправка писем
+require_once __DIR__ . '/mail.php';
+
 // Система хуков (Actions, Filters, Routes)
 require_once __DIR__ . '/hooks.php';
 

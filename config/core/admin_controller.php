@@ -643,6 +643,16 @@ function handleSaveSettings(): array {
         // Плагины: настройки сохранены (SEO, кеш, .min и т.п.)
         do_action('settings_saved', $oldSettings, $newSettings);
 
+        // Секция «Почта»: свои поля форма сайта шлёт сюда, но живут они
+        // в отдельном mail_config.json, а не в settings.json.
+        $mailError = '';
+        if (post_flag('mail_config_section')) {
+            $mailResult = mail_save_from_post($_POST);
+            if (empty($mailResult['success'])) {
+                $mailError = (string)($mailResult['error'] ?? 'не удалось сохранить настройки почты');
+            }
+        }
+
         // Настройки влияют на все страницы (контакты, логотип, custom_css,
         // варианты хедера и футера, настройки ассетов) — сбрасываем кеш
         // целиком, иначе он отдаёт старую вёрстку до истечения TTL.
@@ -656,7 +666,11 @@ function handleSaveSettings(): array {
             createMinFilesForAllModules($newSettings);
         }
         
-        setFlash('Настройки ' . $source . ' успешно сохранены!');
+        if ($mailError !== '') {
+            setFlash('Настройки ' . $source . ' сохранены, но почта: ' . $mailError, 'warning', 8);
+        } else {
+            setFlash('Настройки ' . $source . ' успешно сохранены!');
+        }
         
         // Проверяем, откуда пришел запрос (для возврата на нужную вкладку)
         $returnUrl = $_POST['return_url'] ?? 'index.php?tab=config_vars';
@@ -1657,14 +1671,52 @@ function handleGetModuleSettings(): void {
     $moduleData = $moduleData;
     $moduleSettings = $moduleSettings;
     
+    // Зависимость от почты модуль объявляет сам (`requires_mail` в манифесте),
+    // ядро читает её из реестра и не держит список ID. Модуль, который без
+    // почты исчезает целиком, настраивать нечего — вместо полей показываем
+    // предупреждение. Если скрывается только форма, настройки остаются
+    // рабочими, сверху добавляем пометку.
+    $mailMode = '';
+    $mailAgentMissing = false;
+
+    if (function_exists('mail_dependent_modules') && function_exists('mail_agent_is_configured')) {
+        $mailDependentModules = mail_dependent_modules();
+        $mailMode = isset($mailDependentModules[$moduleType]) ? (string)$mailDependentModules[$moduleType] : '';
+        $mailAgentMissing = $mailMode !== '' && !mail_agent_is_configured();
+    }
+
     // Буферизация HTML
     ob_start();
-    
+
+    if ($mailAgentMissing && $mailMode === 'module') {
+        echo '<div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">';
+        echo '<p class="text-sm font-bold text-amber-800 flex items-center gap-2">';
+        echo '<span class="icon-triangle-alert text-amber-500 leading-none"></span>';
+        echo 'Почтовый агент не настроен</p>';
+        echo '<p class="text-xs text-amber-700 mt-1">Модуль не выводится на сайте, пока не настроена почта. ';
+        echo 'Настройте почту в «Настройках сайта» → «Почта (SMTP)», и поля вернутся.</p>';
+        echo '</div>';
+
+        $html = ob_get_clean();
+        echo json_encode(['success' => true, 'locked' => true, 'html' => $html]);
+        exit;
+    }
+
+    if ($mailAgentMissing && $mailMode === 'form') {
+        echo '<div class="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">';
+        echo '<p class="text-sm font-bold text-amber-800 flex items-center gap-2">';
+        echo '<span class="icon-triangle-alert text-amber-500 leading-none"></span>';
+        echo 'Почтовый агент не настроен</p>';
+        echo '<p class="text-xs text-amber-700 mt-1">Форма на сайте не выводится, остальное содержимое модуля остаётся. ';
+        echo 'Остальные настройки работают как обычно.</p>';
+        echo '</div>';
+    }
+
     // Подключаем CSS (если есть)
     if (file_exists($moduleDir . 'style.css')) {
         echo '<link rel="stylesheet" href="/config/modules/' . $moduleType . '/style.css">';
     }
-    
+
     // Основной файл модуля
     include $moduleFile;
     

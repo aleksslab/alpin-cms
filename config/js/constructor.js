@@ -699,6 +699,7 @@ if (typeof PageConstructor === 'undefined') {
             this._editingModuleId = jsModId;
             this._editingModuleType = moduleType;
             this._editingModuleColId = colId;
+            this._moduleSettingsLocked = false;
 
             const titleEl = document.getElementById('settings-module-name');
             const info = this.modules[moduleType] || {};
@@ -740,6 +741,7 @@ if (typeof PageConstructor === 'undefined') {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
+                        this._moduleSettingsLocked = data.locked === true;
                         content.innerHTML = data.html;
                         this.executeScripts(content);
                     } else {
@@ -809,6 +811,7 @@ if (typeof PageConstructor === 'undefined') {
             this._editingModuleId = null;
             this._editingModuleType = null;
             this._editingModuleColId = null;
+            this._moduleSettingsLocked = false;
         }
 
         saveModuleSettings() {
@@ -817,6 +820,13 @@ if (typeof PageConstructor === 'undefined') {
 
             if (!moduleId || !moduleType) {
                 alert('Модуль не найден');
+                return;
+            }
+
+            // Поля не выводились (например, не настроен почтовый агент).
+            // Сохранять нечего: иначе данные модуля затрутся пустым набором.
+            if (this._moduleSettingsLocked) {
+                this.closeModuleSettings();
                 return;
             }
 

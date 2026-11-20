@@ -238,7 +238,7 @@ function _moduleCleanupRuntime(): void {
  * @return array
  */
 function _moduleRegistryEntry(array $manifest, string $moduleId): array {
-    return [
+    $entry = [
         'name' => $manifest['name'] ?? $moduleId,
         'icon' => $manifest['icon'] ?? 'icon-box',
         'description' => $manifest['description'] ?? '',
@@ -247,6 +247,17 @@ function _moduleRegistryEntry(array $manifest, string $moduleId): array {
         'version' => $manifest['version'] ?? '1.0.0',
         'author' => $manifest['author'] ?? ''
     ];
+
+    // Зависимость от почтового агента объявляет сам модуль в manifest.json:
+    // `form` — без почты скрывается только форма, `module` — модуль целиком.
+    // Ядро не держит список ID: оно читает признак из реестра.
+    $requiresMail = $manifest['requires_mail'] ?? '';
+
+    if ($requiresMail === 'form' || $requiresMail === 'module' || $requiresMail === true) {
+        $entry['requires_mail'] = $requiresMail === 'form' ? 'form' : 'module';
+    }
+
+    return $entry;
 }
 
 /**
@@ -810,6 +821,14 @@ function syncModulesData(): array {
                 $changed = true;
             }
         }
+
+        // Манифест мог перестать объявлять зависимость от почты — убираем
+        // устаревший флаг, иначе предупреждения останутся навсегда.
+        if (!isset($entries[$id]['requires_mail']) && isset($merged['requires_mail'])) {
+            unset($merged['requires_mail']);
+            $changed = true;
+        }
+
         $result[$id] = $merged;
         unset($entries[$id]);
     }

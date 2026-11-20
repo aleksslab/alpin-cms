@@ -7,6 +7,19 @@ if (!defined('APP_ROOT') || empty($_SESSION['admin_auth'])) {
 $modules = getModulesData();
 $token = $_SESSION['csrf_token'] ?? '';
 
+// Модули, объявившие зависимость от почты (`requires_mail` в манифесте):
+// без почтового агента такие формы на сайте не выводятся.
+$mailDependentModules = mail_dependent_modules();
+$mailAgentReady = mail_agent_is_configured();
+$hasMailModule = false;
+
+foreach (array_keys($mailDependentModules) as $mailModuleId) {
+    if (isModuleInstalled($mailModuleId)) {
+        $hasMailModule = true;
+        break;
+    }
+}
+
 // Доступные для установки модули и обновления из кеша каталога
 $cacheFile = DATA_DIR . 'updates_cache.json';
 $newModules = [];
@@ -55,6 +68,23 @@ uasort($modules, function ($a, $b) {
 </div>
 
 <?php echo renderFlash(); ?>
+
+<?php if ($hasMailModule && !$mailAgentReady): ?>
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+    <span class="icon-triangle-alert text-amber-500 text-lg leading-none"></span>
+    <div class="text-sm text-amber-800 flex-1">
+        <p class="font-bold">Почтовый агент не настроен</p>
+        <p class="text-xs mt-1">
+            Модули, которым нужна почта, работают на сайте не полностью: часть
+            скрывается целиком, у части пропадает только форма.
+        </p>
+    </div>
+    <a href="index.php?tab=config_vars"
+       class="px-4 py-2.5 bg-white border border-amber-200 text-amber-800 font-bold rounded-xl hover:bg-amber-100 transition-all text-sm text-center whitespace-nowrap">
+        Настроить почту
+    </a>
+</div>
+<?php endif; ?>
 
 <!-- Подключаем модалку загрузки -->
 <?php include __DIR__ . '/module_upload.php'; ?>
@@ -113,6 +143,13 @@ uasort($modules, function ($a, $b) {
                 </div>
                 <?php /* В onclick двойное экранирование: escapeJsString() — для JS-строки, e() — для HTML-атрибута. */ ?>
                 <div class="flex gap-1 items-center flex-shrink-0">
+                    <?php if (isset($mailDependentModules[$id]) && $isInstalled && !$mailAgentReady): ?>
+                        <?php $mailMode = $mailDependentModules[$id]; ?>
+                        <span class="text-[8px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full"
+                              title="Почтовый агент не настроен — <?php echo $mailMode === 'form' ? 'форма модуля' : 'модуль'; ?> на сайте не выводится">
+                            <?php echo $mailMode === 'form' ? 'форма скрыта' : 'модуль скрыт'; ?>
+                        </span>
+                    <?php endif; ?>
                     <?php if ($updateInfo): ?>
                         <span class="text-[8px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">
                             v<?php echo e($updateInfo['current'] ?? '?'); ?> → v<?php echo e($updateInfo['latest'] ?? '?'); ?>

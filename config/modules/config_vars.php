@@ -78,6 +78,7 @@ $token = $_SESSION['csrf_token'] ?? '';
         // 1. Секции ядра
         $sectionsCore = [
             'contacts',
+            'mail',
             'visual', 
             'colors',
             'header',
@@ -108,6 +109,18 @@ $token = $_SESSION['csrf_token'] ?? '';
                     $ordered[] = $id;
                 }
             }
+
+            // Секция «Почта» появилась позже, чем сохранили порядок:
+            // ставим её сразу после контактов, а не в конец списка.
+            if (!in_array('mail', $ordered, true)) {
+                $contactsPos = array_search('contacts', $ordered, true);
+                if ($contactsPos === false) {
+                    $ordered[] = 'mail';
+                } else {
+                    array_splice($ordered, $contactsPos + 1, 0, ['mail']);
+                }
+            }
+
             foreach ($allSectionIds as $id) {
                 if (!in_array($id, $ordered)) {
                     $ordered[] = $id;
@@ -183,6 +196,7 @@ foreach ($minifyExceptions as $id => $data) {
         $list = [];
         $titlesCore = [
             'contacts' => 'Контактная информация',
+            'mail' => 'Почта (SMTP)',
             'visual' => 'Визуальные элементы',
             'colors' => 'Цветовая схема',
             'header' => 'Настройки хедера',
@@ -215,22 +229,9 @@ foreach ($minifyExceptions as $id => $data) {
         const container = document.getElementById('sections-list-container');
         if (!modal || !container) return;
 
-        // Сортируем: сначала те, что в savedOrder, потом остальные
-        const savedOrder = JSON.parse(document.getElementById('config_sections_order_json').value || '[]');
-        currentSections = [];
-        
-        // Добавляем из savedOrder
-        savedOrder.forEach(id => {
-            const found = allSections.find(s => s.id === id);
-            if (found) currentSections.push(found);
-        });
-        
-        // Добавляем остальные
-        allSections.forEach(s => {
-            if (!currentSections.find(item => item.id === s.id)) {
-                currentSections.push(s);
-            }
-        });
+        // Порядок уже применён на сервере — берём его как есть,
+        // иначе новые секции уезжают в конец списка.
+        currentSections = allSections.slice();
 
         renderSectionsList();
         modal.classList.add('active');
