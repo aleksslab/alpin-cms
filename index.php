@@ -196,7 +196,7 @@ $twitterImage = !empty(TWITTER_IMAGE) ? TWITTER_IMAGE : $ogImage;
     </button>
     
     <?php // POLICY MODAL ?>
-    <div id="policy-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div id="policy-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
         <div class="bg-white rounded-[2rem] w-full max-w-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
             <div class="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between">
                 <h2 id="modal-title" class="text-xl md:text-2xl font-bold text-slate-800"></h2>

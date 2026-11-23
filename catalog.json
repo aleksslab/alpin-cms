@@ -228,6 +228,14 @@
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_backups.zip",
             "sha256": "28bbe00bac37bb3a2331349f7858f29fa14983974917bf4f278ea73e72efced5"
         },
+        "callback": {
+            "type": "plugin",
+            "name": "Обратный звонок",
+            "description": "Плавающая кнопка и мини-форма заказа звонка с журналом заявок",
+            "version": "1.0.0",
+            "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_callback.zip",
+            "sha256": "8b2d987711c870f3788cdd51eac1df2cd3fab8e3139975a9383ba6b278b12a76"
+        },
         "cookie-banner": {
             "type": "plugin",
             "name": "Cookie-баннер",
@@ -240,9 +248,9 @@
             "type": "plugin",
             "name": "Cookie-согласие",
             "description": "Категории cookie, баннер с выбором и активация скриптов только после явного согласия посетителя.",
-            "version": "1.0.6",
+            "version": "1.0.7",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-consent.zip",
-            "sha256": "b824f123ef00e49b4d5c9c1fc225943f84bcbdc27cb887a35fa73d0f0b68fa28"
+            "sha256": "aacfbd7c56cca48db9e14bf6d2602bb1727f76bc126bbd0ba43ba902bc2fb7fe"
         },
         "dark-theme": {
             "type": "plugin",

@@ -77,7 +77,6 @@
 
         document.body.style.overflow = 'hidden';
         modal.classList.replace('hidden', 'flex');
-        modal.style.zIndex = '100';
         
         body.classList.add('flex', 'justify-center');
         body.innerHTML = '<span class="loader"></span>';
