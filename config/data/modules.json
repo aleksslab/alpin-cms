@@ -36,9 +36,9 @@
         "author": "AlekSSLab"
     },
     "text": {
-        "name": "Произвольный HTML\/текст",
+        "name": "Произвольный HTML/текст",
         "icon": "icon-file-text",
-        "description": "Блок с произвольным HTML\/текстом",
+        "description": "Блок с произвольным HTML/текстом",
         "has_settings": true,
         "auto_unpack": false,
         "version": "1.0.1",
@@ -59,7 +59,7 @@
         "description": "Контактная информация, форма обратной связи и карта",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.7",
+        "version": "1.0.8",
         "author": "AlekSSLab",
         "requires_mail": "form"
     },
@@ -124,7 +124,7 @@
         "description": "Отзывы клиентов с фото, видео и рейтингом",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.3",
+        "version": "1.0.4",
         "author": "AlekSSLab"
     },
     "before-after": {
@@ -148,7 +148,7 @@
     "pricing": {
         "name": "Тарифная сетка",
         "icon": "icon-credit-card",
-        "description": "Тарифы с переключателем месячной\/годовой оплаты",
+        "description": "Тарифы с переключателем месячной/годовой оплаты",
         "has_settings": true,
         "auto_unpack": false,
         "version": "1.0.0",
@@ -160,7 +160,7 @@
         "description": "Интерактивная карта с кастомными метками",
         "has_settings": true,
         "auto_unpack": false,
-        "version": "1.0.5",
+        "version": "1.0.6",
         "author": "AlekSSLab"
     },
     "portfolio": {

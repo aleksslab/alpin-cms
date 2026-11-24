@@ -1,6 +1,6 @@
 {
     "core": {
-        "version": "2.1.0",
+        "version": "2.2.0",
         "download_url": "https:\/\/github.com\/AlekSSLab\/alpin-cms\/releases\/latest"
     },
     "extensions": {
@@ -53,9 +53,9 @@
             "type": "module",
             "name": "Контакты",
             "description": "Контактная информация, форма обратной связи и карта",
-            "version": "1.0.7",
+            "version": "1.0.8",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_contacts.zip",
-            "sha256": "6c0ed1dae7e3b10d71f06ffe848cfe01d6103cdc3687056fd2a6d1c55b5e715b",
+            "sha256": "a098e7d968db5d257730f0047d474bc8257f2c64585fb61d267ff4ba07fae5c9",
             "icon": "icon-phone"
         },
         "countdown": {
@@ -116,9 +116,9 @@
             "type": "module",
             "name": "Яндекс.Карты",
             "description": "Интерактивная карта с кастомными метками",
-            "version": "1.0.5",
+            "version": "1.0.6",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_map-advanced.zip",
-            "sha256": "1fde4944f898003528d0b33146bf073902515e56eb8f2fe8a93340350bce13cc",
+            "sha256": "8a37c45be0f8c4c5bc1eab92f24739c38eff4e78cdfeb8b076cb54438513f4d9",
             "icon": "icon-map-pin"
         },
         "portfolio": {
@@ -188,9 +188,9 @@
             "type": "module",
             "name": "Отзывы клиентов",
             "description": "Отзывы клиентов с фото, видео и рейтингом",
-            "version": "1.0.3",
+            "version": "1.0.4",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/mod_testimonials.zip",
-            "sha256": "73d74d8a1221c9ee6bd68ba92c2901c19064e876ac5aa33750745d8ab02edcc2",
+            "sha256": "d6fca218e9eb8c2b980d6fe3dd8d7475926e6aebdff70f0c5d24ce89ab5a93ea",
             "icon": "icon-message-square"
         },
         "text-media": {
@@ -232,25 +232,25 @@
             "type": "plugin",
             "name": "Обратный звонок",
             "description": "Плавающая кнопка и мини-форма заказа звонка с журналом заявок",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_callback.zip",
-            "sha256": "8b2d987711c870f3788cdd51eac1df2cd3fab8e3139975a9383ba6b278b12a76"
+            "sha256": "a7b8c7847be8870ee766311b9a198e51484179817e5020e05aead52341ba46b7"
         },
         "cookie-banner": {
             "type": "plugin",
             "name": "Cookie-баннер",
             "description": "Настраиваемое уведомление о cookies: текст, ссылки на политику и условия, срок согласия.",
-            "version": "1.1.2",
+            "version": "1.1.3",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-banner.zip",
-            "sha256": "f640451c324df481d867e3fc149c8ad5dfb3cfc667b3a4905624938959f6ac77"
+            "sha256": "64599df5156bb9d9f6bd4f37fa8962518198167571a5220333b0d2231d680b2a"
         },
         "cookie-consent": {
             "type": "plugin",
             "name": "Cookie-согласие",
             "description": "Категории cookie, баннер с выбором и активация скриптов только после явного согласия посетителя.",
-            "version": "1.0.7",
+            "version": "1.0.8",
             "download_url": "https:\/\/raw.githubusercontent.com\/AlekSSLab\/alpin-cms\/main\/catalog\/plg_cookie-consent.zip",
-            "sha256": "aacfbd7c56cca48db9e14bf6d2602bb1727f76bc126bbd0ba43ba902bc2fb7fe"
+            "sha256": "06d2ef4b96b5f9083bb6d1eaba62f70a180b2e48a6cb00ebf8114d37dced1da5"
         },
         "dark-theme": {
             "type": "plugin",

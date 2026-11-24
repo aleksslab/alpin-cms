@@ -139,3 +139,210 @@
     }
 
 })();
+
+/**
+ * Реестр плавающих элементов у нижнего края окна.
+ *
+ * Элементы с одинаковой стороной встают друг над другом. Якоря (кнопка
+ * «наверх», баннер cookie) остаются на своём отступе из CSS, элементы
+ * с `above: true` (кнопка обратного звонка) поднимаются над ними.
+ * Оверлеи (баннер cookie-согласия) временно прячут элементы с `above`.
+ *
+ * Плагины регистрируют свои элементы после загрузки — реестр сам следит
+ * за размером и видимостью через ResizeObserver, слушателя прокрутки нет.
+ */
+(function () {
+    'use strict';
+
+    var GAP = 12;
+    var entries = [];
+    var timer = null;
+    var observer = (typeof window.ResizeObserver === 'function')
+        ? new window.ResizeObserver(schedule)
+        : null;
+
+    /**
+     * Проверяет, виден ли элемент.
+     *
+     * @param {Element} el
+     * @returns {boolean}
+     */
+    function isVisible(el) {
+        if (!el || !el.getClientRects().length) {
+            return false;
+        }
+
+        var style = window.getComputedStyle(el);
+
+        return style.display !== 'none' && style.visibility !== 'hidden';
+    }
+
+    /**
+     * Читает отступ снизу из CSS, не учитывая наш инлайн-стиль.
+     *
+     * Переход по `bottom` на время замера выключается: иначе
+     * getComputedStyle возвращает промежуточное значение анимации
+     * и элемент «залипает» на старом отступе.
+     *
+     * @param {Element} el
+     * @returns {number}
+     */
+    function cssBottom(el) {
+        var savedBottom = el.style.bottom;
+        var savedTransition = el.style.transition;
+
+        el.style.transition = 'none';
+        el.style.bottom = '';
+        var value = parseFloat(window.getComputedStyle(el).bottom);
+        el.style.bottom = savedBottom;
+        el.style.transition = savedTransition;
+
+        return isFinite(value) ? value : 0;
+    }
+
+    /**
+     * Возвращает базовый отступ элемента.
+     *
+     * @param {Object} entry
+     * @returns {number}
+     */
+    function baseOf(entry) {
+        if (typeof entry.base === 'function') {
+            return entry.base();
+        }
+
+        if (typeof entry.base === 'number') {
+            return entry.base;
+        }
+
+        return cssBottom(entry.el);
+    }
+
+    /**
+     * Пересчитывает положения элементов.
+     *
+     * @returns {void}
+     */
+    function layout() {
+        var overlay = null;
+
+        entries.forEach(function (entry) {
+            if (entry.overlay && isVisible(entry.el)) {
+                overlay = entry;
+            }
+        });
+
+        entries.forEach(function (entry) {
+            if (entry.above) {
+                entry.el.style.visibility = overlay ? 'hidden' : '';
+            }
+        });
+
+        if (overlay) {
+            return;
+        }
+
+        ['left', 'right'].forEach(function (side) {
+            var cursor = 0;
+
+            // Якоря остаются на своих местах, но задают высоту стека.
+            entries.forEach(function (entry) {
+                if (entry.overlay || entry.above || entry.side !== side || !isVisible(entry.el)) {
+                    return;
+                }
+
+                cursor = Math.max(cursor, baseOf(entry) + entry.el.getBoundingClientRect().height + GAP);
+            });
+
+            entries.forEach(function (entry) {
+                if (!entry.above || entry.side !== side || !isVisible(entry.el)) {
+                    return;
+                }
+
+                var bottom = Math.max(baseOf(entry), cursor);
+
+                entry.el.style.bottom = bottom + 'px';
+            });
+        });
+    }
+
+    /**
+     * Откладывает пересчёт: ResizeObserver может сработать пачкой.
+     *
+     * @returns {void}
+     */
+    function schedule() {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(layout, 60);
+    }
+
+    window.FloatStack = {
+        /**
+         * Регистрирует плавающий элемент.
+         *
+         * @param {Element} el
+         * @param {{side?: string, above?: boolean, overlay?: boolean, base?: number|function}} options
+         * @returns {void}
+         */
+        register: function (el, options) {
+            if (!el) {
+                return;
+            }
+
+            options = options || {};
+
+            entries.push({
+                el: el,
+                side: options.side === 'left' ? 'left' : 'right',
+                above: !!options.above,
+                overlay: !!options.overlay,
+                base: (options.base === undefined) ? null : options.base
+            });
+
+            if (observer) {
+                observer.observe(el);
+            }
+
+            layout();
+        },
+
+        /**
+         * Убирает элемент из реестра.
+         *
+         * @param {Element} el
+         * @returns {void}
+         */
+        unregister: function (el) {
+            entries = entries.filter(function (entry) {
+                return entry.el !== el;
+            });
+
+            if (observer) {
+                observer.unobserve(el);
+            }
+
+            layout();
+        },
+
+        /**
+         * Пересчитывает положения вручную.
+         *
+         * @returns {void}
+         */
+        refresh: layout
+    };
+
+    window.addEventListener('resize', schedule);
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', layout);
+    } else {
+        layout();
+    }
+
+    var backToTop = document.getElementById('back-to-top');
+
+    if (backToTop) {
+        window.FloatStack.register(backToTop, { side: 'right' });
+    }
+})();

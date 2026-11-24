@@ -107,7 +107,7 @@ define('SITE_CUSTOM_JS', $settings['custom_js'] ?? '');
 // 6. Размер загружаемых файлов
 define('MAX_UPLOAD_SIZE', 2 * 1024 * 1024);
 
-define('CMS_VERSION', '2.1.0'); // Версия ядра
+define('CMS_VERSION', '2.2.0'); // Версия ядра
 define('CONFIG_DIR', APP_ROOT . DIRECTORY_SEPARATOR . 'config');
 define('PLUGINS_DIR', CONFIG_DIR . DIRECTORY_SEPARATOR . 'plugins');
 define('CMS_LOGS_DIR', CONFIG_DIR . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR);
